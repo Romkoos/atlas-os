@@ -4,7 +4,7 @@
   "description": "Atlas OS — desktop control panel for AI tools (macOS)",
   "private": true,
   "type": "module",
-  "main": "./out/main/index.js",
+  "main": "./out/main/index.cjs",
   "author": "Roman Neganov",
   "license": "MIT",
   "engines": {
@@ -42,7 +42,6 @@
     "electron-store": "^11.0.2",
     "electron-trpc": "^0.7.1",
     "electron-updater": "^6.8.3",
-    "superjson": "^2.2.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -12,10 +12,13 @@ const alias = {
 export default defineConfig({
   main: {
     resolve: { alias },
-    plugins: [externalizeDepsPlugin()],
+    // CJS main: better-sqlite3 (native) and electron-trpc behave under require().
+    // electron-store v11 is ESM-only, so bundle it instead of externalizing.
+    plugins: [externalizeDepsPlugin({ exclude: ['electron-store'] })],
     build: {
       rollupOptions: {
         input: { index: resolve('src/main/index.ts') },
+        output: { format: 'cjs', entryFileNames: '[name].cjs' },
       },
     },
   },

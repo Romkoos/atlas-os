@@ -1,0 +1,26 @@
+import { z } from 'zod'
+import { CLAUDE_MODEL_IDS, DEFAULT_MODEL_ID } from './models'
+
+export const THEMES = ['system', 'light', 'dark'] as const
+export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
+
+export type Theme = (typeof THEMES)[number]
+export type LogLevel = (typeof LOG_LEVELS)[number]
+
+// Single source of truth for the settings shape (main store + renderer form).
+export const settingsSchema = z.object({
+  apiKey: z.string(),
+  model: z.enum(CLAUDE_MODEL_IDS),
+  outputDir: z.string().min(1, 'Choose an output folder'),
+  theme: z.enum(THEMES),
+  logLevel: z.enum(LOG_LEVELS),
+})
+
+export type AppSettings = z.infer<typeof settingsSchema>
+
+export const DEFAULT_SETTINGS: Omit<AppSettings, 'outputDir'> = {
+  apiKey: '',
+  model: DEFAULT_MODEL_ID,
+  theme: 'system',
+  logLevel: 'info',
+}

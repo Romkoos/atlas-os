@@ -1,8 +1,11 @@
 import type { AtlasBridge } from '@shared/bridge'
 import { contextBridge, ipcRenderer } from 'electron'
+import { exposeElectronTRPC } from 'electron-trpc/main'
 
-// Narrow, typed bridge. The only other thing exposed is electron-trpc's
-// `electronTRPC` channel (added in the infrastructure phase).
+// electron-trpc's typed IPC bridge → window.electronTRPC (consumed by ipcLink).
+exposeElectronTRPC()
+
+// Narrow, hand-written bridge for non-tRPC main→renderer signals.
 const atlas: AtlasBridge = {
   onNavigate(callback) {
     const listener = (_event: Electron.IpcRendererEvent, section: string) => callback(section)
