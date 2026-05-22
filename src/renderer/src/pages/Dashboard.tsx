@@ -37,6 +37,7 @@ function HealthBadge() {
 export function Dashboard() {
   const setSection = useUiStore((s) => s.setSection)
   const settings = trpc.settings.get.useQuery()
+  const utils = trpc.useUtils()
 
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
   const [output, setOutput] = useState('')
@@ -62,6 +63,7 @@ export function Dashboard() {
           break
         case 'done':
           setRunning(false)
+          void utils.stats.invalidate()
           toast.success(`Saved to ${event.filePath}`, {
             duration: 8000,
             action: {
