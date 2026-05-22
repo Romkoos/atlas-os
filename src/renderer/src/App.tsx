@@ -3,6 +3,7 @@ import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Settings } from '@renderer/pages/Settings'
+import { Skills } from '@renderer/pages/Skills'
 import { Stats } from '@renderer/pages/Stats'
 import { useResolvedTheme } from '@renderer/providers/ThemeProvider'
 import { type Section, useUiStore } from '@renderer/store/ui'
@@ -11,6 +12,7 @@ import { type ComponentType, useEffect } from 'react'
 const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
   stats: Stats,
+  skills: Skills,
   settings: Settings,
 }
 
