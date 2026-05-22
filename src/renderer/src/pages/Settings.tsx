@@ -22,8 +22,8 @@ import {
 import { trpc } from '@renderer/lib/trpc'
 import { CLAUDE_MODELS } from '@shared/models'
 import { type AppSettings, LOG_LEVELS, settingsSchema, THEMES } from '@shared/settings'
-import { Eye, EyeOff, FolderOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { FolderOpen, ShieldCheck } from 'lucide-react'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -32,12 +32,10 @@ const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slic
 export function Settings() {
   const utils = trpc.useUtils()
   const settingsQuery = trpc.settings.get.useQuery()
-  const [showKey, setShowKey] = useState(false)
 
   const form = useForm<AppSettings>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      apiKey: '',
       model: CLAUDE_MODELS[0].id,
       outputDir: '',
       theme: 'system',
@@ -80,8 +78,19 @@ export function Settings() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Settings" description="API key, model, output folder, theme, logging." />
-      <div className="max-w-2xl p-8">
+      <PageHeader title="Settings" description="Model, output folder, theme, logging." />
+      <div className="flex max-w-2xl flex-col gap-4 p-8">
+        <div className="flex items-start gap-3 rounded-md border bg-muted/40 px-4 py-3 text-sm">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+          <div className="text-muted-foreground">
+            Atlas OS uses your{' '}
+            <span className="font-medium text-foreground">Claude subscription</span> via Claude Code
+            — no API key needed. If a run fails with an auth error, run{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">claude login</code> in a
+            terminal.
+          </div>
+        </div>
+
         <Card>
           <CardContent>
             {settingsQuery.isLoading ? (
@@ -89,40 +98,6 @@ export function Settings() {
             ) : (
               <Form {...form}>
                 <form onSubmit={onSubmit} className="grid gap-6">
-                  <FormField
-                    control={form.control}
-                    name="apiKey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Anthropic API key</FormLabel>
-                        <div className="relative">
-                          <FormControl>
-                            <Input
-                              type={showKey ? 'text' : 'password'}
-                              placeholder="sk-ant-…"
-                              autoComplete="off"
-                              spellCheck={false}
-                              className="pr-10"
-                              {...field}
-                            />
-                          </FormControl>
-                          <button
-                            type="button"
-                            onClick={() => setShowKey((v) => !v)}
-                            className="-translate-y-1/2 absolute top-1/2 right-2 text-muted-foreground hover:text-foreground"
-                            aria-label={showKey ? 'Hide API key' : 'Show API key'}
-                          >
-                            {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                          </button>
-                        </div>
-                        <FormDescription>
-                          Stored encrypted in app settings — never written to the database or logs.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <FormField
                     control={form.control}
                     name="model"

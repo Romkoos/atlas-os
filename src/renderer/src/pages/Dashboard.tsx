@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/u
 import { Textarea } from '@renderer/components/ui/textarea'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
-import { useUiStore } from '@renderer/store/ui'
 import { CLAUDE_MODELS } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
 import { LoaderCircle, Play, Square } from 'lucide-react'
@@ -35,7 +34,6 @@ function HealthBadge() {
 }
 
 export function Dashboard() {
-  const setSection = useUiStore((s) => s.setSection)
   const settings = trpc.settings.get.useQuery()
   const utils = trpc.useUtils()
 
@@ -45,10 +43,8 @@ export function Dashboard() {
   const [requestId, setRequestId] = useState<string | null>(null)
 
   const openFile = trpc.agent.openFile.useMutation()
-  const cancelMutation = trpc.agent.cancel.useMutation()
 
   const model = settings.data?.model ?? CLAUDE_MODELS[0].id
-  const apiKeyMissing = settings.isSuccess && !settings.data.apiKey
 
   const subInput = useMemo(
     () => (running && requestId ? { requestId, prompt, model } : skipToken),
@@ -89,19 +85,14 @@ export function Dashboard() {
   })
 
   const start = () => {
-    if (apiKeyMissing) {
-      toast.error('Add your Anthropic API key in Settings first')
-      return
-    }
     setOutput('')
     setRequestId(crypto.randomUUID())
     setRunning(true)
   }
 
-  const cancel = () => {
-    if (requestId) cancelMutation.mutate({ requestId })
-    setRunning(false)
-  }
+  // Flipping `running` off switches the subscription input to skipToken, which
+  // unsubscribes → the main-side run is aborted in the observable teardown.
+  const cancel = () => setRunning(false)
 
   return (
     <div className="flex flex-col">
@@ -112,15 +103,6 @@ export function Dashboard() {
       />
 
       <div className="flex max-w-3xl flex-col gap-6 p-8">
-        {apiKeyMissing ? (
-          <div className="flex items-center justify-between rounded-md border border-dashed bg-muted/40 px-4 py-3 text-sm">
-            <span className="text-muted-foreground">No Anthropic API key set.</span>
-            <Button size="sm" variant="outline" onClick={() => setSection('settings')}>
-              Open Settings
-            </Button>
-          </div>
-        ) : null}
-
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Run agent</CardTitle>

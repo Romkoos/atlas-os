@@ -1,7 +1,7 @@
 import { db } from '@main/db/client'
 import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
-import { streamCompletion } from '@main/services/anthropic'
+import { type ClaudeRun, runClaude } from '@main/services/claude'
 import { revealInFinder, saveMarkdown } from '@main/services/files'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -10,8 +10,8 @@ import { CLAUDE_MODEL_IDS } from '@shared/models'
 import { observable } from '@trpc/server/observable'
 import { z } from 'zod'
 
-// Active runs keyed by requestId, so an explicit cancel can abort them.
-const aborts = new Map<string, AbortController>()
+// Active runs keyed by requestId, so an explicit cancel can stop them.
+const runs = new Map<string, ClaudeRun>()
 
 export const agentRouter = router({
   run: publicProcedure
@@ -24,20 +24,19 @@ export const agentRouter = router({
     )
     .subscription(({ input }) =>
       observable<AgentEvent>((emit) => {
-        const controller = new AbortController()
-        aborts.set(input.requestId, controller)
         const startedAt = Date.now()
+        let cancelled = false
+        const settings = getSettings()
 
-        const run = async () => {
-          try {
-            const settings = getSettings()
-            const result = await streamCompletion({
-              prompt: input.prompt,
-              model: input.model,
-              signal: controller.signal,
-              onToken: (text) => emit.next({ type: 'token', text }),
-            })
+        const run = runClaude({
+          prompt: input.prompt,
+          model: input.model,
+          onToken: (text) => emit.next({ type: 'token', text }),
+        })
+        runs.set(input.requestId, run)
 
+        run.done
+          .then(async (result) => {
             const durationMs = Date.now() - startedAt
             const filePath = await saveMarkdown(settings.outputDir, result.text, {
               model: input.model,
@@ -64,8 +63,9 @@ export const agentRouter = router({
             })
             emit.next({ type: 'done', filePath, tokens: result.outputTokens, durationMs })
             emit.complete()
-          } catch (error) {
-            if (controller.signal.aborted) {
+          })
+          .catch((error) => {
+            if (cancelled) {
               emit.next({ type: 'aborted' })
               emit.complete()
               return
@@ -74,17 +74,16 @@ export const agentRouter = router({
             logger.error('Agent run failed', message)
             emit.next({ type: 'error', message })
             emit.complete()
-          } finally {
-            aborts.delete(input.requestId)
-          }
-        }
+          })
+          .finally(() => {
+            runs.delete(input.requestId)
+          })
 
-        void run()
-
-        // Teardown when the renderer unsubscribes (also our cancel path).
+        // Teardown on unsubscribe (the renderer's cancel path).
         return () => {
-          controller.abort()
-          aborts.delete(input.requestId)
+          cancelled = true
+          run.cancel()
+          runs.delete(input.requestId)
         }
       }),
     ),
@@ -93,9 +92,9 @@ export const agentRouter = router({
     .input(z.object({ requestId: z.string().min(1) }))
     .output(z.object({ ok: z.boolean() }))
     .mutation(({ input }) => {
-      const controller = aborts.get(input.requestId)
-      controller?.abort()
-      return { ok: Boolean(controller) }
+      const run = runs.get(input.requestId)
+      run?.cancel()
+      return { ok: Boolean(run) }
     }),
 
   openFile: publicProcedure

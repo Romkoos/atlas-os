@@ -3,8 +3,8 @@ import type { AppSettings } from '@shared/settings'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import Store from 'electron-store'
 
-// NOTE: electron-store's encryptionKey is obfuscation, not real security — the
-// key ships inside the app. See README TODO: migrate the API key to macOS Keychain.
+// Settings hold no secrets (auth is the Claude subscription, not an API key).
+// encryptionKey is light obfuscation of the on-disk JSON, not real security.
 const ENCRYPTION_KEY = 'atlas-os-local-store-v1'
 
 let store: Store<AppSettings> | null = null
@@ -37,8 +37,4 @@ export function resetSettings(): AppSettings {
   // clear() restores the defaults registered in initStore().
   requireStore().clear()
   return getSettings()
-}
-
-export function getApiKey(): string {
-  return requireStore().get('apiKey')
 }

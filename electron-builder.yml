@@ -15,10 +15,12 @@ extraResources:
     filter:
       - "**/*"
 
-# better-sqlite3 is a native module — keep its .node binary outside the asar.
+# Native module + the Agent SDK's bundled CLI must live outside the asar so they
+# can be loaded/spawned at runtime.
 asarUnpack:
   - "**/*.node"
   - "node_modules/better-sqlite3/**"
+  - "node_modules/@anthropic-ai/claude-agent-sdk/**"
 
 mac:
   category: public.app-category.developer-tools

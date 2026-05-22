@@ -16,7 +16,7 @@ richer analytics all sit on the same spine.
 | Shell / build | Electron 38 · electron-vite · electron-builder · @electron/rebuild |
 | Renderer | React 19 + TypeScript (strict) · Tailwind v4 · shadcn/ui · Zustand · TanStack Query · Recharts · React Hook Form + Zod · sonner · lucide-react |
 | IPC | electron-trpc + tRPC v11 (every procedure has a Zod input/output) |
-| Main | better-sqlite3 · Drizzle ORM + drizzle-kit · electron-store (encrypted) · electron-log · @anthropic-ai/sdk · electron-updater |
+| Main | better-sqlite3 · Drizzle ORM + drizzle-kit · electron-store (encrypted) · electron-log · @anthropic-ai/claude-agent-sdk (Claude **subscription**, no API key) · electron-updater |
 | Tooling | pnpm · Biome · Vitest · Playwright · Volta · simple-git-hooks |
 
 > **Why Electron 38, not the latest?** `better-sqlite3` (a native module) does not yet
@@ -27,9 +27,10 @@ richer analytics all sit on the same spine.
 
 ## Architecture
 
-The renderer has **no Node.js access**. Every domain operation (DB, files, the Claude
-SDK) runs in main and is reached over a typed tRPC bridge. The renderer never makes
-HTTP calls — all network happens in main.
+The renderer has **no Node.js access**. Every domain operation (DB, files, Claude)
+runs in main and is reached over a typed tRPC bridge. Claude calls go through the
+Claude Agent SDK, which drives the bundled Claude Code authenticated with the user's
+**Pro/Max subscription** (OAuth) — no Anthropic API key, no metered billing.
 
 ```
 ┌───────────────────────────┐         ┌────────────────────────────────────────┐
@@ -44,15 +45,18 @@ HTTP calls — all network happens in main.
 │   ipcLink ───────────────► │ IPC     │   (encrypted)     + Drizzle      (.md)   │
 │        ◄────────────────── │ electron│        │            │                    │
 │   subscription (tokens)    │  -trpc  │        ▼            ▼                    │
-│                            │         │   @anthropic-ai/sdk (messages.stream)    │
+│                            │         │   @anthropic-ai/claude-agent-sdk         │
 │  preload: contextBridge    │         │        │                                 │
 │  (contextIsolation, sandbox│         │        ▼                                 │
-│   nodeIntegration:false)   │         │   api.anthropic.com (HTTPS, main only)   │
+│   nodeIntegration:false)   │         │   bundled Claude Code → Pro/Max sub       │
+│                            │         │   (OAuth, no API key)                    │
 └───────────────────────────┘         └────────────────────────────────────────┘
 ```
 
-Streaming uses a tRPC **subscription**: main calls the SDK with streaming on and
-emits token/done/error events; the renderer appends tokens as they arrive.
+Streaming uses a tRPC **subscription**: main runs the Agent SDK `query()` with
+`includePartialMessages` (and strips `ANTHROPIC_API_KEY` from the spawned env to
+force subscription auth), emitting token/done/error events; the renderer appends
+tokens as they arrive.
 
 ---
 
@@ -65,6 +69,8 @@ emits token/done/error events; the renderer appends tokens as they arrive.
 - **pnpm** — `npm i -g pnpm` (or via Volta: `volta install pnpm`).
 - **Xcode Command Line Tools** — required to compile `better-sqlite3`:
   `xcode-select --install`.
+- **Claude Pro/Max subscription, logged in via Claude Code** — `claude login` once.
+  The Agent SDK bundles the Claude Code CLI; no separate install or API key needed.
 
 ## Commands
 
@@ -86,11 +92,17 @@ A pre-commit hook (simple-git-hooks) runs `pnpm lint && pnpm typecheck`.
 
 ## First run
 
-1. `pnpm install && pnpm dev`
-2. Open **Settings** (or press <kbd>⌘</kbd><kbd>,</kbd>), paste your Anthropic API key,
-   pick a model and output folder, **Save**.
-3. On **Dashboard**, press **Run agent** — the response streams in, then a toast
-   confirms the saved `.md` file (with **Open file**). **Stats** updates after runs.
+1. Make sure Claude Code is logged in with your Pro/Max subscription: run
+   `claude login` once in a terminal (no Anthropic API key needed).
+2. `pnpm install && pnpm dev`
+3. Open **Settings** (or press <kbd>⌘</kbd><kbd>,</kbd>), pick a model and output
+   folder, **Save**.
+4. On **Dashboard**, press **Run agent** — the response streams in via your
+   subscription, then a toast confirms the saved `.md` file (with **Open file**).
+   **Stats** updates after runs.
+
+> If `ANTHROPIC_API_KEY` is set in your environment, Atlas strips it from the
+> spawned process so runs always use the subscription, never metered billing.
 
 ## Keyboard shortcuts
 
@@ -112,8 +124,8 @@ A pre-commit hook (simple-git-hooks) runs `pnpm lint && pnpm typecheck`.
 | Generated `.md` output (default) | `~/Library/Application Support/atlas-os/outputs/` |
 | Logs (rotating, 5 MB) | `~/Library/Logs/atlas-os/main.log` |
 
-> The output folder is configurable in Settings. The API key is stored in the
-> encrypted settings file and is **never** written to the database or the logs.
+> The output folder is configurable in Settings. No API key is stored anywhere —
+> auth is your Claude subscription via Claude Code (credentials live in `~/.claude`).
 
 ---
 
@@ -122,8 +134,9 @@ A pre-commit hook (simple-git-hooks) runs `pnpm lint && pnpm typecheck`.
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
 - Preload exposes only the electron-trpc channel and a tiny `window.atlas` bridge.
 - Strict Content-Security-Policy in production (relaxed in dev for Vite HMR).
-- API key encrypted at rest via electron-store (obfuscation, not hardware-backed —
-  see TODO: Keychain).
+- No API key handled or stored — Claude auth is the user's subscription (OAuth in
+  `~/.claude`). `ANTHROPIC_API_KEY` is stripped from the spawned env to guarantee
+  subscription-only usage. Agent runs use no tools (`allowedTools: []`).
 
 ---
 
@@ -151,6 +164,9 @@ sqlite3 "$HOME/Library/Application Support/atlas-os/atlas.db" "SELECT * FROM __d
 Migrations run automatically on startup. After editing `src/main/db/schema.ts`, run
 `pnpm db:generate` to create a new migration in `./drizzle`.
 
+**Run fails with an auth error**: log in to Claude Code with your subscription —
+`claude login` — then retry. Atlas reads those credentials from `~/.claude`.
+
 **Unsigned app warning on launch** (expected — not notarized): right-click the app →
 Open, or `xattr -dr com.apple.quarantine "/Applications/Atlas OS.app"`.
 
@@ -162,7 +178,9 @@ Open, or `xattr -dr com.apple.quarantine "/Applications/Atlas OS.app"`.
 - [ ] Notarization (`@electron/notarize`)
 - [ ] Activate auto-update: set up release publishing (`electron-builder.yml` →
       `publish`) and call `autoUpdater.checkForUpdatesAndNotify()`
-- [ ] Move the API key to the macOS **Keychain** (`keytar` / `safeStorage`)
+- [ ] Validate the bundled Claude Agent SDK CLI inside the packaged `.dmg`
+      (asar-unpacked; confirm it finds Node + `~/.claude` credentials when launched
+      from /Applications — verified in dev, not yet in a packaged build)
 - [ ] App icon + DMG background
 - [ ] MCP servers
 - [ ] Skills library

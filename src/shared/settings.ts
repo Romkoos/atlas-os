@@ -8,8 +8,8 @@ export type Theme = (typeof THEMES)[number]
 export type LogLevel = (typeof LOG_LEVELS)[number]
 
 // Single source of truth for the settings shape (main store + renderer form).
+// Auth is the user's Claude subscription (via Claude Code OAuth) — no API key here.
 export const settingsSchema = z.object({
-  apiKey: z.string(),
   model: z.enum(CLAUDE_MODEL_IDS),
   outputDir: z.string().min(1, 'Choose an output folder'),
   theme: z.enum(THEMES),
@@ -19,7 +19,6 @@ export const settingsSchema = z.object({
 export type AppSettings = z.infer<typeof settingsSchema>
 
 export const DEFAULT_SETTINGS: Omit<AppSettings, 'outputDir'> = {
-  apiKey: '',
   model: DEFAULT_MODEL_ID,
   theme: 'system',
   logLevel: 'info',

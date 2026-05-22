@@ -11,7 +11,7 @@ test('boots, renders the sidebar, and loads Settings over tRPC', async () => {
 
   // tRPC IPC round-trip: opening Settings renders the form from settings.get.
   await window.getByRole('button', { name: 'Settings' }).click()
-  await expect(window.getByText('Anthropic API key')).toBeVisible()
+  await expect(window.getByText('Default model')).toBeVisible()
 
   await app.close()
 })
