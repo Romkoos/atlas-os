@@ -4,6 +4,7 @@ import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Settings } from '@renderer/pages/Settings'
 import { Stats } from '@renderer/pages/Stats'
+import { useResolvedTheme } from '@renderer/providers/ThemeProvider'
 import { type Section, useUiStore } from '@renderer/store/ui'
 import { type ComponentType, useEffect } from 'react'
 
@@ -16,6 +17,7 @@ const PAGES: Record<Section, ComponentType> = {
 export function App() {
   const section = useUiStore((s) => s.section)
   const setSection = useUiStore((s) => s.setSection)
+  const theme = useResolvedTheme()
 
   // Native menu (Cmd+,) asks the renderer to switch sections.
   useEffect(() => window.atlas.onNavigate((next) => setSection(next as Section)), [setSection])
@@ -30,7 +32,7 @@ export function App() {
           <Page />
         </main>
       </div>
-      <Toaster richColors closeButton />
+      <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )
 }
