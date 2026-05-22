@@ -12,8 +12,8 @@ const alias = {
 export default defineConfig({
   main: {
     resolve: { alias },
-    // CJS main: better-sqlite3 (native) and electron-trpc behave under require().
-    // electron-store v11 is ESM-only, so bundle it instead of externalizing.
+    // CJS main: better-sqlite3 (native) behaves under require(); the Agent SDK is
+    // loaded via dynamic import(). electron-store v11 is ESM-only → bundle it.
     plugins: [externalizeDepsPlugin({ exclude: ['electron-store'] })],
     build: {
       rollupOptions: {
@@ -24,9 +24,9 @@ export default defineConfig({
   },
   preload: {
     resolve: { alias },
-    // Preload imports only 'electron' (kept external automatically). The electron-trpc
-    // bridge is inlined in src/preload/index.ts to stay sandbox-safe. Output is
-    // CommonJS (.cjs): ESM preloads are unsupported under sandbox:true.
+    // Preload imports only 'electron' (kept external automatically) and exposes a
+    // tiny IPC bridge. Output is CommonJS (.cjs): ESM preloads are unsupported
+    // under sandbox:true.
     build: {
       rollupOptions: {
         input: { index: resolve('src/preload/index.ts') },

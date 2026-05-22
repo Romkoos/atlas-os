@@ -1,17 +1,21 @@
-import type { AtlasBridge } from '@shared/bridge'
+import type { AtlasBridge, AtlasTrpcBridge } from '@shared/bridge'
 import { contextBridge, ipcRenderer } from 'electron'
 
-// electron-trpc's `electronTRPC` bridge, inlined. A sandboxed preload can only use
-// the 'electron' module at runtime (it cannot require() node_modules), so we expose
-// the exact contract ipcLink expects instead of importing electron-trpc/main here.
-// Channel + shape mirror electron-trpc's exposeElectronTRPC().
-const ELECTRON_TRPC_CHANNEL = 'electron-trpc'
+const TRPC_CHANNEL = 'atlas-trpc'
 
-contextBridge.exposeInMainWorld('electronTRPC', {
-  sendMessage: (message: unknown) => ipcRenderer.send(ELECTRON_TRPC_CHANNEL, message),
-  onMessage: (callback: (message: unknown) => void) =>
-    ipcRenderer.on(ELECTRON_TRPC_CHANNEL, (_event, message) => callback(message)),
-})
+// Minimal tRPC transport bridge (sandbox-safe: only uses the 'electron' module).
+const atlasTrpc: AtlasTrpcBridge = {
+  send: (message) => ipcRenderer.send(TRPC_CHANNEL, message),
+  subscribe: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, message: unknown) => callback(message)
+    ipcRenderer.on(TRPC_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(TRPC_CHANNEL, listener)
+    }
+  },
+}
+
+contextBridge.exposeInMainWorld('atlasTrpc', atlasTrpc)
 
 // Narrow, hand-written bridge for non-tRPC main→renderer signals.
 const atlas: AtlasBridge = {

@@ -1,9 +1,8 @@
-import type { AtlasBridge } from '@shared/bridge'
+import type { AtlasBridge, AtlasTrpcBridge } from '@shared/bridge'
 
 declare global {
   interface Window {
     atlas: AtlasBridge
-    // Injected by electron-trpc's exposeElectronTRPC() (infrastructure phase).
-    electronTRPC: unknown
+    atlasTrpc: AtlasTrpcBridge
   }
 }

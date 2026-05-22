@@ -15,7 +15,7 @@ richer analytics all sit on the same spine.
 |------|------|
 | Shell / build | Electron 38 · electron-vite · electron-builder · @electron/rebuild |
 | Renderer | React 19 + TypeScript (strict) · Tailwind v4 · shadcn/ui · Zustand · TanStack Query · Recharts · React Hook Form + Zod · sonner · lucide-react |
-| IPC | electron-trpc + tRPC v11 (every procedure has a Zod input/output) |
+| IPC | tRPC v11 over a small custom Electron IPC link (every procedure has a Zod input/output) |
 | Main | better-sqlite3 · Drizzle ORM + drizzle-kit · electron-store (encrypted) · electron-log · @anthropic-ai/claude-agent-sdk (Claude **subscription**, no API key) · electron-updater |
 | Tooling | pnpm · Biome · Vitest · Playwright · Volta · simple-git-hooks |
 
@@ -43,8 +43,8 @@ Claude Agent SDK, which drives the bundled Claude Code authenticated with the us
 │        │ trpc react hooks  │         │        ▼            ▼          ▼         │
 │        ▼                   │         │  electron-store   better-sqlite3   files  │
 │   ipcLink ───────────────► │ IPC     │   (encrypted)     + Drizzle      (.md)   │
-│        ◄────────────────── │ electron│        │            │                    │
-│   subscription (tokens)    │  -trpc  │        ▼            ▼                    │
+│        ◄────────────────── │ (tRPC   │        │            │                    │
+│   subscription (tokens)    │  /clone)│        ▼            ▼                    │
 │                            │         │   @anthropic-ai/claude-agent-sdk         │
 │  preload: contextBridge    │         │        │                                 │
 │  (contextIsolation, sandbox│         │        ▼                                 │
@@ -132,7 +132,8 @@ A pre-commit hook (simple-git-hooks) runs `pnpm lint && pnpm typecheck`.
 ## Security
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- Preload exposes only the electron-trpc channel and a tiny `window.atlas` bridge.
+- Preload exposes only the tRPC IPC channel (`window.atlasTrpc`) and a tiny
+  `window.atlas` navigation bridge — nothing else.
 - Strict Content-Security-Policy in production (relaxed in dev for Vite HMR).
 - No API key handled or stored — Claude auth is the user's subscription (OAuth in
   `~/.claude`). `ANTHROPIC_API_KEY` is stripped from the spawned env to guarantee

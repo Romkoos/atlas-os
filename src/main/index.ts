@@ -4,10 +4,9 @@ import { initLogger, logger } from '@main/logger'
 import { buildMenu } from '@main/menu'
 import { applySecurity } from '@main/security'
 import { getSettings, initStore } from '@main/store'
-import { appRouter } from '@main/trpc/router'
+import { registerTrpcIpc } from '@main/trpc/ipc'
 import { createMainWindow } from '@main/window'
 import { app, BrowserWindow } from 'electron'
-import { createIPCHandler } from 'electron-trpc/main'
 
 app
   .whenReady()
@@ -22,21 +21,14 @@ app
     logger.info('Database ready and migrations applied')
 
     applySecurity()
+    registerTrpcIpc()
 
     const win = createMainWindow()
     buildMenu(win)
 
-    const handler = createIPCHandler({
-      router: appRouter,
-      windows: [win],
-      createContext: async () => ({}),
-    })
-
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
-        const next = createMainWindow()
-        buildMenu(next)
-        handler.attachWindow(next)
+        buildMenu(createMainWindow())
       }
     })
   })

@@ -26,9 +26,6 @@ importers:
       electron-store:
         specifier: ^11.0.2
         version: 11.0.2
-      electron-trpc:
-        specifier: ^0.7.1
-        version: 0.7.1(@trpc/client@11.17.0(@trpc/server@11.17.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.17.0(typescript@6.0.3))(electron@38.8.6)
       electron-updater:
         specifier: ^6.8.3
         version: 6.8.3
@@ -2364,13 +2361,6 @@ packages:
 
   electron-to-chromium@1.5.361:
     resolution: {integrity: sha512-Q6Hts7N9FnJc5LeGRINFvLhCI9xZmNtTDe5ZbcVezQz7cU4a8Aua3GH1b8J2XY8Al9PF+OCwYqhgsOOheMdvkA==}
-
-  electron-trpc@0.7.1:
-    resolution: {integrity: sha512-aWjZ5pLeVhrX9A9d8O8YgR8N+q4IXXzc76CJT1PwtDijIw+y5I+c75IAAtZ4JayYLeR3ll95PNGl5RTBu2qePw==}
-    peerDependencies:
-      '@trpc/client': '>10.0.0'
-      '@trpc/server': '>10.0.0'
-      electron: '>19.0.0'
 
   electron-updater@6.8.3:
     resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
@@ -5746,15 +5736,6 @@ snapshots:
       type-fest: 5.6.0
 
   electron-to-chromium@1.5.361: {}
-
-  electron-trpc@0.7.1(@trpc/client@11.17.0(@trpc/server@11.17.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.17.0(typescript@6.0.3))(electron@38.8.6):
-    dependencies:
-      '@trpc/client': 11.17.0(@trpc/server@11.17.0(typescript@6.0.3))(typescript@6.0.3)
-      '@trpc/server': 11.17.0(typescript@6.0.3)
-      debug: 4.4.3
-      electron: 38.8.6
-    transitivePeerDependencies:
-      - supports-color
 
   electron-updater@6.8.3:
     dependencies:
