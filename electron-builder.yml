@@ -1,0 +1,40 @@
+appId: com.atlas.os
+productName: Atlas OS
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+  - package.json
+
+# Drizzle SQL migrations are read at runtime from resources/drizzle (see paths.ts).
+extraResources:
+  - from: drizzle
+    to: drizzle
+    filter:
+      - "**/*"
+
+# better-sqlite3 is a native module — keep its .node binary outside the asar.
+asarUnpack:
+  - "**/*.node"
+  - "node_modules/better-sqlite3/**"
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+  artifactName: ${productName}-${version}-${arch}.dmg
+  # No Developer ID / notarization configured. electron-builder ad-hoc signs the
+  # bundle so it runs on Apple Silicon; Gatekeeper still warns on other Macs.
+  # See README → TODO before distributing outside your own machine.
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.dmg
+
+# electron-updater config is generated from this block, but checkForUpdates() is
+# never called (see README → TODO). Replace owner/repo and wire publishing later.
+publish:
+  provider: github
+  owner: your-org
+  repo: atlas-os
