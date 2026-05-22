@@ -65,11 +65,12 @@ export function Skills() {
               No skills found in ~/.claude/skills.
             </p>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul aria-label="Skills" className="flex flex-col gap-1">
               {items.map((skill) => (
                 <li key={skill.id}>
                   <button
                     type="button"
+                    aria-pressed={selectedId === skill.id}
                     onClick={() => setSelectedId(skill.id)}
                     className={cn(
                       'w-full rounded-md px-3 py-2 text-left transition-colors',
