@@ -8,7 +8,7 @@ import { load } from 'js-yaml'
 export const SKILLS_DIR = join(homedir(), '.claude', 'skills')
 
 // Captures the YAML between the leading `---` fence and the rest as the body.
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
+const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?([\s\S]*)$/
 
 function parseFrontmatter(raw: string): { data: Record<string, unknown>; body: string } {
   const match = raw.match(FRONTMATTER)
@@ -52,6 +52,7 @@ export async function listSkills(dir: string = SKILLS_DIR): Promise<SkillMeta[]>
 
   const skills: SkillMeta[] = []
   for (const entry of entries) {
+    // Symlinked dirs are intentionally excluded: isDirectory() is false for symlinks (no withFileTypes follow).
     if (!entry.isDirectory()) continue
     let raw: string
     try {
@@ -84,6 +85,10 @@ function assertSafeId(id: string, dir: string): void {
 export async function readSkill(id: string, dir: string = SKILLS_DIR): Promise<SkillDetail> {
   assertSafeId(id, dir)
   const raw = await readFile(join(dir, id, 'SKILL.md'), 'utf8')
-  const { data, body } = parseFrontmatter(raw)
-  return { meta: toMeta(id, dir, data), content: body }
+  try {
+    const { data, body } = parseFrontmatter(raw)
+    return { meta: toMeta(id, dir, data), content: body }
+  } catch (error) {
+    throw new Error(`Failed to parse SKILL.md for "${id}": ${(error as Error).message}`)
+  }
 }

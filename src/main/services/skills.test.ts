@@ -43,6 +43,16 @@ beforeAll(async () => {
     'utf8',
   )
 
+  // epsilon: allowed-tools as a comma-separated string → counts as 2
+  await mkdir(join(dir, 'epsilon'), { recursive: true })
+  await writeFile(
+    join(dir, 'epsilon', 'SKILL.md'),
+    ['---', 'name: Epsilon', 'allowed-tools: "Read, Write"', '---', '', 'Epsilon body.', ''].join(
+      '\n',
+    ),
+    'utf8',
+  )
+
   // gamma-workspace: no SKILL.md → must be excluded
   await mkdir(join(dir, 'gamma-workspace'), { recursive: true })
   await writeFile(join(dir, 'gamma-workspace', 'eval.py'), 'print(1)\n', 'utf8')
@@ -58,7 +68,7 @@ afterAll(async () => {
 describe('listSkills', () => {
   it('lists only directories containing SKILL.md, sorted by name', async () => {
     const skills = await listSkills(dir)
-    expect(skills.map((s) => s.id)).toEqual(['alpha', 'beta'])
+    expect(skills.map((s) => s.id)).toEqual(['alpha', 'beta', 'epsilon'])
   })
 
   it('parses frontmatter fields', async () => {
@@ -79,6 +89,12 @@ describe('listSkills', () => {
     expect(beta?.allowedToolsCount).toBe(0)
   })
 
+  it('counts comma-separated string allowed-tools', async () => {
+    const skills = await listSkills(dir)
+    const epsilon = skills.find((s) => s.id === 'epsilon')
+    expect(epsilon?.allowedToolsCount).toBe(2)
+  })
+
   it('returns [] when the directory does not exist', async () => {
     expect(await listSkills(join(dir, 'does-not-exist'))).toEqual([])
   })
@@ -96,5 +112,9 @@ describe('readSkill', () => {
   it('rejects path-traversal ids', async () => {
     await expect(readSkill('../beta', dir)).rejects.toThrow()
     await expect(readSkill('alpha/../beta', dir)).rejects.toThrow()
+  })
+
+  it('rejects unknown skill ids', async () => {
+    await expect(readSkill('no-such-skill', dir)).rejects.toThrow()
   })
 })
