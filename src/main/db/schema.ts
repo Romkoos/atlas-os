@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // One row per AI action. Single source of truth for the Event type (re-used in
 // the renderer via tRPC type inference — never imported at runtime there).
@@ -16,3 +16,79 @@ export const events = sqliteTable('events', {
 
 export type EventRow = typeof events.$inferSelect
 export type NewEventRow = typeof events.$inferInsert
+
+// ── Agent Productivity Tracker ──────────────────────────────────────────────
+// See docs/agent-productivity-tracker.md. Distinct from `events` above (which
+// tracks Atlas's own AI actions). These three tables are populated by the
+// productivity ingest service: agent_turns from Claude Code transcripts,
+// agent_sessions/ecosystem_changes from the ~/agent-analytics JSONL buffer.
+
+// One turn of the agent, reconstructed from a Claude Code transcript.
+// id is deterministic (hash of session_id + turn_index) so re-ingesting a
+// growing transcript is idempotent via onConflictDoNothing.
+export const agentTurns = sqliteTable(
+  'agent_turns',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    projectPath: text('project_path').notNull(),
+    turnIndex: integer('turn_index').notNull(),
+    ts: integer('ts', { mode: 'timestamp_ms' }).notNull(),
+    tokensIn: integer('tokens_in').notNull().default(0),
+    tokensOut: integer('tokens_out').notNull().default(0),
+    toolsUsed: text('tools_used', { mode: 'json' }).$type<string[]>().notNull(),
+    skillsUsed: text('skills_used', { mode: 'json' }).$type<string[]>().notNull(),
+    complexityProxy: real('complexity_proxy'),
+  },
+  (t) => [
+    index('idx_turns_session').on(t.sessionId),
+    index('idx_turns_project').on(t.projectPath),
+    index('idx_turns_ts').on(t.ts),
+  ],
+)
+
+// Per-session summary: lifecycle from hooks, score/summary from the /done skill,
+// aggregates recomputed from agent_turns on each ingest.
+export const agentSessions = sqliteTable(
+  'agent_sessions',
+  {
+    sessionId: text('session_id').primaryKey(),
+    projectPath: text('project_path').notNull(),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+    endedAt: integer('ended_at', { mode: 'timestamp_ms' }),
+    endReason: text('end_reason'),
+    score: integer('score'), // 1–10 from /done; null until rated
+    summary: text('summary'),
+    totalTokensIn: integer('total_tokens_in').notNull().default(0),
+    totalTokensOut: integer('total_tokens_out').notNull().default(0),
+    turnCount: integer('turn_count').notNull().default(0),
+    avgComplexity: real('avg_complexity'),
+  },
+  (t) => [
+    index('idx_sessions_project').on(t.projectPath),
+    index('idx_sessions_started').on(t.startedAt),
+  ],
+)
+
+// One ecosystem change: settings (ConfigChange), skills (FileChanged), or a
+// manual note added from the Atlas UI. id is deterministic for idempotency.
+export const ecosystemChanges = sqliteTable(
+  'ecosystem_changes',
+  {
+    id: text('id').primaryKey(),
+    ts: integer('ts', { mode: 'timestamp_ms' }).notNull(),
+    type: text('type').notNull(), // mcp_added | skill_edited | config_changed | manual_note | …
+    target: text('target'),
+    source: text('source'), // 'auto' | 'manual'
+    diff: text('diff'),
+    note: text('note'),
+  },
+  (t) => [index('idx_eco_ts').on(t.ts), index('idx_eco_type').on(t.type)],
+)
+
+export type AgentTurnRow = typeof agentTurns.$inferSelect
+export type NewAgentTurnRow = typeof agentTurns.$inferInsert
+export type AgentSessionRow = typeof agentSessions.$inferSelect
+export type NewAgentSessionRow = typeof agentSessions.$inferInsert
+export type EcosystemChangeRow = typeof ecosystemChanges.$inferSelect
+export type NewEcosystemChangeRow = typeof ecosystemChanges.$inferInsert

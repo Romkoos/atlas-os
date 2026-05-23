@@ -1,12 +1,23 @@
-import { initDb } from '@main/db/client'
+import { db, initDb } from '@main/db/client'
 import { runMigrations } from '@main/db/migrate'
 import { initLogger, logger } from '@main/logger'
 import { buildMenu } from '@main/menu'
+import { appPaths } from '@main/paths'
 import { applySecurity } from '@main/security'
+import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings, initStore } from '@main/store'
 import { registerTrpcIpc } from '@main/trpc/ipc'
 import { createMainWindow } from '@main/window'
 import { app, BrowserWindow } from 'electron'
+
+// Productivity tracker: pull the latest transcripts + hook buffer into the DB.
+// Fire-and-forget so a slow/large scan never blocks the window.
+function ingestProductivity(): void {
+  const { claudeProjectsDir, analyticsBufferDir } = appPaths()
+  ingestAll(db(), { projectsDir: claudeProjectsDir, bufferDir: analyticsBufferDir })
+    .then((res) => logger.info('Productivity ingest complete', res))
+    .catch((error) => logger.error('Productivity ingest failed', error))
+}
 
 app
   .whenReady()
@@ -25,6 +36,8 @@ app
 
     const win = createMainWindow()
     buildMenu(win)
+
+    ingestProductivity()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

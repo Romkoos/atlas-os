@@ -20,14 +20,98 @@ import {
   SelectValue,
 } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
+import { cn } from '@renderer/lib/utils'
 import { CLAUDE_MODELS } from '@shared/models'
 import { type AppSettings, LOG_LEVELS, settingsSchema, THEMES } from '@shared/settings'
-import { FolderOpen, ShieldCheck } from 'lucide-react'
+import { Check, FolderOpen, ShieldCheck } from 'lucide-react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
+
+// Pick which projects the Productivity tracker counts. Empty selection = all.
+function TrackedProjectsCard() {
+  const utils = trpc.useUtils()
+  const discover = trpc.productivity.discoverProjects.useQuery()
+  const setTracked = trpc.settings.set.useMutation({
+    onSuccess: () => {
+      void utils.settings.get.invalidate()
+      void utils.productivity.invalidate()
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const projects = discover.data ?? []
+  const allPaths = projects.map((p) => p.projectPath)
+  const allTracked = projects.length > 0 && projects.every((p) => p.tracked)
+
+  const toggle = (path: string) => {
+    const next = new Set(projects.filter((p) => p.tracked).map((p) => p.projectPath))
+    if (next.has(path)) next.delete(path)
+    else next.add(path)
+    const arr = [...next]
+    // [] means "track all" — collapse a full or empty selection to that default.
+    const value = arr.length === 0 || arr.length === allPaths.length ? [] : arr
+    setTracked.mutate({ trackedProjects: value })
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3">
+        <div>
+          <h2 className="font-medium text-sm">Tracked projects</h2>
+          <p className="text-muted-foreground text-xs">
+            Productivity only counts these projects. None selected = all tracked.
+          </p>
+        </div>
+
+        {discover.isLoading ? (
+          <p className="py-4 text-muted-foreground text-sm">Loading projects…</p>
+        ) : projects.length === 0 ? (
+          <p className="py-4 text-muted-foreground text-sm">
+            No projects yet. Run Refresh on the Productivity page first.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {projects.map((p) => (
+                <button
+                  key={p.projectPath}
+                  type="button"
+                  aria-pressed={p.tracked}
+                  onClick={() => toggle(p.projectPath)}
+                  disabled={setTracked.isPending}
+                  title={p.projectPath}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm transition-colors disabled:opacity-50',
+                    p.tracked
+                      ? 'border-transparent bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {p.tracked ? <Check className="size-3.5" /> : null}
+                  {p.project}
+                </button>
+              ))}
+            </div>
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={allTracked || setTracked.isPending}
+                onClick={() => setTracked.mutate({ trackedProjects: [] })}
+              >
+                Track all
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export function Settings() {
   const utils = trpc.useUtils()
@@ -40,6 +124,7 @@ export function Settings() {
       outputDir: '',
       theme: 'system',
       logLevel: 'info',
+      trackedProjects: [],
     },
   })
 
@@ -222,6 +307,8 @@ export function Settings() {
             )}
           </CardContent>
         </Card>
+
+        <TrackedProjectsCard />
       </div>
     </div>
   )

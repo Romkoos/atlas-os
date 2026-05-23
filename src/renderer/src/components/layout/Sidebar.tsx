@@ -1,6 +1,7 @@
 import { cn } from '@renderer/lib/utils'
 import { type Section, useUiStore } from '@renderer/store/ui'
 import {
+  Activity,
   BarChart3,
   LayoutDashboard,
   type LucideIcon,
@@ -12,6 +13,7 @@ import type { CSSProperties } from 'react'
 const ITEMS: ReadonlyArray<{ id: Section; label: string; icon: LucideIcon }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
+  { id: 'productivity', label: 'Productivity', icon: Activity },
   { id: 'skills', label: 'Skills', icon: Sparkles },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]

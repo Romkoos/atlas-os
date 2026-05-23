@@ -14,6 +14,10 @@ export const settingsSchema = z.object({
   outputDir: z.string().min(1, 'Choose an output folder'),
   theme: z.enum(THEMES),
   logLevel: z.enum(LOG_LEVELS),
+  // Productivity tracker: project paths to track. Empty = track all.
+  // Required in the shape (default supplied by the store / DEFAULT_SETTINGS) so
+  // the input and output types match for the renderer's react-hook-form.
+  trackedProjects: z.array(z.string()),
 })
 
 export type AppSettings = z.infer<typeof settingsSchema>
@@ -22,4 +26,5 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'outputDir'> = {
   model: DEFAULT_MODEL_ID,
   theme: 'system',
   logLevel: 'info',
+  trackedProjects: [],
 }

@@ -1,0 +1,560 @@
+import { basename } from 'node:path'
+import { db } from '@main/db/client'
+import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
+import { appPaths } from '@main/paths'
+import { ecosystemId } from '@main/services/productivity/ids'
+import { ingestAll } from '@main/services/productivity/ingest'
+import { getSettings } from '@main/store'
+import { publicProcedure, router } from '@main/trpc/trpc'
+import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
+import { z } from 'zod'
+
+const cutoffDate = (days: number): Date => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+const toNum = (v: string | number | null): number | null => (v == null ? null : Number(v))
+
+// Shared input: a time window (in days) and an optional project filter.
+const rangeInput = z
+  .object({
+    days: z.number().int().positive().default(30),
+    projectPath: z.string().optional(),
+  })
+  .default({ days: 30 })
+
+const trackedProjects = (): string[] => getSettings().trackedProjects ?? []
+
+// Restrict to the tracked-project allowlist (empty = track all). Ignores any
+// single-project selection — used for cross-project views (byProject, dropdown).
+const trackedCondition = (): SQL | undefined => {
+  const tracked = trackedProjects()
+  return tracked.length ? inArray(agentTurns.projectPath, tracked) : undefined
+}
+
+// Project scope for a scoped query: an explicit project wins; otherwise fall
+// back to the tracked allowlist.
+const projectCondition = (projectPath?: string): SQL | undefined =>
+  projectPath ? eq(agentTurns.projectPath, projectPath) : trackedCondition()
+
+// Sessions are windowed by turn activity (agent_turns.ts), not by started_at —
+// started_at comes only from the SessionStart hook and may be null, so keying
+// on it would hide every session when hooks aren't installed.
+const turnFilter = (cutoff: Date, projectPath?: string): SQL | undefined =>
+  and(gte(agentTurns.ts, cutoff), projectCondition(projectPath))
+
+export const productivityRouter = router({
+  // Re-scan transcripts + JSONL buffer and upsert into the DB.
+  refresh: publicProcedure
+    .output(z.object({ turns: z.number(), sessions: z.number(), ecosystem: z.number() }))
+    .mutation(async () => {
+      const { claudeProjectsDir, analyticsBufferDir } = appPaths()
+      return await ingestAll(db(), {
+        projectsDir: claudeProjectsDir,
+        bufferDir: analyticsBufferDir,
+      })
+    }),
+
+  // Tracked projects for the page filter dropdown (all-time, stable across the
+  // selected window). Respects the tracked-project allowlist.
+  projects: publicProcedure
+    .output(z.array(z.object({ projectPath: z.string(), project: z.string() })))
+    .query(() => {
+      const rows = db()
+        .selectDistinct({ projectPath: agentTurns.projectPath })
+        .from(agentTurns)
+        .where(trackedCondition())
+        .all()
+      return rows
+        .map((r) => ({
+          projectPath: r.projectPath,
+          project: basename(r.projectPath) || r.projectPath,
+        }))
+        .sort((a, b) => a.project.localeCompare(b.project))
+    }),
+
+  // Every discoverable project (ignores the allowlist) + whether it is tracked.
+  // Powers the tracked-project picker in Settings.
+  discoverProjects: publicProcedure
+    .output(
+      z.array(z.object({ projectPath: z.string(), project: z.string(), tracked: z.boolean() })),
+    )
+    .query(() => {
+      const tracked = new Set(trackedProjects())
+      const rows = db()
+        .selectDistinct({ projectPath: agentTurns.projectPath })
+        .from(agentTurns)
+        .all()
+      return rows
+        .map((r) => ({
+          projectPath: r.projectPath,
+          project: basename(r.projectPath) || r.projectPath,
+          tracked: tracked.size === 0 || tracked.has(r.projectPath),
+        }))
+        .sort((a, b) => a.project.localeCompare(b.project))
+    }),
+
+  // Overview scoped by window + optional project. byProject is always the
+  // cross-project comparison over the window (ignores the project filter).
+  overview: publicProcedure
+    .input(rangeInput)
+    .output(
+      z.object({
+        tokensByDay: z.array(
+          z.object({ date: z.string(), tokensIn: z.number(), tokensOut: z.number() }),
+        ),
+        totals: z.object({
+          totalTokens: z.number(),
+          turns: z.number(),
+          sessions: z.number(),
+          avgScore: z.number().nullable(),
+          avgComplexity: z.number().nullable(),
+        }),
+        byProject: z.array(
+          z.object({
+            projectPath: z.string(),
+            project: z.string(),
+            totalTokens: z.number(),
+            turns: z.number(),
+            sessions: z.number(),
+            avgComplexity: z.number().nullable(),
+          }),
+        ),
+      }),
+    )
+    .query(({ input }) => {
+      const cutoff = cutoffDate(input.days)
+      const scoped = turnFilter(cutoff, input.projectPath)
+
+      const day = sql<string>`date(${agentTurns.ts} / 1000, 'unixepoch', 'localtime')`
+      const tokensByDay = db()
+        .select({
+          date: day,
+          tokensIn: sql<number>`coalesce(sum(${agentTurns.tokensIn}), 0)`,
+          tokensOut: sql<number>`coalesce(sum(${agentTurns.tokensOut}), 0)`,
+        })
+        .from(agentTurns)
+        .where(scoped)
+        .groupBy(day)
+        .orderBy(day)
+        .all()
+
+      const totals = db()
+        .select({
+          totalTokens: sql<number>`coalesce(sum(${agentTurns.tokensIn} + ${agentTurns.tokensOut}), 0)`,
+          turns: count(),
+          sessions: countDistinct(agentTurns.sessionId),
+          avgComplexity: avg(agentTurns.complexityProxy),
+        })
+        .from(agentTurns)
+        .where(scoped)
+        .get()
+
+      // avgScore from the sessions that were active in the window.
+      const windowSessionIds = db()
+        .select({ id: agentTurns.sessionId })
+        .from(agentTurns)
+        .where(scoped)
+      const scoreRow = db()
+        .select({ avgScore: avg(agentSessions.score) })
+        .from(agentSessions)
+        .where(inArray(agentSessions.sessionId, windowSessionIds))
+        .get()
+
+      const byProject = db()
+        .select({
+          projectPath: agentTurns.projectPath,
+          totalTokens: sql<number>`coalesce(sum(${agentTurns.tokensIn} + ${agentTurns.tokensOut}), 0)`,
+          turns: count(),
+          sessions: countDistinct(agentTurns.sessionId),
+          avgComplexity: avg(agentTurns.complexityProxy),
+        })
+        .from(agentTurns)
+        .where(and(gte(agentTurns.ts, cutoff), trackedCondition()))
+        .groupBy(agentTurns.projectPath)
+        .all()
+
+      return {
+        tokensByDay,
+        totals: {
+          totalTokens: Number(totals?.totalTokens ?? 0),
+          turns: totals?.turns ?? 0,
+          sessions: totals?.sessions ?? 0,
+          avgScore: toNum(scoreRow?.avgScore ?? null),
+          avgComplexity: toNum(totals?.avgComplexity ?? null),
+        },
+        byProject: byProject
+          .map((p) => ({
+            projectPath: p.projectPath,
+            project: basename(p.projectPath) || p.projectPath,
+            totalTokens: Number(p.totalTokens),
+            turns: p.turns,
+            sessions: p.sessions,
+            avgComplexity: toNum(p.avgComplexity),
+          }))
+          .sort((a, b) => b.totalTokens - a.totalTokens),
+      }
+    }),
+
+  // Current local calendar day broken down by hour (0–23). Always "today",
+  // independent of the page range toggle. Respects the project/tracked scope.
+  today: publicProcedure
+    .input(z.object({ projectPath: z.string().optional() }).default({}))
+    .output(
+      z.object({
+        hours: z.array(
+          z.object({
+            hour: z.string(),
+            tokensIn: z.number(),
+            tokensOut: z.number(),
+            turns: z.number(),
+          }),
+        ),
+        totals: z.object({
+          totalTokens: z.number(),
+          turns: z.number(),
+          sessions: z.number(),
+          activeHours: z.number(),
+        }),
+      }),
+    )
+    .query(({ input }) => {
+      const isToday = sql`date(${agentTurns.ts} / 1000, 'unixepoch', 'localtime') = date('now', 'localtime')`
+      const scoped = and(isToday, projectCondition(input.projectPath))
+      const hour = sql<string>`strftime('%H', ${agentTurns.ts} / 1000, 'unixepoch', 'localtime')`
+
+      const byHour = db()
+        .select({
+          hour,
+          tokensIn: sql<number>`coalesce(sum(${agentTurns.tokensIn}), 0)`,
+          tokensOut: sql<number>`coalesce(sum(${agentTurns.tokensOut}), 0)`,
+          turns: count(),
+        })
+        .from(agentTurns)
+        .where(scoped)
+        .groupBy(hour)
+        .all()
+
+      const totals = db()
+        .select({
+          totalTokens: sql<number>`coalesce(sum(${agentTurns.tokensIn} + ${agentTurns.tokensOut}), 0)`,
+          turns: count(),
+          sessions: countDistinct(agentTurns.sessionId),
+        })
+        .from(agentTurns)
+        .where(scoped)
+        .get()
+
+      // Fill 0–23 so the chart draws a full-day axis with idle hours as zeros.
+      const map = new Map(byHour.map((r) => [r.hour, r]))
+      const hours = Array.from({ length: 24 }, (_, h) => {
+        const key = String(h).padStart(2, '0')
+        const row = map.get(key)
+        return {
+          hour: key,
+          tokensIn: Number(row?.tokensIn ?? 0),
+          tokensOut: Number(row?.tokensOut ?? 0),
+          turns: row?.turns ?? 0,
+        }
+      })
+
+      return {
+        hours,
+        totals: {
+          totalTokens: Number(totals?.totalTokens ?? 0),
+          turns: totals?.turns ?? 0,
+          sessions: totals?.sessions ?? 0,
+          activeHours: byHour.length,
+        },
+      }
+    }),
+
+  // Session list, newest first, windowed by turn activity + optional project.
+  sessions: publicProcedure
+    .input(rangeInput)
+    .output(
+      z.array(
+        z.object({
+          sessionId: z.string(),
+          project: z.string(),
+          projectPath: z.string(),
+          startedAt: z.date().nullable(),
+          endedAt: z.date().nullable(),
+          score: z.number().nullable(),
+          summary: z.string().nullable(),
+          turnCount: z.number(),
+          totalTokens: z.number(),
+          avgComplexity: z.number().nullable(),
+        }),
+      ),
+    )
+    .query(({ input }) => {
+      const windowSessionIds = db()
+        .select({ id: agentTurns.sessionId })
+        .from(agentTurns)
+        .where(turnFilter(cutoffDate(input.days), input.projectPath))
+
+      const rows = db()
+        .select()
+        .from(agentSessions)
+        .where(inArray(agentSessions.sessionId, windowSessionIds))
+        .orderBy(desc(agentSessions.startedAt))
+        .all()
+
+      return rows.map((r) => ({
+        sessionId: r.sessionId,
+        project: basename(r.projectPath) || r.projectPath,
+        projectPath: r.projectPath,
+        startedAt: r.startedAt,
+        endedAt: r.endedAt,
+        score: r.score,
+        summary: r.summary,
+        turnCount: r.turnCount,
+        totalTokens: r.totalTokensIn + r.totalTokensOut,
+        avgComplexity: r.avgComplexity,
+      }))
+    }),
+
+  // Tool / skill usage frequency (turns that used each), windowed + per project.
+  toolSkillUsage: publicProcedure
+    .input(rangeInput)
+    .output(
+      z.object({
+        tools: z.array(z.object({ name: z.string(), count: z.number() })),
+        skills: z.array(z.object({ name: z.string(), count: z.number() })),
+      }),
+    )
+    .query(({ input }) => {
+      const rows = db()
+        .select({ tools: agentTurns.toolsUsed, skills: agentTurns.skillsUsed })
+        .from(agentTurns)
+        .where(turnFilter(cutoffDate(input.days), input.projectPath))
+        .all()
+
+      const tally = (lists: (string[] | null)[]): { name: string; count: number }[] => {
+        const counts = new Map<string, number>()
+        for (const list of lists) {
+          for (const name of list ?? []) counts.set(name, (counts.get(name) ?? 0) + 1)
+        }
+        return [...counts.entries()]
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+      }
+
+      return {
+        tools: tally(rows.map((r) => r.tools)),
+        skills: tally(rows.map((r) => r.skills)),
+      }
+    }),
+
+  // Tool / skill co-occurrence: how often two appear together in the same turn.
+  // Counts unordered pairs per turn, windowed + per project.
+  coOccurrence: publicProcedure
+    .input(rangeInput)
+    .output(
+      z.object({
+        toolPairs: z.array(z.object({ name: z.string(), count: z.number() })),
+        skillPairs: z.array(z.object({ name: z.string(), count: z.number() })),
+      }),
+    )
+    .query(({ input }) => {
+      const rows = db()
+        .select({ tools: agentTurns.toolsUsed, skills: agentTurns.skillsUsed })
+        .from(agentTurns)
+        .where(turnFilter(cutoffDate(input.days), input.projectPath))
+        .all()
+
+      const pairs = (lists: (string[] | null)[]): { name: string; count: number }[] => {
+        const counts = new Map<string, number>()
+        for (const list of lists) {
+          const uniq = [...new Set(list ?? [])].sort()
+          for (let i = 0; i < uniq.length; i++) {
+            for (let j = i + 1; j < uniq.length; j++) {
+              const key = `${uniq[i]} + ${uniq[j]}`
+              counts.set(key, (counts.get(key) ?? 0) + 1)
+            }
+          }
+        }
+        return [...counts.entries()]
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+      }
+
+      return {
+        toolPairs: pairs(rows.map((r) => r.tools)),
+        skillPairs: pairs(rows.map((r) => r.skills)),
+      }
+    }),
+
+  // Ecosystem-change days within the window (global), for overlaying reference
+  // lines on the daily charts. Date keys match overview.tokensByDay. `label`
+  // summarizes that day's changes for the chart tooltip.
+  ecosystemDays: publicProcedure
+    .input(z.object({ days: z.number().int().positive().default(30) }).default({ days: 30 }))
+    .output(
+      z.array(
+        z.object({
+          date: z.string(),
+          count: z.number(),
+          types: z.array(z.string()),
+          label: z.string(),
+        }),
+      ),
+    )
+    .query(({ input }) => {
+      const day = sql<string>`date(${ecosystemChanges.ts} / 1000, 'unixepoch', 'localtime')`
+      const rows = db()
+        .select({
+          date: day,
+          type: ecosystemChanges.type,
+          target: ecosystemChanges.target,
+          note: ecosystemChanges.note,
+        })
+        .from(ecosystemChanges)
+        .where(gte(ecosystemChanges.ts, cutoffDate(input.days)))
+        .all()
+
+      const m = new Map<string, { count: number; types: Set<string>; parts: string[] }>()
+      for (const r of rows) {
+        const e = m.get(r.date) ?? { count: 0, types: new Set<string>(), parts: [] }
+        e.count++
+        e.types.add(r.type)
+        e.parts.push(r.target ?? r.note ?? r.type.replace(/_/g, ' '))
+        m.set(r.date, e)
+      }
+      const cap = (s: string): string => (s.length > 80 ? `${s.slice(0, 79)}…` : s)
+      return [...m.entries()]
+        .map(([date, e]) => ({
+          date,
+          count: e.count,
+          types: [...e.types],
+          label: cap([...new Set(e.parts)].join(', ')),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date))
+    }),
+
+  // Before/after impact of each ecosystem change: avg tokens-per-turn in the
+  // `window` days before vs after the change. The core thesis metric — does a
+  // skill/MCP/config edit move token efficiency? Global, respects the allowlist.
+  ecosystemImpact: publicProcedure
+    .input(z.object({ window: z.number().int().positive().default(7) }).default({ window: 7 }))
+    .output(
+      z.array(
+        z.object({
+          id: z.string(),
+          ts: z.date(),
+          type: z.string(),
+          target: z.string().nullable(),
+          turnsBefore: z.number(),
+          turnsAfter: z.number(),
+          tokPerTurnBefore: z.number().nullable(),
+          tokPerTurnAfter: z.number().nullable(),
+          deltaPct: z.number().nullable(),
+        }),
+      ),
+    )
+    .query(({ input }) => {
+      const w = input.window * 24 * 60 * 60 * 1000
+      // Bound the change list to the last 60 days so the table stays digestible.
+      const changes = db()
+        .select()
+        .from(ecosystemChanges)
+        .where(gte(ecosystemChanges.ts, cutoffDate(60)))
+        .orderBy(desc(ecosystemChanges.ts))
+        .all()
+      if (changes.length === 0) return []
+
+      // Load every turn that could fall in any before/after window in one pass,
+      // then bucket in JS (variable per-change windows don't group well in SQL).
+      const earliest = Math.min(...changes.map((c) => c.ts.getTime())) - w
+      const turns = db()
+        .select({ ts: agentTurns.ts, tin: agentTurns.tokensIn, tout: agentTurns.tokensOut })
+        .from(agentTurns)
+        .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
+        .all()
+
+      return changes.map((c) => {
+        const t = c.ts.getTime()
+        let nb = 0
+        let sb = 0
+        let na = 0
+        let sa = 0
+        for (const x of turns) {
+          const xt = x.ts.getTime()
+          if (xt >= t - w && xt < t) {
+            nb++
+            sb += x.tin + x.tout
+          } else if (xt >= t && xt < t + w) {
+            na++
+            sa += x.tin + x.tout
+          }
+        }
+        const before = nb ? sb / nb : null
+        const after = na ? sa / na : null
+        const deltaPct = before != null && after != null ? ((after - before) / before) * 100 : null
+        return {
+          id: c.id,
+          ts: c.ts,
+          type: c.type,
+          target: c.target,
+          turnsBefore: nb,
+          turnsAfter: na,
+          tokPerTurnBefore: before,
+          tokPerTurnAfter: after,
+          deltaPct,
+        }
+      })
+    }),
+
+  // Ecosystem change timeline (global — settings/skill edits aren't per-project).
+  ecosystem: publicProcedure
+    .input(z.object({ days: z.number().int().positive().default(90) }).default({ days: 90 }))
+    .output(
+      z.array(
+        z.object({
+          id: z.string(),
+          ts: z.date(),
+          type: z.string(),
+          target: z.string().nullable(),
+          source: z.string().nullable(),
+          note: z.string().nullable(),
+        }),
+      ),
+    )
+    .query(({ input }) => {
+      const rows = db()
+        .select()
+        .from(ecosystemChanges)
+        .where(gte(ecosystemChanges.ts, cutoffDate(input.days)))
+        .orderBy(desc(ecosystemChanges.ts))
+        .all()
+
+      return rows.map((r) => ({
+        id: r.id,
+        ts: r.ts,
+        type: r.type,
+        target: r.target,
+        source: r.source,
+        note: r.note,
+      }))
+    }),
+
+  // Add a manual annotation to the ecosystem timeline.
+  addNote: publicProcedure
+    .input(z.object({ ts: z.date(), note: z.string().min(1) }))
+    .output(z.object({ id: z.string() }))
+    .mutation(({ input }) => {
+      const id = ecosystemId(input.ts.toISOString(), 'manual_note', null, input.note)
+      db()
+        .insert(ecosystemChanges)
+        .values({
+          id,
+          ts: input.ts,
+          type: 'manual_note',
+          target: null,
+          source: 'manual',
+          diff: null,
+          note: input.note,
+        })
+        .onConflictDoNothing()
+        .run()
+      return { id }
+    }),
+})
