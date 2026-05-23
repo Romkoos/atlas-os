@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import { db } from '@main/db/client'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { appPaths } from '@main/paths'
+import { complexityFromPercentiles, percentileRanks } from '@main/services/productivity/complexity'
 import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
@@ -39,6 +40,55 @@ const projectCondition = (projectPath?: string): SQL | undefined =>
 // on it would hide every session when hooks aren't installed.
 const turnFilter = (cutoff: Date, projectPath?: string): SQL | undefined =>
   and(gte(agentTurns.ts, cutoff), projectCondition(projectPath))
+
+interface SessionComplexity {
+  complexity: number // 1..10
+  distinctFiles: number
+  distinctDirs: number
+  distinctTools: number
+  distinctSkills: number
+  subagentCount: number
+}
+
+// Complexity = percentile-composite of five scope counts across the whole
+// (tracked) session corpus. Computed at read time so it never goes stale.
+function sessionComplexityMap(): Map<string, SessionComplexity> {
+  const tracked = trackedProjects()
+  const rows = db()
+    .select({
+      sessionId: agentSessions.sessionId,
+      distinctFiles: agentSessions.distinctFiles,
+      distinctDirs: agentSessions.distinctDirs,
+      distinctTools: agentSessions.distinctTools,
+      distinctSkills: agentSessions.distinctSkills,
+      subagentCount: agentSessions.subagentCount,
+    })
+    .from(agentSessions)
+    .where(tracked.length ? inArray(agentSessions.projectPath, tracked) : undefined)
+    .all()
+
+  const pFiles = percentileRanks(rows.map((r) => r.distinctFiles))
+  const pDirs = percentileRanks(rows.map((r) => r.distinctDirs))
+  const pTools = percentileRanks(rows.map((r) => r.distinctTools))
+  const pSkills = percentileRanks(rows.map((r) => r.distinctSkills))
+  const pSub = percentileRanks(rows.map((r) => r.subagentCount))
+
+  const map = new Map<string, SessionComplexity>()
+  rows.forEach((r, i) => {
+    map.set(r.sessionId, {
+      complexity: complexityFromPercentiles([pFiles[i], pDirs[i], pTools[i], pSkills[i], pSub[i]]),
+      distinctFiles: r.distinctFiles,
+      distinctDirs: r.distinctDirs,
+      distinctTools: r.distinctTools,
+      distinctSkills: r.distinctSkills,
+      subagentCount: r.subagentCount,
+    })
+  })
+  return map
+}
+
+const mean = (xs: number[]): number | null =>
+  xs.length === 0 ? null : xs.reduce((s, x) => s + x, 0) / xs.length
 
 export const productivityRouter = router({
   // Re-scan transcripts + JSONL buffer and upsert into the DB.
@@ -141,7 +191,6 @@ export const productivityRouter = router({
           totalTokens: sql<number>`coalesce(sum(${agentTurns.tokensIn} + ${agentTurns.tokensOut}), 0)`,
           turns: count(),
           sessions: countDistinct(agentTurns.sessionId),
-          avgComplexity: avg(agentTurns.complexityProxy),
         })
         .from(agentTurns)
         .where(scoped)
@@ -164,12 +213,46 @@ export const productivityRouter = router({
           totalTokens: sql<number>`coalesce(sum(${agentTurns.tokensIn} + ${agentTurns.tokensOut}), 0)`,
           turns: count(),
           sessions: countDistinct(agentTurns.sessionId),
-          avgComplexity: avg(agentTurns.complexityProxy),
         })
         .from(agentTurns)
         .where(and(gte(agentTurns.ts, cutoff), trackedCondition()))
         .groupBy(agentTurns.projectPath)
         .all()
+
+      // Complexity aggregates computed at read time from the session corpus.
+      const cmap = sessionComplexityMap()
+      const windowIdSet = new Set(
+        db()
+          .select({ id: agentTurns.sessionId })
+          .from(agentTurns)
+          .where(scoped)
+          .all()
+          .map((r) => r.id),
+      )
+      const avgComplexity = mean(
+        [...windowIdSet]
+          .map((id) => cmap.get(id)?.complexity)
+          .filter((c): c is number => c != null),
+      )
+
+      // Per-project complexity over the window. Restrict to tracked sessions so
+      // the project lookup matches sessionComplexityMap's corpus.
+      const projComplexity = new Map<string, number[]>()
+      const tracked = trackedProjects()
+      const projOfSession = db()
+        .select({ id: agentSessions.sessionId, project: agentSessions.projectPath })
+        .from(agentSessions)
+        .where(tracked.length ? inArray(agentSessions.projectPath, tracked) : undefined)
+        .all()
+      const projById = new Map(projOfSession.map((r) => [r.id, r.project]))
+      for (const id of windowIdSet) {
+        const c = cmap.get(id)?.complexity
+        const p = projById.get(id)
+        if (c == null || p == null) continue
+        const arr = projComplexity.get(p) ?? []
+        arr.push(c)
+        projComplexity.set(p, arr)
+      }
 
       return {
         tokensByDay,
@@ -178,7 +261,7 @@ export const productivityRouter = router({
           turns: totals?.turns ?? 0,
           sessions: totals?.sessions ?? 0,
           avgScore: toNum(scoreRow?.avgScore ?? null),
-          avgComplexity: toNum(totals?.avgComplexity ?? null),
+          avgComplexity,
         },
         byProject: byProject
           .map((p) => ({
@@ -187,7 +270,7 @@ export const productivityRouter = router({
             totalTokens: Number(p.totalTokens),
             turns: p.turns,
             sessions: p.sessions,
-            avgComplexity: toNum(p.avgComplexity),
+            avgComplexity: mean(projComplexity.get(p.projectPath) ?? []),
           }))
           .sort((a, b) => b.totalTokens - a.totalTokens),
       }
@@ -281,7 +364,12 @@ export const productivityRouter = router({
           summary: z.string().nullable(),
           turnCount: z.number(),
           totalTokens: z.number(),
-          avgComplexity: z.number().nullable(),
+          complexity: z.number().nullable(),
+          distinctFiles: z.number(),
+          distinctDirs: z.number(),
+          distinctTools: z.number(),
+          distinctSkills: z.number(),
+          subagentCount: z.number(),
         }),
       ),
     )
@@ -298,18 +386,27 @@ export const productivityRouter = router({
         .orderBy(desc(agentSessions.startedAt))
         .all()
 
-      return rows.map((r) => ({
-        sessionId: r.sessionId,
-        project: basename(r.projectPath) || r.projectPath,
-        projectPath: r.projectPath,
-        startedAt: r.startedAt,
-        endedAt: r.endedAt,
-        score: r.score,
-        summary: r.summary,
-        turnCount: r.turnCount,
-        totalTokens: r.totalTokensIn + r.totalTokensOut,
-        avgComplexity: r.avgComplexity,
-      }))
+      const cmap = sessionComplexityMap()
+      return rows.map((r) => {
+        const c = cmap.get(r.sessionId)
+        return {
+          sessionId: r.sessionId,
+          project: basename(r.projectPath) || r.projectPath,
+          projectPath: r.projectPath,
+          startedAt: r.startedAt,
+          endedAt: r.endedAt,
+          score: r.score,
+          summary: r.summary,
+          turnCount: r.turnCount,
+          totalTokens: r.totalTokensIn + r.totalTokensOut,
+          complexity: c?.complexity ?? null,
+          distinctFiles: c?.distinctFiles ?? 0,
+          distinctDirs: c?.distinctDirs ?? 0,
+          distinctTools: c?.distinctTools ?? 0,
+          distinctSkills: c?.distinctSkills ?? 0,
+          subagentCount: c?.subagentCount ?? 0,
+        }
+      })
     }),
 
   // Tool / skill usage frequency (turns that used each), windowed + per project.
