@@ -508,15 +508,24 @@ function OverviewTab({ days, projectPath }: Scope) {
   )
 }
 
+const SESSIONS_PAGE_SIZE = 25
+
 function SessionsTab({ days, projectPath }: Scope) {
   const sessions = trpc.productivity.sessions.useQuery({ days, projectPath })
+  const [page, setPage] = useState(0)
 
   if (sessions.isLoading) return <Loading />
   if (sessions.isError)
     return <p className="px-1 py-4 text-destructive text-sm">Failed to load sessions.</p>
 
+  // Rows arrive newest-first from the router (ordered by startedAt desc).
   const rows = sessions.data ?? []
   if (rows.length === 0) return <EmptyHint />
+
+  const pageCount = Math.ceil(rows.length / SESSIONS_PAGE_SIZE)
+  const current = Math.min(page, pageCount - 1) // clamp if scope shrank the list
+  const start = current * SESSIONS_PAGE_SIZE
+  const pageRows = rows.slice(start, start + SESSIONS_PAGE_SIZE)
 
   return (
     <Card>
@@ -538,7 +547,7 @@ function SessionsTab({ days, projectPath }: Scope) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => (
+              {pageRows.map((s) => (
                 <tr key={s.sessionId} className="border-b align-top last:border-0">
                   <td className="py-2 pr-4">
                     <span className="font-medium" title={s.projectPath}>
@@ -569,6 +578,34 @@ function SessionsTab({ days, projectPath }: Scope) {
             </tbody>
           </table>
         </div>
+        {pageCount > 1 && (
+          <div className="mt-3 flex items-center justify-between text-muted-foreground text-xs">
+            <span className="tabular-nums">
+              {start + 1}–{Math.min(start + SESSIONS_PAGE_SIZE, rows.length)} of {rows.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current === 0}
+                onClick={() => setPage(current - 1)}
+              >
+                Prev
+              </Button>
+              <span className="tabular-nums">
+                Page {current + 1} / {pageCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current >= pageCount - 1}
+                onClick={() => setPage(current + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
