@@ -737,7 +737,7 @@ function RatingControl({ sessionId, score }: { sessionId: string; score: number 
         setRating.mutate({ sessionId, score: v })
       }}
     >
-      <option value="">— (7)</option>
+      <option value="">— (5.5)</option>
       {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
         <option key={n} value={n}>
           {n}
