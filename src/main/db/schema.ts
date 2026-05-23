@@ -38,6 +38,7 @@ export const agentTurns = sqliteTable(
     tokensOut: integer('tokens_out').notNull().default(0),
     toolsUsed: text('tools_used', { mode: 'json' }).$type<string[]>().notNull(),
     skillsUsed: text('skills_used', { mode: 'json' }).$type<string[]>().notNull(),
+    filesTouched: text('files_touched', { mode: 'json' }).$type<string[]>().notNull().default([]),
     complexityProxy: real('complexity_proxy'),
   },
   (t) => [
@@ -62,7 +63,12 @@ export const agentSessions = sqliteTable(
     totalTokensIn: integer('total_tokens_in').notNull().default(0),
     totalTokensOut: integer('total_tokens_out').notNull().default(0),
     turnCount: integer('turn_count').notNull().default(0),
-    avgComplexity: real('avg_complexity'),
+    avgComplexity: real('avg_complexity'), // DEPRECATED: complexity is computed at read time
+    distinctFiles: integer('distinct_files').notNull().default(0),
+    distinctDirs: integer('distinct_dirs').notNull().default(0),
+    distinctTools: integer('distinct_tools').notNull().default(0),
+    distinctSkills: integer('distinct_skills').notNull().default(0),
+    subagentCount: integer('subagent_count').notNull().default(0),
   },
   (t) => [
     index('idx_sessions_project').on(t.projectPath),
