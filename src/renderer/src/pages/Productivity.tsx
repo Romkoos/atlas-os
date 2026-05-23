@@ -51,6 +51,8 @@ interface Scope {
 const fmtInt = new Intl.NumberFormat('en-US')
 const num = (n: number): string => fmtInt.format(n)
 const dash = (v: number | null, digits = 1): string => (v == null ? '—' : v.toFixed(digits))
+const scoreLabel = (avg: number | null, rated: number, total: number): string =>
+  rated === 0 ? '—' : `${avg == null ? '—' : avg.toFixed(1)} · ${rated}/${total} rated`
 // Dates cross IPC as real Date objects (structured clone), but tRPC's transformer-less
 // type inference reports them as string — accept both and normalize.
 const fmtDate = (d: Date | string | null): string => (d ? new Date(d).toLocaleString() : '—')
@@ -240,7 +242,10 @@ function OverviewTab({ days, projectPath }: Scope) {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <MetricCard label="Total tokens" value={num(totals.totalTokens)} />
         <MetricCard label="Sessions" value={num(totals.sessions)} />
-        <MetricCard label="Avg score" value={dash(totals.avgScore)} />
+        <MetricCard
+          label="Avg score (rated)"
+          value={scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
+        />
         <MetricCard label="Avg complexity" value={dash(totals.avgComplexity)} />
       </div>
 
