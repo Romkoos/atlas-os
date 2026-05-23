@@ -155,6 +155,8 @@ export const productivityRouter = router({
           turns: z.number(),
           sessions: z.number(),
           avgScore: z.number().nullable(),
+          ratedCount: z.number(),
+          totalCount: z.number(),
           avgComplexity: z.number().nullable(),
         }),
         byProject: z.array(
@@ -202,7 +204,11 @@ export const productivityRouter = router({
         .from(agentTurns)
         .where(scoped)
       const scoreRow = db()
-        .select({ avgScore: avg(agentSessions.score) })
+        .select({
+          avgScore: avg(agentSessions.score),
+          ratedCount: sql<number>`count(${agentSessions.score})`, // counts non-null only
+          totalCount: count(),
+        })
         .from(agentSessions)
         .where(inArray(agentSessions.sessionId, windowSessionIds))
         .get()
@@ -261,6 +267,8 @@ export const productivityRouter = router({
           turns: totals?.turns ?? 0,
           sessions: totals?.sessions ?? 0,
           avgScore: toNum(scoreRow?.avgScore ?? null),
+          ratedCount: scoreRow?.ratedCount ?? 0,
+          totalCount: scoreRow?.totalCount ?? 0,
           avgComplexity,
         },
         byProject: byProject
@@ -631,6 +639,22 @@ export const productivityRouter = router({
         source: r.source,
         note: r.note,
       }))
+    }),
+
+  // Set/clear the user quality rating (1–10) for a session. Quality is
+  // user-only; null clears it (falls back to the imputed default in the UI).
+  setRating: publicProcedure
+    .input(
+      z.object({ sessionId: z.string().min(1), score: z.number().int().min(1).max(10).nullable() }),
+    )
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(({ input }) => {
+      db()
+        .update(agentSessions)
+        .set({ score: input.score })
+        .where(eq(agentSessions.sessionId, input.sessionId))
+        .run()
+      return { ok: true }
     }),
 
   // Add a manual annotation to the ecosystem timeline.
