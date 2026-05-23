@@ -1,12 +1,36 @@
-import type { AgentTurn } from '@main/services/productivity/transcript'
+// Session-level complexity from "scope" signals (files, dirs, tool types,
+// skills, subagents). Each signal is percentile-ranked across the session
+// corpus, then averaged and mapped to 1–10. Kept pure (no DB) so it is
+// unit-testable; the tRPC layer supplies the corpus. See
+// docs/superpowers/specs/2026-05-23-complexity-quality-metrics-design.md.
 
-// Subjective-effort proxy on a 1–5 scale.
-//
-// STUB: returns the middle value for every turn. A real heuristic
-// (f(turn_count, distinct_tools, files_touched, tokens)) will replace this
-// later — see docs/agent-productivity-tracker.md "Открытые вопросы". The
-// signature is intentionally stable so the ingest pipeline does not change
-// when the formula lands.
-export function complexityProxy(_turn: AgentTurn): number {
+// Mid-rank percentile of each value within `values`, in [0,1].
+// (countLess + 0.5*countEqual) / n. Single value -> 0.5. Empty -> [].
+export function percentileRanks(values: number[]): number[] {
+  const n = values.length
+  if (n === 0) return []
+  return values.map((v) => {
+    let less = 0
+    let equal = 0
+    for (const o of values) {
+      if (o < v) less++
+      else if (o === v) equal++
+    }
+    return (less + 0.5 * equal) / n
+  })
+}
+
+// Mean of the per-signal percentiles -> 1..10. Empty -> 1.
+export function complexityFromPercentiles(percentiles: number[]): number {
+  if (percentiles.length === 0) return 1
+  const mean = percentiles.reduce((s, p) => s + p, 0) / percentiles.length
+  const scaled = 1 + 9 * mean
+  return Math.min(10, Math.max(1, scaled))
+}
+
+// @deprecated Stub kept for ingest.ts compatibility; removed in Task 5 when
+// ingest is updated to use the corpus-aware percentile path.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function complexityProxy(_turn: any): number {
   return 3
 }
