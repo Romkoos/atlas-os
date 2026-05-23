@@ -11,7 +11,6 @@ import {
 } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
-import { kpiSession } from '@shared/kpi'
 import { RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import {
@@ -54,6 +53,7 @@ interface Scope {
 const fmtInt = new Intl.NumberFormat('en-US')
 const num = (n: number): string => fmtInt.format(n)
 const dash = (v: number | null, digits = 1): string => (v == null ? '—' : v.toFixed(digits))
+const pct = (v: number | null, digits = 0): string => (v == null ? '—' : `${v.toFixed(digits)}%`)
 const scoreLabel = (avg: number | null, rated: number, total: number): string =>
   rated === 0 ? '—' : `${avg == null ? '—' : avg.toFixed(1)} · ${rated}/${total} rated`
 // Dates cross IPC as real Date objects (structured clone), but tRPC's transformer-less
@@ -139,7 +139,7 @@ function KpiTooltip(props: {
       <div className="mb-1 font-medium">{props.label}</div>
       <div className="flex justify-between gap-6">
         <span className="text-muted-foreground">KPI</span>
-        <span className="tabular-nums">{row.kpi == null ? '—' : row.kpi.toFixed(1)}</span>
+        <span className="tabular-nums">{row.kpi == null ? '—' : `${row.kpi.toFixed(0)}%`}</span>
       </div>
       <div className="flex justify-between gap-6">
         <span className="text-muted-foreground">Sessions</span>
@@ -290,7 +290,7 @@ function OverviewTab({ days, projectPath }: Scope) {
           value={scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
         />
         <MetricCard label="Avg complexity" value={dash(totals.avgComplexity)} />
-        <MetricCard label="KPI" value={dash(kpi.data?.overall ?? null)} />
+        <MetricCard label="KPI" value={pct(kpi.data?.overall ?? null)} />
       </div>
 
       <Card>
@@ -447,8 +447,9 @@ function OverviewTab({ days, projectPath }: Scope) {
         <CardHeader>
           <CardTitle className="text-base">KPI (efficiency)</CardTitle>
           <p className="text-muted-foreground text-xs">
-            (score ?? 5.5) × complexity per 1M tokens, token-weighted per day — higher is better.
-            {(ecoDays.data?.length ?? 0) > 0 ? ' ⚑ marks ecosystem changes.' : ''}
+            Efficiency percentile (quality × complexity per token, ranked across all sessions),
+            averaged per day — higher is better.{' '}
+            {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
           </p>
         </CardHeader>
         <CardContent>
@@ -474,10 +475,11 @@ function OverviewTab({ days, projectPath }: Scope) {
                     minTickGap={16}
                   />
                   <YAxis
+                    domain={[0, 100]}
                     tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={44}
-                    tickFormatter={(value: number) => value.toFixed(1)}
+                    tickFormatter={(value: number) => `${value}%`}
                   />
                   <Tooltip
                     cursor={{ stroke: 'var(--color-muted)', strokeWidth: 1 }}
@@ -668,9 +670,9 @@ function SessionsTab({ days, projectPath }: Scope) {
                   </td>
                   <td
                     className="py-2 pr-4 text-right tabular-nums"
-                    title="score (or 5.5 if unrated) × complexity ÷ (tokens / 1M) — higher is more efficient"
+                    title="Efficiency percentile across all sessions — higher is more efficient"
                   >
-                    {dash(kpiSession(s.score, s.complexity, s.totalTokens), 1)}
+                    {pct(s.kpi)}
                   </td>
                   <td className="py-2 pr-4">
                     <RatingControl sessionId={s.sessionId} score={s.score} />
@@ -900,12 +902,8 @@ function EcosystemTab({ days }: { days: number }) {
                       <td className="py-2 pr-4 text-right">
                         <ImpactDelta pct={r.deltaPct} />
                       </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {r.kpiBefore == null ? '—' : r.kpiBefore.toFixed(1)}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {r.kpiAfter == null ? '—' : r.kpiAfter.toFixed(1)}
-                      </td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiBefore)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiAfter)}</td>
                       <td className="py-2 text-right">
                         <ImpactDelta pct={r.kpiDeltaPct} goodDirection="up" />
                       </td>

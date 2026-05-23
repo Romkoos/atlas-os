@@ -7,7 +7,7 @@ import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { type KpiInput, type KpiSession, kpiByDay, kpiWindow } from '@shared/kpi'
+import { type KpiDaySession, kpiByDay, kpiCoefficient, rawEfficiency } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -85,6 +85,35 @@ function sessionComplexityMap(): Map<string, SessionComplexity> {
       subagentCount: r.subagentCount,
     })
   })
+  return map
+}
+
+// Per-session efficiency percentile (0..1) across the tracked corpus. rawEff =
+// (score ?? 5.5) × complexity / tokens, percentile-ranked the same way complexity
+// is. Sessions with no complexity or no tokens are unrankable → absent from the map.
+function sessionEfficiencyMap(
+  cmap: Map<string, SessionComplexity> = sessionComplexityMap(),
+): Map<string, number> {
+  const tracked = trackedProjects()
+  const rows = db()
+    .select({
+      id: agentSessions.sessionId,
+      score: agentSessions.score,
+      tin: agentSessions.totalTokensIn,
+      tout: agentSessions.totalTokensOut,
+    })
+    .from(agentSessions)
+    .where(tracked.length ? inArray(agentSessions.projectPath, tracked) : undefined)
+    .all()
+  const items = rows
+    .map((r) => ({
+      id: r.id,
+      e: rawEfficiency(r.score, cmap.get(r.id)?.complexity ?? null, r.tin + r.tout),
+    }))
+    .filter((x): x is { id: string; e: number } => x.e != null)
+  const ranks = percentileRanks(items.map((x) => x.e))
+  const map = new Map<string, number>()
+  for (let i = 0; i < items.length; i++) map.set(items[i].id, ranks[i])
   return map
 }
 
@@ -285,29 +314,18 @@ export const productivityRouter = router({
       }
     }),
 
-  // Efficiency KPI per day + overall, scoped by window + optional project.
-  // KPI = (score ?? 5.5) × complexity / (tokens / 1M), token-weighted per day.
-  // Each session is bucketed on its last-turn local day so day keys align with
-  // tokensByDay / ecosystemDays (the EcoMarkers overlay relies on that).
+  // Efficiency KPI (0–100% percentile coefficient) per day + overall, scoped by
+  // window + optional project. Each session bucketed on its last-turn local day.
   kpi: publicProcedure
     .input(rangeInput)
     .output(
       z.object({
-        byDay: z.array(
-          z.object({
-            date: z.string(),
-            kpi: z.number(),
-            sessions: z.number(),
-            tokens: z.number(),
-          }),
-        ),
+        byDay: z.array(z.object({ date: z.string(), kpi: z.number(), sessions: z.number() })),
         overall: z.number().nullable(),
       }),
     )
     .query(({ input }) => {
       const scoped = turnFilter(cutoffDate(input.days), input.projectPath)
-
-      // Each session's last-turn local day, within window + scope.
       const day = sql<string>`date(max(${agentTurns.ts}) / 1000, 'unixepoch', 'localtime')`
       const dayRows = db()
         .select({ id: agentTurns.sessionId, day })
@@ -316,35 +334,17 @@ export const productivityRouter = router({
         .groupBy(agentTurns.sessionId)
         .all()
       if (dayRows.length === 0) return { byDay: [], overall: null }
-      const dayById = new Map(dayRows.map((r) => [r.id, r.day]))
 
-      const ids = dayRows.map((r) => r.id)
-      const sessRows = db()
-        .select({
-          id: agentSessions.sessionId,
-          score: agentSessions.score,
-          tin: agentSessions.totalTokensIn,
-          tout: agentSessions.totalTokensOut,
-        })
-        .from(agentSessions)
-        .where(inArray(agentSessions.sessionId, ids))
-        .all()
-
-      const cmap = sessionComplexityMap()
-      const sessions: KpiSession[] = sessRows.flatMap((r) => {
-        const day = dayById.get(r.id)
-        if (!day) return []
-        return [
-          {
-            day,
-            score: r.score,
-            complexity: cmap.get(r.id)?.complexity ?? null,
-            tokens: r.tin + r.tout,
-          },
-        ]
+      const effMap = sessionEfficiencyMap()
+      const sessions: KpiDaySession[] = dayRows.flatMap((r) => {
+        const percentile = effMap.get(r.id)
+        return percentile == null ? [] : [{ day: r.day, percentile }]
       })
-
-      return { byDay: kpiByDay(sessions), overall: kpiWindow(sessions) }
+      // Percentiles are corpus-wide; overall is their mean over the window — intentionally NOT re-ranked within the window.
+      return {
+        byDay: kpiByDay(sessions),
+        overall: kpiCoefficient(sessions.map((s) => s.percentile)),
+      }
     }),
 
   // Current local calendar day broken down by hour (0–23). Always "today",
@@ -436,6 +436,7 @@ export const productivityRouter = router({
           turnCount: z.number(),
           totalTokens: z.number(),
           complexity: z.number().nullable(),
+          kpi: z.number().nullable(),
           distinctFiles: z.number(),
           distinctDirs: z.number(),
           distinctTools: z.number(),
@@ -474,6 +475,7 @@ export const productivityRouter = router({
         .all()
 
       const cmap = sessionComplexityMap()
+      const effMap = sessionEfficiencyMap(cmap)
       const recency = (r: (typeof rows)[number]): number =>
         lastById.get(r.sessionId) ?? r.endedAt?.getTime() ?? r.startedAt?.getTime() ?? 0
 
@@ -481,6 +483,7 @@ export const productivityRouter = router({
         .sort((a, b) => recency(b) - recency(a))
         .map((r) => {
           const c = cmap.get(r.sessionId)
+          const eff = effMap.get(r.sessionId)
           const firstTs = firstById.get(r.sessionId)
           const lastTs = lastById.get(r.sessionId)
           return {
@@ -494,6 +497,7 @@ export const productivityRouter = router({
             turnCount: r.turnCount,
             totalTokens: r.totalTokensIn + r.totalTokensOut,
             complexity: c?.complexity ?? null,
+            kpi: eff == null ? null : eff * 100,
             distinctFiles: c?.distinctFiles ?? 0,
             distinctDirs: c?.distinctDirs ?? 0,
             distinctTools: c?.distinctTools ?? 0,
@@ -672,31 +676,10 @@ export const productivityRouter = router({
         .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
         .groupBy(agentTurns.sessionId)
         .all()
-      const sessMeta = db()
-        .select({
-          id: agentSessions.sessionId,
-          score: agentSessions.score,
-          tin: agentSessions.totalTokensIn,
-          tout: agentSessions.totalTokensOut,
-        })
-        .from(agentSessions)
-        .where(
-          inArray(
-            agentSessions.sessionId,
-            sessLast.map((s) => s.id),
-          ),
-        )
-        .all()
-      const cmap = sessionComplexityMap()
-      const metaById = new Map(sessMeta.map((m) => [m.id, m]))
-      const kpiSessions = sessLast.map((s) => {
-        const m = metaById.get(s.id)
-        return {
-          last: s.last,
-          score: m?.score ?? null,
-          complexity: cmap.get(s.id)?.complexity ?? null,
-          tokens: (m?.tin ?? 0) + (m?.tout ?? 0),
-        }
+      const effMap = sessionEfficiencyMap()
+      const kpiSessions = sessLast.flatMap((s) => {
+        const percentile = effMap.get(s.id)
+        return percentile == null ? [] : [{ last: s.last, percentile }]
       })
 
       return changes.map((c) => {
@@ -718,14 +701,14 @@ export const productivityRouter = router({
         const before = nb ? sb / nb : null
         const after = na ? sa / na : null
         const deltaPct = before != null && after != null ? ((after - before) / before) * 100 : null
-        const kb: KpiInput[] = []
-        const ka: KpiInput[] = []
+        const kb: number[] = []
+        const ka: number[] = []
         for (const s of kpiSessions) {
-          if (s.last >= t - w && s.last < t) kb.push(s)
-          else if (s.last >= t && s.last < t + w) ka.push(s)
+          if (s.last >= t - w && s.last < t) kb.push(s.percentile)
+          else if (s.last >= t && s.last < t + w) ka.push(s.percentile)
         }
-        const kpiBefore = kpiWindow(kb)
-        const kpiAfter = kpiWindow(ka)
+        const kpiBefore = kpiCoefficient(kb)
+        const kpiAfter = kpiCoefficient(ka)
         const kpiDeltaPct =
           kpiBefore != null && kpiAfter != null && kpiBefore !== 0
             ? ((kpiAfter - kpiBefore) / kpiBefore) * 100

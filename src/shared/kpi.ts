@@ -1,78 +1,56 @@
-// KPI = efficiency: useful output (quality × complexity) per token spent.
-// Pure math, shared by the tRPC router (main), the Productivity page (renderer),
-// and unit tests. See docs/superpowers/specs/2026-05-23-kpd-efficiency-metric-design.md
+// KPI = efficiency coefficient (0–100%). Per session, raw efficiency is
+// (quality × complexity) / tokens; that raw value is percentile-ranked across
+// the whole session corpus (in the tRPC layer, via percentileRanks — the same
+// machinery as complexity). A set's KPI is the mean of its members' percentiles
+// × 100 — bounded, smooth, and independent of token volume.
+// See docs/superpowers/specs/2026-05-23-kpd-efficiency-metric-design.md
 
 /** Imputed quality for sessions the user has not rated (1–10 scale midpoint). */
 export const UNRATED_SCORE = 5.5
 
-const TOKENS_PER_UNIT = 1_000_000 // KPI is expressed per 1M tokens
-
-/** Minimal per-session shape KPI needs. `score` null = unrated. */
-export interface KpiInput {
-  score: number | null
-  complexity: number | null
-  tokens: number
-}
-
-/** A KPI input tagged with the local calendar day it belongs to (YYYY-MM-DD). */
-export interface KpiSession extends KpiInput {
-  day: string
-}
-
-const usable = (s: KpiInput): s is KpiInput & { complexity: number } =>
-  s.complexity != null && s.tokens > 0
-const quality = (score: number | null): number => score ?? UNRATED_SCORE
-
-// Token-weighted KPI over a set of sessions: Σ(q × complexity) / (Σ tokens / 1M).
-// q = score ?? 5.5. Skips sessions with null complexity or non-positive tokens.
-// Returns null when no usable tokens remain.
-export function kpiWindow(sessions: KpiInput[]): number | null {
-  let sumQC = 0
-  let sumTok = 0
-  for (const s of sessions) {
-    if (!usable(s)) continue
-    sumQC += quality(s.score) * s.complexity
-    sumTok += s.tokens
-  }
-  return sumTok > 0 ? sumQC / (sumTok / TOKENS_PER_UNIT) : null
-}
-
-/** KPI of a single session (null if not computable). */
-export function kpiSession(
+// Raw per-session efficiency: (score ?? 5.5) × complexity / tokens.
+// Null when complexity is unknown or tokens are non-positive (not rankable).
+export function rawEfficiency(
   score: number | null,
   complexity: number | null,
   tokens: number,
 ): number | null {
-  return kpiWindow([{ score, complexity, tokens }])
+  if (complexity == null || tokens <= 0) return null
+  return ((score ?? UNRATED_SCORE) * complexity) / tokens
+}
+
+const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length
+
+// Mean of percentile ranks (each 0..1) → coefficient 0..100. Null if empty.
+export function kpiCoefficient(percentiles: number[]): number | null {
+  return percentiles.length === 0 ? null : mean(percentiles) * 100
+}
+
+/** A session's percentile rank (0..1) tagged with its local calendar day. */
+export interface KpiDaySession {
+  day: string
+  percentile: number
 }
 
 export interface KpiDay {
   date: string
   kpi: number
   sessions: number
-  tokens: number
 }
 
-// Group sessions by day, token-weight KPI within each day, sort ascending by date.
-// Days whose sessions are all unusable are dropped.
-export function kpiByDay(sessions: KpiSession[]): KpiDay[] {
-  const byDay = new Map<string, KpiSession[]>()
+// Group sessions by day, average each day's percentiles → 0..100, sort by date.
+export function kpiByDay(sessions: KpiDaySession[]): KpiDay[] {
+  const byDay = new Map<string, number[]>()
   for (const s of sessions) {
     const arr = byDay.get(s.day) ?? []
-    arr.push(s)
+    arr.push(s.percentile)
     byDay.set(s.day, arr)
   }
   const out: KpiDay[] = []
-  for (const [date, list] of byDay) {
-    const kpi = kpiWindow(list)
+  for (const [date, ps] of byDay) {
+    const kpi = kpiCoefficient(ps)
     if (kpi == null) continue
-    const used = list.filter(usable)
-    out.push({
-      date,
-      kpi,
-      sessions: used.length,
-      tokens: used.reduce((t, s) => t + s.tokens, 0),
-    })
+    out.push({ date, kpi, sessions: ps.length })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
 }

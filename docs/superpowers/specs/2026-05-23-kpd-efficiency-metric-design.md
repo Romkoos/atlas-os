@@ -22,50 +22,31 @@ answers: *did adding this MCP / skill / config make the system more efficient?*
 
 ## Definition
 
-KPI = useful output / spent input. Per session:
+KPI is an **efficiency percentile coefficient (0–100%)**, volume-independent.
 
+Per session, raw efficiency:
 ```
-kpi_session = (score ?? 5.5) × complexity / (tokens / 1_000_000)
-
-  score      = agent_sessions.score (user quality 1–10); unrated → 5.5 (scale midpoint)
-  complexity = read-time percentile-composite 1–10 (existing complexity.ts)
-  tokens     = totalTokensIn + totalTokensOut
+rawEff = (score ?? 5.5) × complexity / tokens
 ```
+That raw value is **percentile-ranked across the whole tracked session corpus** (the
+same `percentileRanks` machinery that powers `complexity`), giving each session a
+rank in `[0,1]`. A session with no `complexity` or no `tokens` is unrankable and
+excluded.
 
-- **Unit:** quality·complexity points per **1M tokens**. Higher = better (the opposite
-  direction of the existing tokens-per-turn metric).
-- **Decisions locked with user:**
-  - Numerator = **score × complexity** (combines real quality and work scope).
-  - Counts **all** sessions, not only rated ones.
-  - Unrated `score` → **5.5** (neutral scale midpoint). Real ratings move KPI above/below.
-- **Range on real data:** roughly ~5–65 (token-heavy sessions low, focused high). Y-axis
-  auto-scales; no cap.
+- **Coefficient (0–100%)** for any set of sessions = **mean of members' percentiles × 100**, equal weight per session (NOT token-weighted). Bounded, smooth, independent of how many tokens or sessions.
+- **Decisions locked with user:** numerator = score × complexity; unrated `score` → 5.5; all sessions counted; the metric is a *relative percentile* (centered ~50% by construction) so the long-run baseline recenters as the corpus grows, but before/after comparisons still surface change.
 
 ### Per-day KPI (chart)
-
-KPI is physically output/input, so the day value is a **token-weighted ratio of sums**,
-not an average of per-session KPI:
-
-```
-kpi_day = Σ(score_i × complexity_i) / (Σ tokens_i / 1_000_000)
-```
-
-A token-hungry session correctly drags its day down.
+`kpi_day = mean(percentile of each session whose last turn fell on that day) × 100`.
 
 ### Day attribution
+Each session is bucketed on the local-calendar day of its **last turn**
+(`max(agent_turns.ts)`, SQL `date(...,'localtime')`), so day keys align with
+`tokensByDay`/`ecosystemDays` for the `EcoMarkers` overlay. See [[recharts-v3-overlay-markers]].
 
-`complexity` and `score` are **per-session** (complexity is computed at read time as a
-percentile across the corpus; it is not a per-turn quantity). So each session is bucketed
-into **one** day = the local-calendar day of its **last turn** (`max(agent_turns.ts)`,
-the same "last activity" signal the Sessions tab already orders by). Day strings are
-produced in SQL with `date(ts/1000,'unixepoch','localtime')` so they align exactly with
-`tokensByDay` and `ecosystemDays` — required for the `EcoMarkers` overlay to land on the
-right category. See [[recharts-v3-overlay-markers]].
-
-### Overall KPI (card)
-
-Same token-weighted ratio over **all** sessions active in the window:
-`Σ(score×complexity) / (Σ tokens / 1M)`. Single number for the metric card.
+### Overall KPI (card) & per-session column & before/after
+Same mean-of-percentiles × 100, over the window's sessions / a single session /
+each before-after window respectively.
 
 ## Scope (this change)
 
@@ -185,3 +166,5 @@ stale.
 UI label "KPI" / chart "KPI (efficiency)". Code identifiers in English: tRPC procedure
 `kpi`, fields `kpi` / `kpiBefore` / `kpiAfter` / `kpiDeltaPct`, helper `kpi(...)` +
 `kpiByDay` / `kpiWindow`.
+
+(Revised 2026-05-23: KPI is now a percentile coefficient. Shared helpers: `rawEfficiency`, `kpiCoefficient`, `kpiByDay`, `UNRATED_SCORE`, type `KpiDaySession`. Router builds `sessionEfficiencyMap()` mirroring `sessionComplexityMap()`.)
