@@ -382,39 +382,62 @@ export const productivityRouter = router({
       ),
     )
     .query(({ input }) => {
+      const filter = turnFilter(cutoffDate(input.days), input.projectPath)
       const windowSessionIds = db()
         .select({ id: agentTurns.sessionId })
         .from(agentTurns)
-        .where(turnFilter(cutoffDate(input.days), input.projectPath))
+        .where(filter)
+
+      // Buffer started_at/ended_at are unreliable (commonly null), so derive each
+      // session's real activity window from its turn timestamps and order by last
+      // activity — that is the meaningful "newest first" signal.
+      const activity = db()
+        .select({
+          id: agentTurns.sessionId,
+          first: sql<number>`min(${agentTurns.ts})`,
+          last: sql<number>`max(${agentTurns.ts})`,
+        })
+        .from(agentTurns)
+        .where(filter)
+        .groupBy(agentTurns.sessionId)
+        .all()
+      const firstById = new Map(activity.map((a) => [a.id, a.first]))
+      const lastById = new Map(activity.map((a) => [a.id, a.last]))
 
       const rows = db()
         .select()
         .from(agentSessions)
         .where(inArray(agentSessions.sessionId, windowSessionIds))
-        .orderBy(desc(agentSessions.startedAt))
         .all()
 
       const cmap = sessionComplexityMap()
-      return rows.map((r) => {
-        const c = cmap.get(r.sessionId)
-        return {
-          sessionId: r.sessionId,
-          project: basename(r.projectPath) || r.projectPath,
-          projectPath: r.projectPath,
-          startedAt: r.startedAt,
-          endedAt: r.endedAt,
-          score: r.score,
-          summary: r.summary,
-          turnCount: r.turnCount,
-          totalTokens: r.totalTokensIn + r.totalTokensOut,
-          complexity: c?.complexity ?? null,
-          distinctFiles: c?.distinctFiles ?? 0,
-          distinctDirs: c?.distinctDirs ?? 0,
-          distinctTools: c?.distinctTools ?? 0,
-          distinctSkills: c?.distinctSkills ?? 0,
-          subagentCount: c?.subagentCount ?? 0,
-        }
-      })
+      const recency = (r: (typeof rows)[number]): number =>
+        lastById.get(r.sessionId) ?? r.endedAt?.getTime() ?? r.startedAt?.getTime() ?? 0
+
+      return [...rows]
+        .sort((a, b) => recency(b) - recency(a))
+        .map((r) => {
+          const c = cmap.get(r.sessionId)
+          const firstTs = firstById.get(r.sessionId)
+          const lastTs = lastById.get(r.sessionId)
+          return {
+            sessionId: r.sessionId,
+            project: basename(r.projectPath) || r.projectPath,
+            projectPath: r.projectPath,
+            startedAt: r.startedAt ?? (firstTs != null ? new Date(firstTs) : null),
+            endedAt: r.endedAt ?? (lastTs != null ? new Date(lastTs) : null),
+            score: r.score,
+            summary: r.summary,
+            turnCount: r.turnCount,
+            totalTokens: r.totalTokensIn + r.totalTokensOut,
+            complexity: c?.complexity ?? null,
+            distinctFiles: c?.distinctFiles ?? 0,
+            distinctDirs: c?.distinctDirs ?? 0,
+            distinctTools: c?.distinctTools ?? 0,
+            distinctSkills: c?.distinctSkills ?? 0,
+            subagentCount: c?.subagentCount ?? 0,
+          }
+        })
     }),
 
   // Tool / skill usage frequency (turns that used each), windowed + per project.
