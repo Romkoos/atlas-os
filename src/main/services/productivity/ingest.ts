@@ -25,7 +25,7 @@ export interface SessionAggregate {
   subagentCount: number
 }
 
-// Parent dir of a path ("/a/b/c.ts" -> "/a/b"). No node:path needed.
+// Parent dir of a path ("/a/b/c.ts" -> "/a/b"). No node:path needed; assumes non-empty paths.
 function dirOf(path: string): string {
   const i = path.lastIndexOf('/')
   return i <= 0 ? '/' : path.slice(0, i)
@@ -244,7 +244,7 @@ export function writeRows(database: AppDatabase, rows: IngestRows): IngestResult
           totalTokensIn: row.totalTokensIn,
           totalTokensOut: row.totalTokensOut,
           turnCount: row.turnCount,
-          avgComplexity: row.avgComplexity,
+          avgComplexity: row.avgComplexity, // always null (deprecated)
           distinctFiles: row.distinctFiles,
           distinctDirs: row.distinctDirs,
           distinctTools: row.distinctTools,

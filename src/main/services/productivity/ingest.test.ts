@@ -103,6 +103,8 @@ describe('buildSessionRows', () => {
       endReason: 'other',
       summary: 'done',
       turnCount: 1,
+      totalTokensIn: 100,
+      totalTokensOut: 10,
       distinctFiles: 1,
       distinctTools: 1,
     })
@@ -119,5 +121,19 @@ describe('buildSessionRows', () => {
       distinctFiles: 0,
     })
     expect(sx?.score ?? null).toBeNull()
+  })
+
+  it('transcript-only session has null lifecycle and correct scope counts', () => {
+    const rows = buildSessionRows(agg, []) // no buffer record
+    const s1 = rows.find((r) => r.sessionId === 's1')
+    expect(s1?.startedAt ?? null).toBeNull()
+    expect(s1?.endedAt ?? null).toBeNull()
+    expect(s1).toMatchObject({
+      turnCount: 1,
+      totalTokensIn: 100,
+      totalTokensOut: 10,
+      distinctFiles: 1,
+    })
+    expect(s1?.score ?? null).toBeNull()
   })
 })

@@ -39,7 +39,7 @@ export const agentTurns = sqliteTable(
     toolsUsed: text('tools_used', { mode: 'json' }).$type<string[]>().notNull(),
     skillsUsed: text('skills_used', { mode: 'json' }).$type<string[]>().notNull(),
     filesTouched: text('files_touched', { mode: 'json' }).$type<string[]>().notNull().default([]),
-    complexityProxy: real('complexity_proxy'),
+    complexityProxy: real('complexity_proxy'), // DEPRECATED: no longer written; remove in a future migration
   },
   (t) => [
     index('idx_turns_session').on(t.sessionId),
