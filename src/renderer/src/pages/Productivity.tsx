@@ -11,6 +11,7 @@ import {
 } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
+import { kpiSession } from '@shared/kpi'
 import { RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import {
@@ -542,6 +543,7 @@ function SessionsTab({ days, projectPath }: Scope) {
                 <th className="py-2 pr-4 text-right font-medium">Turns</th>
                 <th className="py-2 pr-4 text-right font-medium">Tokens</th>
                 <th className="py-2 pr-4 text-right font-medium">Complexity</th>
+                <th className="py-2 pr-4 text-right font-medium">KPI</th>
                 <th className="py-2 pr-4 font-medium">Rating</th>
                 <th className="py-2 font-medium">Summary</th>
               </tr>
@@ -564,6 +566,12 @@ function SessionsTab({ days, projectPath }: Scope) {
                     title={`files ${s.distinctFiles} · dirs ${s.distinctDirs} · tools ${s.distinctTools} · skills ${s.distinctSkills} · subagents ${s.subagentCount}`}
                   >
                     {dash(s.complexity, 1)}
+                  </td>
+                  <td
+                    className="py-2 pr-4 text-right tabular-nums"
+                    title="score (or 5.5 if unrated) × complexity ÷ (tokens / 1M) — higher is more efficient"
+                  >
+                    {dash(kpiSession(s.score, s.complexity, s.totalTokens), 1)}
                   </td>
                   <td className="py-2 pr-4">
                     <RatingControl sessionId={s.sessionId} score={s.score} />
