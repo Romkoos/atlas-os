@@ -182,3 +182,39 @@ describe('parseTranscriptTurns', () => {
     expect(turns[0].turnIndex).toBe(0)
   })
 })
+
+describe('parseTranscriptTurns — filesTouched', () => {
+  const userLine = {
+    type: 'user',
+    sessionId: 's1',
+    cwd: '/proj',
+    timestamp: '2026-05-23T10:00:00Z',
+    message: { content: [{ type: 'text', text: 'do it' }] },
+  }
+  const assistantWith = (content: unknown[]) => ({
+    type: 'assistant',
+    message: { usage: { input_tokens: 1, output_tokens: 1 }, content },
+  })
+
+  it('collects unique file paths from Read/Edit/Write/MultiEdit/NotebookEdit', () => {
+    const turns = parseTranscriptTurns([
+      userLine,
+      assistantWith([
+        { type: 'tool_use', name: 'Read', input: { file_path: '/proj/a.ts' } },
+        { type: 'tool_use', name: 'Edit', input: { file_path: '/proj/a.ts' } }, // dup
+        { type: 'tool_use', name: 'Write', input: { file_path: '/proj/b.ts' } },
+        { type: 'tool_use', name: 'NotebookEdit', input: { notebook_path: '/proj/n.ipynb' } },
+        { type: 'tool_use', name: 'Bash', input: { command: 'ls' } }, // no path
+      ]),
+    ])
+    expect(turns[0].filesTouched).toEqual(['/proj/a.ts', '/proj/b.ts', '/proj/n.ipynb'])
+  })
+
+  it('defaults filesTouched to [] when no file tools are used', () => {
+    const turns = parseTranscriptTurns([
+      userLine,
+      assistantWith([{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }]),
+    ])
+    expect(turns[0].filesTouched).toEqual([])
+  })
+})

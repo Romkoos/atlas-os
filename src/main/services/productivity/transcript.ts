@@ -11,6 +11,7 @@ export interface AgentTurn {
   tokensOut: number
   toolsUsed: string[]
   skillsUsed: string[]
+  filesTouched: string[]
 }
 
 // A "real" user prompt starts a new turn. Tool results also arrive as `user`
@@ -58,6 +59,7 @@ export function parseTranscriptTurns(lines: unknown[]): AgentTurn[] {
           tokensOut: 0,
           toolsUsed: [],
           skillsUsed: [],
+          filesTouched: [],
         },
         assistantCount: 0,
       }
@@ -76,7 +78,11 @@ export function parseTranscriptTurns(lines: unknown[]): AgentTurn[] {
       const content = line.message?.content
       if (Array.isArray(content)) {
         for (const block of content) {
-          const b = block as { type?: string; name?: string; input?: { skill?: string } }
+          const b = block as {
+            type?: string
+            name?: string
+            input?: { skill?: string; file_path?: string; notebook_path?: string }
+          }
           if (b?.type !== 'tool_use') continue
           if (b.name === 'Skill') {
             const skill = b.input?.skill
@@ -84,6 +90,10 @@ export function parseTranscriptTurns(lines: unknown[]): AgentTurn[] {
           } else if (b.name && !turn.toolsUsed.includes(b.name)) {
             turn.toolsUsed.push(b.name)
           }
+          // File-scope signal for complexity. Edit/Write/Read/MultiEdit use
+          // file_path; NotebookEdit uses notebook_path.
+          const path = b.input?.file_path ?? b.input?.notebook_path
+          if (path && !turn.filesTouched.includes(path)) turn.filesTouched.push(path)
         }
       }
     }

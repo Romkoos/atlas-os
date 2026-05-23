@@ -16,6 +16,7 @@ const turn = (over: Partial<AgentTurn> = {}): AgentTurn => ({
   tokensOut: 0,
   toolsUsed: [],
   skillsUsed: [],
+  filesTouched: [],
   ...over,
 })
 
