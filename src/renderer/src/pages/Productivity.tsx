@@ -755,13 +755,25 @@ function EcoBadge({ type }: { type: string }) {
   )
 }
 
-// Tokens-per-turn before vs after a change. Fewer tokens/turn = more efficient,
-// so a negative delta is the "good" direction (shown green).
-function ImpactDelta({ pct }: { pct: number | null }) {
+// Delta colouring. goodDirection='down' (default) = lower is better (tokens/turn);
+// 'up' = higher is better (KPI). The "good" direction is green, the other red.
+function ImpactDelta({
+  pct,
+  goodDirection = 'down',
+}: {
+  pct: number | null
+  goodDirection?: 'up' | 'down'
+}) {
   if (pct == null) return <span className="text-muted-foreground">—</span>
   const sign = pct > 0 ? '+' : ''
+  const good = goodDirection === 'down' ? pct < 0 : pct > 0
   return (
-    <span className={cn('tabular-nums', pct < 0 ? 'text-emerald-500' : 'text-destructive')}>
+    <span
+      className={cn(
+        'tabular-nums',
+        pct === 0 ? 'text-muted-foreground' : good ? 'text-emerald-500' : 'text-destructive',
+      )}
+    >
       {sign}
       {pct.toFixed(0)}%
     </span>
@@ -837,8 +849,8 @@ function EcosystemTab({ days }: { days: number }) {
         <CardHeader>
           <CardTitle className="text-base">Change impact</CardTitle>
           <p className="text-muted-foreground text-xs">
-            Avg tokens/turn 7 days before vs after each change (global). Lower after = more
-            efficient.
+            7 days before vs after each change (global). Tokens/turn: lower after = better. KPI:
+            higher after = better.
           </p>
         </CardHeader>
         <CardContent>
@@ -855,7 +867,10 @@ function EcosystemTab({ days }: { days: number }) {
                     <th className="py-2 pr-4 font-medium">Change</th>
                     <th className="py-2 pr-4 text-right font-medium">tok/turn before</th>
                     <th className="py-2 pr-4 text-right font-medium">after</th>
-                    <th className="py-2 text-right font-medium">Δ</th>
+                    <th className="py-2 pr-4 text-right font-medium">Δ tok</th>
+                    <th className="py-2 pr-4 text-right font-medium">KPI before</th>
+                    <th className="py-2 pr-4 text-right font-medium">after</th>
+                    <th className="py-2 text-right font-medium">Δ KPI</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -882,8 +897,17 @@ function EcosystemTab({ days }: { days: number }) {
                         {tpt(r.tokPerTurnAfter)}
                         <span className="ml-1 text-muted-foreground text-xs">({r.turnsAfter})</span>
                       </td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 pr-4 text-right">
                         <ImpactDelta pct={r.deltaPct} />
+                      </td>
+                      <td className="py-2 pr-4 text-right tabular-nums">
+                        {r.kpiBefore == null ? '—' : r.kpiBefore.toFixed(1)}
+                      </td>
+                      <td className="py-2 pr-4 text-right tabular-nums">
+                        {r.kpiAfter == null ? '—' : r.kpiAfter.toFixed(1)}
+                      </td>
+                      <td className="py-2 text-right">
+                        <ImpactDelta pct={r.kpiDeltaPct} goodDirection="up" />
                       </td>
                     </tr>
                   ))}
