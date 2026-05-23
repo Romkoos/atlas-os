@@ -21,10 +21,26 @@ const turn = (over: Partial<AgentTurn> = {}): AgentTurn => ({
 })
 
 describe('aggregateBySession', () => {
-  it('sums tokens and counts turns per session', () => {
+  it('sums tokens, counts turns, and unions scope signals per session', () => {
     const agg = aggregateBySession([
-      turn({ sessionId: 's1', turnIndex: 0, tokensIn: 100, tokensOut: 10 }),
-      turn({ sessionId: 's1', turnIndex: 1, tokensIn: 200, tokensOut: 20 }),
+      turn({
+        sessionId: 's1',
+        turnIndex: 0,
+        tokensIn: 100,
+        tokensOut: 10,
+        toolsUsed: ['Read', 'Edit'],
+        skillsUsed: ['brainstorming'],
+        filesTouched: ['/proj/a.ts', '/proj/sub/b.ts'],
+      }),
+      turn({
+        sessionId: 's1',
+        turnIndex: 1,
+        tokensIn: 200,
+        tokensOut: 20,
+        toolsUsed: ['Edit', 'Task'], // Edit dup; Task = subagent
+        skillsUsed: [],
+        filesTouched: ['/proj/a.ts', '/proj/c.ts'], // a.ts dup
+      }),
       turn({ sessionId: 's2', turnIndex: 0, tokensIn: 50, tokensOut: 5 }),
     ])
 
@@ -33,29 +49,43 @@ describe('aggregateBySession', () => {
       turnCount: 2,
       totalTokensIn: 300,
       totalTokensOut: 30,
-      avgComplexity: 3, // stub complexityProxy = 3
+      distinctFiles: 3, // a.ts, b.ts, c.ts
+      distinctDirs: 2, // /proj, /proj/sub
+      distinctTools: 3, // Read, Edit, Task
+      distinctSkills: 1, // brainstorming
+      subagentCount: 1, // one turn used Task
     })
-    expect(agg.get('s2')?.turnCount).toBe(1)
+    expect(agg.get('s2')).toMatchObject({ turnCount: 1, distinctFiles: 0, subagentCount: 0 })
   })
 })
 
 describe('buildTurnRows', () => {
-  it('assigns deterministic id and complexity proxy', () => {
-    const rows = buildTurnRows([turn({ sessionId: 's1', turnIndex: 0, toolsUsed: ['Bash'] })])
+  it('assigns deterministic id and passes through scope fields', () => {
+    const rows = buildTurnRows([
+      turn({ sessionId: 's1', turnIndex: 0, toolsUsed: ['Bash'], filesTouched: ['/p/x.ts'] }),
+    ])
     expect(rows[0]).toMatchObject({
       id: turnId('s1', 0),
       sessionId: 's1',
       turnIndex: 0,
       toolsUsed: ['Bash'],
-      complexityProxy: 3,
+      filesTouched: ['/p/x.ts'],
     })
   })
 })
 
 describe('buildSessionRows', () => {
-  const agg = aggregateBySession([turn({ sessionId: 's1', tokensIn: 100, tokensOut: 10 })])
+  const agg = aggregateBySession([
+    turn({
+      sessionId: 's1',
+      tokensIn: 100,
+      tokensOut: 10,
+      toolsUsed: ['Read'],
+      filesTouched: ['/proj/a.ts'],
+    }),
+  ])
 
-  it('merges transcript aggregates with buffer lifecycle/score', () => {
+  it('merges transcript aggregates with buffer lifecycle, ignoring buffer score', () => {
     const rows = buildSessionRows(agg, [
       {
         sessionId: 's1',
@@ -63,7 +93,7 @@ describe('buildSessionRows', () => {
         startedAt: new Date('2026-05-23T09:00:00Z'),
         endedAt: new Date('2026-05-23T10:00:00Z'),
         endReason: 'other',
-        score: 8,
+        score: 8, // agent self-score — must be ignored now
         summary: 'done',
       },
     ])
@@ -71,26 +101,23 @@ describe('buildSessionRows', () => {
     expect(s1).toMatchObject({
       projectPath: '/proj',
       endReason: 'other',
-      score: 8,
       summary: 'done',
       turnCount: 1,
-      totalTokensIn: 100,
-      totalTokensOut: 10,
-      avgComplexity: 3,
+      distinctFiles: 1,
+      distinctTools: 1,
     })
+    expect(s1?.score ?? null).toBeNull() // self-score dropped
   })
 
-  it('includes a buffer-only session with zero turns', () => {
+  it('includes a buffer-only session with zero turns and null score', () => {
     const rows = buildSessionRows(new Map(), [{ sessionId: 'sX', projectPath: '/p', score: 5 }])
     const sx = rows.find((r) => r.sessionId === 'sX')
-    expect(sx).toMatchObject({ projectPath: '/p', score: 5, turnCount: 0, totalTokensIn: 0 })
-    expect(sx?.avgComplexity ?? null).toBeNull()
-  })
-
-  it('includes a transcript-only session with null score', () => {
-    const rows = buildSessionRows(agg, [])
-    const s1 = rows.find((r) => r.sessionId === 's1')
-    expect(s1?.turnCount).toBe(1)
-    expect(s1?.score ?? null).toBeNull()
+    expect(sx).toMatchObject({
+      projectPath: '/p',
+      turnCount: 0,
+      totalTokensIn: 0,
+      distinctFiles: 0,
+    })
+    expect(sx?.score ?? null).toBeNull()
   })
 })

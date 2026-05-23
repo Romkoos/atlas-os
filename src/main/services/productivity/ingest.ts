@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import type { NewAgentSessionRow, NewAgentTurnRow } from '@main/db/schema'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
-import { complexityProxy } from '@main/services/productivity/complexity'
 import { turnId } from '@main/services/productivity/ids'
 import {
   type EcosystemChange,
@@ -19,12 +18,34 @@ export interface SessionAggregate {
   turnCount: number
   totalTokensIn: number
   totalTokensOut: number
-  avgComplexity: number
+  distinctFiles: number
+  distinctDirs: number
+  distinctTools: number
+  distinctSkills: number
+  subagentCount: number
 }
 
-// Per-session rollup of transcript-derived turns.
+// Parent dir of a path ("/a/b/c.ts" -> "/a/b"). No node:path needed.
+function dirOf(path: string): string {
+  const i = path.lastIndexOf('/')
+  return i <= 0 ? '/' : path.slice(0, i)
+}
+
+// Per-session rollup of transcript-derived turns, including the five "scope"
+// signals used for complexity.
 export function aggregateBySession(turns: AgentTurn[]): Map<string, SessionAggregate> {
-  const agg = new Map<string, SessionAggregate & { complexitySum: number }>()
+  interface Acc {
+    projectPath: string
+    turnCount: number
+    totalTokensIn: number
+    totalTokensOut: number
+    files: Set<string>
+    dirs: Set<string>
+    tools: Set<string>
+    skills: Set<string>
+    subagentCount: number
+  }
+  const agg = new Map<string, Acc>()
   for (const t of turns) {
     let a = agg.get(t.sessionId)
     if (!a) {
@@ -33,15 +54,24 @@ export function aggregateBySession(turns: AgentTurn[]): Map<string, SessionAggre
         turnCount: 0,
         totalTokensIn: 0,
         totalTokensOut: 0,
-        avgComplexity: 0,
-        complexitySum: 0,
+        files: new Set(),
+        dirs: new Set(),
+        tools: new Set(),
+        skills: new Set(),
+        subagentCount: 0,
       }
       agg.set(t.sessionId, a)
     }
     a.turnCount++
     a.totalTokensIn += t.tokensIn
     a.totalTokensOut += t.tokensOut
-    a.complexitySum += complexityProxy(t)
+    for (const f of t.filesTouched) {
+      a.files.add(f)
+      a.dirs.add(dirOf(f))
+    }
+    for (const tool of t.toolsUsed) a.tools.add(tool)
+    for (const s of t.skillsUsed) a.skills.add(s)
+    if (t.toolsUsed.includes('Task')) a.subagentCount++
   }
   const out = new Map<string, SessionAggregate>()
   for (const [id, a] of agg) {
@@ -50,7 +80,11 @@ export function aggregateBySession(turns: AgentTurn[]): Map<string, SessionAggre
       turnCount: a.turnCount,
       totalTokensIn: a.totalTokensIn,
       totalTokensOut: a.totalTokensOut,
-      avgComplexity: a.turnCount > 0 ? a.complexitySum / a.turnCount : 0,
+      distinctFiles: a.files.size,
+      distinctDirs: a.dirs.size,
+      distinctTools: a.tools.size,
+      distinctSkills: a.skills.size,
+      subagentCount: a.subagentCount,
     })
   }
   return out
@@ -67,12 +101,13 @@ export function buildTurnRows(turns: AgentTurn[]): NewAgentTurnRow[] {
     tokensOut: t.tokensOut,
     toolsUsed: t.toolsUsed,
     skillsUsed: t.skillsUsed,
-    complexityProxy: complexityProxy(t),
+    filesTouched: t.filesTouched,
   }))
 }
 
-// Unions transcript aggregates (token/turn rollups) with buffer records
-// (lifecycle + /done score) into one row per session.
+// Unions transcript aggregates (token/turn rollups + scope counts) with buffer
+// records (lifecycle only). Quality `score` is user-set via the UI, never from
+// the buffer/agent self-rating, so it is left untouched here (null on insert).
 export function buildSessionRows(
   aggregates: Map<string, SessionAggregate>,
   bufferRecords: SessionBufferRecord[],
@@ -90,12 +125,17 @@ export function buildSessionRows(
       startedAt: buf?.startedAt ?? null,
       endedAt: buf?.endedAt ?? null,
       endReason: buf?.endReason ?? null,
-      score: buf?.score ?? null,
+      score: null, // user rating only (set via productivity.setRating); never from buffer
       summary: buf?.summary ?? null,
       totalTokensIn: agg?.totalTokensIn ?? 0,
       totalTokensOut: agg?.totalTokensOut ?? 0,
       turnCount: agg?.turnCount ?? 0,
-      avgComplexity: agg ? agg.avgComplexity : null,
+      avgComplexity: null, // deprecated; complexity computed at read time
+      distinctFiles: agg?.distinctFiles ?? 0,
+      distinctDirs: agg?.distinctDirs ?? 0,
+      distinctTools: agg?.distinctTools ?? 0,
+      distinctSkills: agg?.distinctSkills ?? 0,
+      subagentCount: agg?.subagentCount ?? 0,
     })
   }
   return rows
@@ -183,7 +223,7 @@ export function writeRows(database: AppDatabase, rows: IngestRows): IngestResult
           tokensOut: row.tokensOut,
           toolsUsed: row.toolsUsed,
           skillsUsed: row.skillsUsed,
-          complexityProxy: row.complexityProxy,
+          filesTouched: row.filesTouched,
         },
       })
       .run()
@@ -200,12 +240,16 @@ export function writeRows(database: AppDatabase, rows: IngestRows): IngestResult
           startedAt: row.startedAt,
           endedAt: row.endedAt,
           endReason: row.endReason,
-          score: row.score,
           summary: row.summary,
           totalTokensIn: row.totalTokensIn,
           totalTokensOut: row.totalTokensOut,
           turnCount: row.turnCount,
           avgComplexity: row.avgComplexity,
+          distinctFiles: row.distinctFiles,
+          distinctDirs: row.distinctDirs,
+          distinctTools: row.distinctTools,
+          distinctSkills: row.distinctSkills,
+          subagentCount: row.subagentCount,
         },
       })
       .run()

@@ -27,10 +27,3 @@ export function complexityFromPercentiles(percentiles: number[]): number {
   const scaled = 1 + 9 * mean
   return Math.min(10, Math.max(1, scaled))
 }
-
-// @deprecated Stub kept for ingest.ts compatibility; removed in Task 5 when
-// ingest is updated to use the corpus-aware percentile path.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function complexityProxy(_turn: any): number {
-  return 3
-}

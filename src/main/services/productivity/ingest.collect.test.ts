@@ -103,7 +103,7 @@ describe('collectIngestRows', () => {
     expect(rows.sessionRows[0]).toMatchObject({
       sessionId: SID,
       projectPath: CWD,
-      score: 8,
+      score: null,
       summary: 'done',
       endReason: 'other',
       turnCount: 2,
