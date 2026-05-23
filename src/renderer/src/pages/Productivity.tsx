@@ -18,6 +18,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   usePlotArea,
@@ -124,6 +126,34 @@ function TokensTooltip(props: {
   )
 }
 
+// KPI-per-day tooltip: efficiency value + session count + any ecosystem change.
+function KpiTooltip(props: {
+  active?: boolean
+  label?: string | number
+  payload?: { payload: { kpi: number | null; sessions: number; event: string | null } }[]
+}) {
+  const row = props.payload?.[0]?.payload
+  if (!props.active || !row) return null
+  return (
+    <div style={tooltipStyle} className="px-2.5 py-2 text-xs">
+      <div className="mb-1 font-medium">{props.label}</div>
+      <div className="flex justify-between gap-6">
+        <span className="text-muted-foreground">KPI</span>
+        <span className="tabular-nums">{row.kpi == null ? '—' : row.kpi.toFixed(1)}</span>
+      </div>
+      <div className="flex justify-between gap-6">
+        <span className="text-muted-foreground">Sessions</span>
+        <span className="tabular-nums">{row.sessions}</span>
+      </div>
+      {row.event ? (
+        <div className="mt-1.5 max-w-56 border-t pt-1.5 text-[var(--color-chart-3)]">
+          ⚑ {row.event}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 // Compact horizontal bar list for tool/skill usage frequency.
 function UsageList({
   items,
@@ -210,6 +240,7 @@ function OverviewTab({ days, projectPath }: Scope) {
   const co = trpc.productivity.coOccurrence.useQuery({ days, projectPath })
   const ecoDays = trpc.productivity.ecosystemDays.useQuery({ days })
   const today = trpc.productivity.today.useQuery({ projectPath })
+  const kpi = trpc.productivity.kpi.useQuery({ days, projectPath })
 
   if (overview.isLoading) return <Loading />
   if (overview.isError)
@@ -238,9 +269,20 @@ function OverviewTab({ days, projectPath }: Scope) {
   }))
   const eventDays = ecoDays.data ?? []
 
+  // KPI per day, unioned with ecosystem-event days (null-filled) so a marker can
+  // be drawn even on a day with no in-scope sessions. connectNulls bridges gaps.
+  const kpiByDate = new Map((kpi.data?.byDay ?? []).map((d) => [d.date, d] as const))
+  const kpiDates = [...new Set([...kpiByDate.keys(), ...ecoMap.keys()])].sort()
+  const kpiChartData = kpiDates.map((date) => ({
+    date,
+    kpi: kpiByDate.get(date)?.kpi ?? null,
+    sessions: kpiByDate.get(date)?.sessions ?? 0,
+    event: ecoMap.get(date)?.label ?? null,
+  }))
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <MetricCard label="Total tokens" value={num(totals.totalTokens)} />
         <MetricCard label="Sessions" value={num(totals.sessions)} />
         <MetricCard
@@ -248,6 +290,7 @@ function OverviewTab({ days, projectPath }: Scope) {
           value={scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
         />
         <MetricCard label="Avg complexity" value={dash(totals.avgComplexity)} />
+        <MetricCard label="KPI" value={dash(kpi.data?.overall ?? null)} />
       </div>
 
       <Card>
@@ -394,6 +437,62 @@ function OverviewTab({ days, projectPath }: Scope) {
                   />
                   <EcoMarkers events={eventDays} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">KPI (efficiency)</CardTitle>
+          <p className="text-muted-foreground text-xs">
+            (score ?? 5.5) × complexity per 1M tokens, token-weighted per day — higher is better.
+            {(ecoDays.data?.length ?? 0) > 0 ? ' ⚑ marks ecosystem changes.' : ''}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {kpi.isLoading ? (
+            <Loading />
+          ) : (kpi.data?.byDay.length ?? 0) === 0 ? (
+            <p className="py-8 text-center text-muted-foreground text-sm">No KPI data yet.</p>
+          ) : (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={kpiChartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value: string) => value.slice(5)}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    interval="preserveStartEnd"
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    width={44}
+                    tickFormatter={(value: number) => value.toFixed(1)}
+                  />
+                  <Tooltip
+                    cursor={{ stroke: 'var(--color-muted)', strokeWidth: 1 }}
+                    content={<KpiTooltip />}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="kpi"
+                    stroke="var(--color-chart-1)"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+                  <EcoMarkers events={eventDays} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           )}
