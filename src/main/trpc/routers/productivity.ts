@@ -7,7 +7,7 @@ import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { type KpiSession, kpiByDay, kpiWindow } from '@shared/kpi'
+import { type KpiInput, type KpiSession, kpiByDay, kpiWindow } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -638,6 +638,9 @@ export const productivityRouter = router({
           tokPerTurnBefore: z.number().nullable(),
           tokPerTurnAfter: z.number().nullable(),
           deltaPct: z.number().nullable(),
+          kpiBefore: z.number().nullable(),
+          kpiAfter: z.number().nullable(),
+          kpiDeltaPct: z.number().nullable(),
         }),
       ),
     )
@@ -661,6 +664,41 @@ export const productivityRouter = router({
         .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
         .all()
 
+      // Sessions for KPI before/after: last-turn ms + score/complexity/tokens,
+      // bounded by the same `earliest` as the turn pass.
+      const sessLast = db()
+        .select({ id: agentTurns.sessionId, last: sql<number>`max(${agentTurns.ts})` })
+        .from(agentTurns)
+        .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
+        .groupBy(agentTurns.sessionId)
+        .all()
+      const sessMeta = db()
+        .select({
+          id: agentSessions.sessionId,
+          score: agentSessions.score,
+          tin: agentSessions.totalTokensIn,
+          tout: agentSessions.totalTokensOut,
+        })
+        .from(agentSessions)
+        .where(
+          inArray(
+            agentSessions.sessionId,
+            sessLast.map((s) => s.id),
+          ),
+        )
+        .all()
+      const cmap = sessionComplexityMap()
+      const metaById = new Map(sessMeta.map((m) => [m.id, m]))
+      const kpiSessions = sessLast.map((s) => {
+        const m = metaById.get(s.id)
+        return {
+          last: s.last,
+          score: m?.score ?? null,
+          complexity: cmap.get(s.id)?.complexity ?? null,
+          tokens: (m?.tin ?? 0) + (m?.tout ?? 0),
+        }
+      })
+
       return changes.map((c) => {
         const t = c.ts.getTime()
         let nb = 0
@@ -680,6 +718,18 @@ export const productivityRouter = router({
         const before = nb ? sb / nb : null
         const after = na ? sa / na : null
         const deltaPct = before != null && after != null ? ((after - before) / before) * 100 : null
+        const kb: KpiInput[] = []
+        const ka: KpiInput[] = []
+        for (const s of kpiSessions) {
+          if (s.last >= t - w && s.last < t) kb.push(s)
+          else if (s.last >= t && s.last < t + w) ka.push(s)
+        }
+        const kpiBefore = kpiWindow(kb)
+        const kpiAfter = kpiWindow(ka)
+        const kpiDeltaPct =
+          kpiBefore != null && kpiAfter != null && kpiBefore !== 0
+            ? ((kpiAfter - kpiBefore) / kpiBefore) * 100
+            : null
         return {
           id: c.id,
           ts: c.ts,
@@ -690,6 +740,9 @@ export const productivityRouter = router({
           tokPerTurnBefore: before,
           tokPerTurnAfter: after,
           deltaPct,
+          kpiBefore,
+          kpiAfter,
+          kpiDeltaPct,
         }
       })
     }),
