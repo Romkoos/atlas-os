@@ -532,7 +532,8 @@ function SessionsTab({ days, projectPath }: Scope) {
                 <th className="py-2 pr-4 font-medium">Started</th>
                 <th className="py-2 pr-4 text-right font-medium">Turns</th>
                 <th className="py-2 pr-4 text-right font-medium">Tokens</th>
-                <th className="py-2 pr-4 text-right font-medium">Score</th>
+                <th className="py-2 pr-4 text-right font-medium">Complexity</th>
+                <th className="py-2 pr-4 font-medium">Rating</th>
                 <th className="py-2 font-medium">Summary</th>
               </tr>
             </thead>
@@ -549,7 +550,15 @@ function SessionsTab({ days, projectPath }: Scope) {
                   </td>
                   <td className="py-2 pr-4 text-right tabular-nums">{num(s.turnCount)}</td>
                   <td className="py-2 pr-4 text-right tabular-nums">{num(s.totalTokens)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">{dash(s.score, 0)}</td>
+                  <td
+                    className="py-2 pr-4 text-right tabular-nums"
+                    title={`files ${s.distinctFiles} · dirs ${s.distinctDirs} · tools ${s.distinctTools} · skills ${s.distinctSkills} · subagents ${s.subagentCount}`}
+                  >
+                    {dash(s.complexity, 1)}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <RatingControl sessionId={s.sessionId} score={s.score} />
+                  </td>
                   <td className="max-w-xs py-2">
                     <span className="line-clamp-2 text-muted-foreground" title={s.summary ?? ''}>
                       {s.summary ?? '—'}
@@ -562,6 +571,35 @@ function SessionsTab({ days, projectPath }: Scope) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function RatingControl({ sessionId, score }: { sessionId: string; score: number | null }) {
+  const utils = trpc.useUtils()
+  const setRating = trpc.productivity.setRating.useMutation({
+    onSuccess: async () => {
+      await utils.productivity.invalidate()
+    },
+    onError: () => toast.error('Failed to save rating'),
+  })
+  return (
+    <select
+      aria-label={`Quality rating for session ${sessionId}`}
+      className="rounded border bg-background px-1 py-0.5 text-sm tabular-nums"
+      value={score ?? ''}
+      disabled={setRating.isPending}
+      onChange={(e) => {
+        const v = e.target.value === '' ? null : Number(e.target.value)
+        setRating.mutate({ sessionId, score: v })
+      }}
+    >
+      <option value="">— (7)</option>
+      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+        <option key={n} value={n}>
+          {n}
+        </option>
+      ))}
+    </select>
   )
 }
 
