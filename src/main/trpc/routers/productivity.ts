@@ -7,6 +7,7 @@ import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
+import { type KpiSession, kpiByDay, kpiWindow } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -282,6 +283,68 @@ export const productivityRouter = router({
           }))
           .sort((a, b) => b.totalTokens - a.totalTokens),
       }
+    }),
+
+  // Efficiency KPI per day + overall, scoped by window + optional project.
+  // KPI = (score ?? 5.5) × complexity / (tokens / 1M), token-weighted per day.
+  // Each session is bucketed on its last-turn local day so day keys align with
+  // tokensByDay / ecosystemDays (the EcoMarkers overlay relies on that).
+  kpi: publicProcedure
+    .input(rangeInput)
+    .output(
+      z.object({
+        byDay: z.array(
+          z.object({
+            date: z.string(),
+            kpi: z.number(),
+            sessions: z.number(),
+            tokens: z.number(),
+          }),
+        ),
+        overall: z.number().nullable(),
+      }),
+    )
+    .query(({ input }) => {
+      const scoped = turnFilter(cutoffDate(input.days), input.projectPath)
+
+      // Each session's last-turn local day, within window + scope.
+      const day = sql<string>`date(max(${agentTurns.ts}) / 1000, 'unixepoch', 'localtime')`
+      const dayRows = db()
+        .select({ id: agentTurns.sessionId, day })
+        .from(agentTurns)
+        .where(scoped)
+        .groupBy(agentTurns.sessionId)
+        .all()
+      if (dayRows.length === 0) return { byDay: [], overall: null }
+      const dayById = new Map(dayRows.map((r) => [r.id, r.day]))
+
+      const ids = dayRows.map((r) => r.id)
+      const sessRows = db()
+        .select({
+          id: agentSessions.sessionId,
+          score: agentSessions.score,
+          tin: agentSessions.totalTokensIn,
+          tout: agentSessions.totalTokensOut,
+        })
+        .from(agentSessions)
+        .where(inArray(agentSessions.sessionId, ids))
+        .all()
+
+      const cmap = sessionComplexityMap()
+      const sessions: KpiSession[] = sessRows.flatMap((r) => {
+        const day = dayById.get(r.id)
+        if (!day) return []
+        return [
+          {
+            day,
+            score: r.score,
+            complexity: cmap.get(r.id)?.complexity ?? null,
+            tokens: r.tin + r.tout,
+          },
+        ]
+      })
+
+      return { byDay: kpiByDay(sessions), overall: kpiWindow(sessions) }
     }),
 
   // Current local calendar day broken down by hour (0–23). Always "today",
