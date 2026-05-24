@@ -1,20 +1,31 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card'
 import { trpc } from '@renderer/lib/trpc'
-import { RefreshCw } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function Spark({ values, w = 70, h = 22 }: { values: number[]; w?: number; h?: number }) {
+  if (values.length < 2) return null
+  const max = Math.max(...values)
+  const min = Math.min(...values)
+  const range = Math.max(1, max - min)
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w
+      const y = h - ((v - min) / range) * h
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="font-medium text-muted-foreground text-xs">{label}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <span className="font-semibold text-2xl tabular-nums">{value}</span>
-      </CardContent>
-    </Card>
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ position: 'absolute', top: 16, right: 18 }}
+      role="img"
+      aria-label="trend"
+    >
+      <title>trend</title>
+      <polyline points={pts} fill="none" stroke="var(--amber)" strokeWidth="1" />
+    </svg>
   )
 }
 
@@ -27,41 +38,79 @@ export function Stats() {
   const data = daily.data ?? []
 
   const total = summary.data?.total ?? 0
-  const avgDuration = `${((summary.data?.avgDurationMs ?? 0) / 1000).toFixed(1)}s`
-  const avgTokens = String(summary.data?.avgTokens ?? 0)
+  const avgDurationMs = summary.data?.avgDurationMs ?? 0
+  const avgTokens = summary.data?.avgTokens ?? 0
   const lastRun = summary.data?.lastRun ? new Date(summary.data.lastRun).toLocaleString() : '—'
 
+  const sparkValues = data.map((d) => d.count)
+
+  function refresh() {
+    void utils.stats.invalidate()
+  }
+
   return (
-    <div className="flex flex-col">
+    <>
       <PageHeader
-        title="Stats"
+        num="02"
+        title="STATS"
         description="Usage over the last 30 days."
         action={
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => utils.stats.invalidate()}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <button type="button" className="btn" onClick={refresh} disabled={refreshing}>
+            {refreshing ? '↻ REFRESHING…' : '↻ REFRESH'}
+          </button>
         }
       />
+      <div className="scroll">
+        <div className="kpis k4">
+          {/* [01] TOTAL EVENTS */}
+          <div className="kpi">
+            <div className="label">
+              <span className="id">[01]</span>TOTAL EVENTS
+            </div>
+            <div className="val">{total}</div>
+            <div className="delta">last 30 days</div>
+            <Spark values={sparkValues} />
+          </div>
 
-      <div className="flex flex-col gap-6 p-8">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <MetricCard label="Total events" value={String(total)} />
-          <MetricCard label="Avg duration" value={avgDuration} />
-          <MetricCard label="Avg response tokens" value={avgTokens} />
-          <MetricCard label="Last run" value={lastRun} />
+          {/* [02] AVG DURATION */}
+          <div className="kpi">
+            <div className="label">
+              <span className="id">[02]</span>AVG DURATION
+            </div>
+            <div className="val">
+              {(avgDurationMs / 1000).toFixed(1)}
+              <span className="u">s</span>
+            </div>
+            <div className="delta">per run</div>
+          </div>
+
+          {/* [03] AVG RESPONSE TOKENS */}
+          <div className="kpi">
+            <div className="label">
+              <span className="id">[03]</span>AVG RESPONSE TOKENS
+            </div>
+            <div className="val">{avgTokens}</div>
+            <div className="delta">output tokens / run</div>
+          </div>
+
+          {/* [04] LAST RUN */}
+          <div className="kpi">
+            <div className="label">
+              <span className="id">[04]</span>LAST RUN
+            </div>
+            <div className="val" style={{ fontSize: 16 }}>
+              {lastRun}
+            </div>
+            <div className="delta">&nbsp;</div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Events per day</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="panel mt-20">
+          <div className="panel-head">
+            <span className="ttl">events per day</span>
+            <span className="meta">bucket 1d</span>
+          </div>
+          <div className="panel-body">
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -89,18 +138,18 @@ export function Stats() {
                     contentStyle={{
                       background: 'var(--color-popover)',
                       border: '1px solid var(--color-border)',
-                      borderRadius: 8,
+                      borderRadius: 0,
                       fontSize: 12,
                       color: 'var(--color-popover-foreground)',
                     }}
                   />
-                  <Bar dataKey="count" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="var(--color-chart-1)" radius={[0, 0, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

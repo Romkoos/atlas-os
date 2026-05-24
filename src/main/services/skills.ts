@@ -18,15 +18,15 @@ function parseFrontmatter(raw: string): { data: Record<string, unknown>; body: s
   return { data, body: match[2] }
 }
 
-function allowedToolsCount(value: unknown): number {
-  if (Array.isArray(value)) return value.length
+function parseAllowedTools(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean)
   if (typeof value === 'string') {
     return value
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean).length
+      .filter(Boolean)
   }
-  return 0
+  return []
 }
 
 function toMeta(id: string, dir: string, data: Record<string, unknown>): SkillMeta {
@@ -37,7 +37,7 @@ function toMeta(id: string, dir: string, data: Record<string, unknown>): SkillMe
     description: typeof data.description === 'string' ? data.description.trim() : '',
     trigger: typeof data.trigger === 'string' ? data.trigger : undefined,
     argumentHint: typeof data['argument-hint'] === 'string' ? data['argument-hint'] : undefined,
-    allowedToolsCount: allowedToolsCount(data['allowed-tools']),
+    allowedTools: parseAllowedTools(data['allowed-tools']),
     path: join(dir, id),
   }
 }

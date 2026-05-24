@@ -1,21 +1,27 @@
 import type { ReactNode } from 'react'
 
 export function PageHeader({
+  num,
   title,
   description,
   action,
 }: {
+  /** Two-digit screen id shown in amber before the title, e.g. "01". */
+  num: string
   title: string
-  description?: string
+  description?: ReactNode
   action?: ReactNode
 }) {
   return (
-    <header className="flex items-start justify-between gap-4 border-b px-8 py-6">
+    <div className="page-head">
       <div>
-        <h1 className="font-semibold text-xl tracking-tight">{title}</h1>
-        {description ? <p className="mt-1 text-muted-foreground text-sm">{description}</p> : null}
+        <h2>
+          <span className="num">{num}</span>
+          {title}
+        </h2>
+        {description ? <div className="desc">{description}</div> : null}
       </div>
-      {action}
-    </header>
+      {action ? <div className="right">{action}</div> : null}
+    </div>
   )
 }

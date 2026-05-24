@@ -1,18 +1,7 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card'
-import { Input } from '@renderer/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
-import { RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -32,9 +21,9 @@ import { toast } from 'sonner'
 type Tab = 'overview' | 'sessions' | 'ecosystem'
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'ecosystem', label: 'Ecosystem' },
+  { id: 'overview', label: './overview' },
+  { id: 'sessions', label: './sessions' },
+  { id: 'ecosystem', label: './ecosystem' },
 ]
 
 const RANGES: ReadonlyArray<{ days: number; label: string }> = [
@@ -64,39 +53,45 @@ const fmtDate = (d: Date | string | null): string => (d ? new Date(d).toLocaleSt
 const tooltipStyle = {
   background: 'var(--color-popover)',
   border: '1px solid var(--color-border)',
-  borderRadius: 8,
+  borderRadius: 0,
   fontSize: 12,
   color: 'var(--color-popover-foreground)',
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="font-medium text-muted-foreground text-xs">{label}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <span className="font-semibold text-2xl tabular-nums">{value}</span>
-      </CardContent>
-    </Card>
-  )
-}
-
+// Terminal-style empty hint: a single panel with mono "// no data" text.
 function EmptyHint() {
   return (
-    <Card>
-      <CardContent className="py-12 text-center">
-        <p className="font-medium text-sm">No data in this range.</p>
-        <p className="mt-1 text-muted-foreground text-sm">
-          Widen the range, clear the project filter, or Refresh after using Claude Code.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="panel mt-16">
+      <div className="panel-body">
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+          <div style={{ color: 'var(--fg-3)', marginBottom: 8 }}>
+            <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>no data in this range.
+          </div>
+          <div style={{ lineHeight: 1.7 }}>
+            Widen the range, clear the project filter, or refresh after using Claude Code.
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
 function Loading() {
-  return <p className="px-1 py-4 text-muted-foreground text-sm">Loading…</p>
+  return (
+    <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)', padding: '16px 0' }}>
+      <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>loading…
+    </p>
+  )
+}
+
+// Mono "// message" line used for per-panel empty states.
+function NoteLine({ children }: { children: ReactNode }) {
+  return (
+    <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)', padding: '8px 0' }}>
+      <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
+      {children}
+    </p>
+  )
 }
 
 // Tokens-per-day tooltip: tokens in/out + any ecosystem change logged that day.
@@ -127,7 +122,7 @@ function TokensTooltip(props: {
   )
 }
 
-// KPI-per-day tooltip: efficiency value + session count + any ecosystem change.
+// KPI-per-day tooltip: КПД value + quality guardrail + session count + ecosystem change.
 function KpiTooltip(props: {
   active?: boolean
   label?: string | number
@@ -161,35 +156,33 @@ function KpiTooltip(props: {
   )
 }
 
-// Compact horizontal bar list for tool/skill usage frequency.
-function UsageList({
-  items,
-  nameClassName = 'w-32',
-}: {
-  items: { name: string; count: number }[]
-  nameClassName?: string
-}) {
+// Compact horizontal bar list for tool/skill usage frequency, rendered as
+// terminal .barrow rows. `cols` overrides the row grid (e.g. for wide pair names).
+function UsageList({ items, cols }: { items: { name: string; count: number }[]; cols?: string }) {
   const top = items.slice(0, 10)
   const max = top.reduce((m, i) => Math.max(m, i.count), 0) || 1
   return (
-    <ul className="flex flex-col gap-2">
-      {top.map((item) => (
-        <li key={item.name} className="flex items-center gap-3">
-          <span className={cn(nameClassName, 'shrink-0 truncate text-sm')} title={item.name}>
-            {item.name}
-          </span>
-          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+    <>
+      {top.map((item, i) => (
+        <div
+          key={item.name}
+          className="barrow"
+          style={cols ? { gridTemplateColumns: cols } : undefined}
+        >
+          <div className="name" title={item.name}>
+            <span style={{ color: 'var(--fg-4)' }}>{String(i + 1).padStart(2, '0')}</span>
+            &nbsp; {item.name}
+          </div>
+          <div className="bar-wrap">
             <div
-              className="h-full rounded-full bg-[var(--color-chart-1)]"
+              className={cn('bar', i > 2 && 'dim')}
               style={{ width: `${(item.count / max) * 100}%` }}
             />
           </div>
-          <span className="w-8 shrink-0 text-right text-muted-foreground text-xs tabular-nums">
-            {item.count}
-          </span>
-        </li>
+          <div className="v">{item.count}</div>
+        </div>
       ))}
-    </ul>
+    </>
   )
 }
 
@@ -260,7 +253,13 @@ function OverviewTab({ days, projectPath }: Scope) {
 
   if (overview.isLoading) return <Loading />
   if (overview.isError)
-    return <p className="px-1 py-4 text-destructive text-sm">Failed to load overview.</p>
+    return (
+      <p
+        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+      >
+        <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load overview.
+      </p>
+    )
 
   const tokensByDay = overview.data?.tokensByDay ?? []
   const byProject = overview.data?.byProject ?? []
@@ -298,53 +297,93 @@ function OverviewTab({ days, projectPath }: Scope) {
   }))
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricCard label="Total tokens" value={num(totals.totalTokens)} />
-        <MetricCard label="Sessions" value={num(totals.sessions)} />
-        <MetricCard
-          label="Avg score (rated)"
-          value={scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
-        />
-        <MetricCard label="Avg complexity" value={dash(totals.avgComplexity)} />
-        <MetricCard label="КПД" value={pct(kpi.data?.overall ?? null)} />
+    <>
+      <div className="kpis k5 mt-16">
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[01]</span>TOTAL TOKENS
+          </div>
+          <div className="val">{num(totals.totalTokens)}</div>
+          <div className="delta">{num(totals.turns)} turns</div>
+        </div>
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[02]</span>SESSIONS
+          </div>
+          <div className="val">{num(totals.sessions)}</div>
+          <div className="delta">{num(totals.totalCount)} total</div>
+        </div>
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[03]</span>AVG SCORE (RATED)
+          </div>
+          <div className="val">
+            {scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
+          </div>
+          <div className="delta">
+            {totals.ratedCount} / {totals.totalCount} rated
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[04]</span>AVG COMPLEXITY
+          </div>
+          <div className="val">{dash(totals.avgComplexity)}</div>
+          <div className="delta">per session</div>
+        </div>
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[05]</span>КПД · EFFICIENCY
+          </div>
+          <div className="val amber">{pct(kpi.data?.overall ?? null)}</div>
+          <div className="delta">vs baseline</div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Today by hour</CardTitle>
-          <p className="text-muted-foreground text-xs">
-            Current local day — ignores the range above.
-          </p>
-        </CardHeader>
-        <CardContent>
+      {/* TODAY BY HOUR */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">today by hour</span>
+          <span className="meta">current local day · ignores range above</span>
+        </div>
+        <div className="panel-body">
           {today.isLoading ? (
             <Loading />
           ) : !today.data || today.data.totals.turns === 0 ? (
-            <p className="py-8 text-center text-muted-foreground text-sm">No activity yet today.</p>
+            <NoteLine>no activity yet today.</NoteLine>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-muted-foreground text-xs">
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px 24px',
+                  marginBottom: 12,
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  color: 'var(--fg-4)',
+                }}
+              >
                 <span>
-                  <span className="font-semibold text-foreground tabular-nums">
+                  <span style={{ color: 'var(--fg)' }} className="tabular-nums">
                     {num(today.data.totals.totalTokens)}
                   </span>{' '}
                   tokens
                 </span>
                 <span>
-                  <span className="font-semibold text-foreground tabular-nums">
+                  <span style={{ color: 'var(--fg)' }} className="tabular-nums">
                     {num(today.data.totals.turns)}
                   </span>{' '}
                   turns
                 </span>
                 <span>
-                  <span className="font-semibold text-foreground tabular-nums">
+                  <span style={{ color: 'var(--fg)' }} className="tabular-nums">
                     {num(today.data.totals.sessions)}
                   </span>{' '}
                   sessions
                 </span>
                 <span>
-                  <span className="font-semibold text-foreground tabular-nums">
+                  <span style={{ color: 'var(--fg)' }} className="tabular-nums">
                     {num(today.data.totals.activeHours)}
                   </span>{' '}
                   active hours
@@ -390,28 +429,29 @@ function OverviewTab({ days, projectPath }: Scope) {
                       dataKey="tokensOut"
                       stackId="t"
                       fill="var(--color-chart-2)"
-                      radius={[4, 4, 0, 0]}
+                      radius={[0, 0, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tokens per day</CardTitle>
-          {(ecoDays.data?.length ?? 0) > 0 ? (
-            <p className="text-muted-foreground text-xs">
-              ⚑ dashed lines mark ecosystem changes — hover a bar for details.
-            </p>
-          ) : null}
-        </CardHeader>
-        <CardContent>
+      {/* TOKENS PER DAY */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">tokens per day</span>
+          <span className="meta">
+            {(ecoDays.data?.length ?? 0) > 0
+              ? 'dashed lines mark ecosystem changes · hover bar for details'
+              : 'input + output per day'}
+          </span>
+        </div>
+        <div className="panel-body">
           {tokensByDay.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground text-sm">No token activity yet.</p>
+            <NoteLine>no token activity yet.</NoteLine>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -450,47 +490,44 @@ function OverviewTab({ days, projectPath }: Scope) {
                     dataKey="tokensOut"
                     stackId="t"
                     fill="var(--color-chart-2)"
-                    radius={[4, 4, 0, 0]}
+                    radius={[0, 0, 0, 0]}
                   />
                   <EcoMarkers events={eventDays} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <CardTitle className="text-base">КПД (efficiency)</CardTitle>
-            <button
-              type="button"
-              className="rounded border px-2 py-1 text-xs"
-              disabled={rebaseline.isPending}
-              onClick={() =>
-                rebaseline.mutate({
-                  projectPath,
-                  start: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
-                  end: new Date(),
-                })
-              }
-            >
-              Re-baseline ({days}d)
-            </button>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            КПД vs frozen baseline (expected tokens for the task's difficulty ÷ actual tokens),
-            averaged per day. 100% = baseline efficiency; higher is leaner. Dashed line: avg quality
-            (0–10, right axis, guardrail).{' '}
-            {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
-          </p>
-        </CardHeader>
-        <CardContent>
+      {/* КПД (EFFICIENCY) */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">КПД · efficiency</span>
+          <span className="meta">
+            КПД vs frozen baseline · 100% = baseline · dashed = avg quality (0–10, right)
+            {(ecoDays.data?.length ?? 0) > 0 ? ' · ⚑ ecosystem changes' : ''}
+          </span>
+          <button
+            type="button"
+            className="btn"
+            disabled={rebaseline.isPending}
+            onClick={() =>
+              rebaseline.mutate({
+                projectPath,
+                start: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
+                end: new Date(),
+              })
+            }
+          >
+            ↻ RE-BASELINE ({days}d)
+          </button>
+        </div>
+        <div className="panel-body">
           {kpi.isLoading ? (
             <Loading />
           ) : (kpi.data?.byDay.length ?? 0) === 0 ? (
-            <p className="py-8 text-center text-muted-foreground text-sm">No КПД data yet.</p>
+            <NoteLine>no КПД data yet.</NoteLine>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -560,115 +597,139 @@ function OverviewTab({ days, projectPath }: Scope) {
               </ResponsiveContainer>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">By project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {byProject.length === 0 ? (
-            <p className="py-4 text-muted-foreground text-sm">No projects in range.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground text-xs">
-                    <th className="py-2 pr-4 font-medium">Project</th>
-                    <th className="py-2 pr-4 text-right font-medium">Tokens</th>
-                    <th className="py-2 pr-4 text-right font-medium">Turns</th>
-                    <th className="py-2 pr-4 text-right font-medium">Sessions</th>
-                    <th className="py-2 text-right font-medium">Avg complexity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byProject.map((p) => (
-                    <tr key={p.projectPath} className="border-b last:border-0">
-                      <td className="py-2 pr-4">
-                        <span className="font-medium" title={p.projectPath}>
-                          {p.project}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{num(p.totalTokens)}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{num(p.turns)}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{num(p.sessions)}</td>
-                      <td className="py-2 text-right tabular-nums">{dash(p.avgComplexity)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* PROJECTS */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">by project</span>
+          <span className="meta">{byProject.length} tracked · sort: tokens ↓</span>
+        </div>
+        {byProject.length === 0 ? (
+          <div className="panel-body">
+            <NoteLine>no projects in range.</NoteLine>
+          </div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>project</th>
+                <th className="num">tokens</th>
+                <th className="num">turns</th>
+                <th className="num">sessions</th>
+                <th className="num">complexity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byProject.map((p, i) => (
+                <tr key={p.projectPath}>
+                  <td>
+                    <span style={{ color: 'var(--fg-4)' }}>{String(i + 1).padStart(2, '0')}</span>
+                    &nbsp;&nbsp;
+                    <span
+                      style={{ color: i === 0 ? 'var(--amber)' : 'var(--fg)' }}
+                      title={p.projectPath}
+                    >
+                      {p.project}
+                    </span>
+                  </td>
+                  <td className="num">{num(p.totalTokens)}</td>
+                  <td className="num">{num(p.turns)}</td>
+                  <td className="num">{num(p.sessions)}</td>
+                  <td className="num">{dash(p.avgComplexity)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top tools</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* TOP TOOLS / TOP SKILLS */}
+      <div className="grid-2 mt-16">
+        <div className="panel">
+          <div className="panel-head">
+            <span className="ttl">top tools</span>
+            <span className="meta">invocations</span>
+          </div>
+          <div className="panel-body">
             {usage.isLoading ? (
               <Loading />
             ) : tools.length === 0 ? (
-              <p className="py-4 text-muted-foreground text-sm">No tools recorded yet.</p>
+              <NoteLine>no tools recorded yet.</NoteLine>
             ) : (
               <UsageList items={tools} />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top skills</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="panel">
+          <div className="panel-head">
+            <span className="ttl">top skills</span>
+            <span className="meta">invocations</span>
+          </div>
+          <div className="panel-body">
             {usage.isLoading ? (
               <Loading />
             ) : skills.length === 0 ? (
-              <p className="py-4 text-muted-foreground text-sm">No skills recorded yet.</p>
+              <NoteLine>no skills recorded yet.</NoteLine>
             ) : (
               <UsageList items={skills} />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tools used together</CardTitle>
-            <p className="text-muted-foreground text-xs">Pairs co-occurring in the same turn.</p>
-          </CardHeader>
-          <CardContent>
+      {/* TOOLS / SKILLS TOGETHER */}
+      <div className="grid-2 mt-16">
+        <div className="panel">
+          <div className="panel-head">
+            <span className="ttl">tools used together</span>
+            <span className="meta">pairs co-occurring · same turn</span>
+          </div>
+          <div className="panel-body">
             {co.isLoading ? (
               <Loading />
             ) : (co.data?.toolPairs.length ?? 0) === 0 ? (
-              <p className="py-4 text-muted-foreground text-sm">No tool pairs yet.</p>
+              <NoteLine>no tool pairs yet.</NoteLine>
             ) : (
-              <UsageList items={co.data?.toolPairs ?? []} nameClassName="w-44" />
+              <UsageList items={co.data?.toolPairs ?? []} cols="180px 1fr 56px" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Skills used together</CardTitle>
-            <p className="text-muted-foreground text-xs">Pairs co-occurring in the same turn.</p>
-          </CardHeader>
-          <CardContent>
+        <div className="panel">
+          <div className="panel-head">
+            <span className="ttl">skills used together</span>
+            <span className="meta">pairs co-occurring · same turn</span>
+          </div>
+          <div className="panel-body">
             {co.isLoading ? (
               <Loading />
             ) : (co.data?.skillPairs.length ?? 0) === 0 ? (
-              <p className="py-4 text-muted-foreground text-sm">No skill pairs yet.</p>
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  color: 'var(--fg-4)',
+                  padding: '12px 0',
+                }}
+              >
+                <div style={{ color: 'var(--fg-3)', marginBottom: 8 }}>
+                  <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>no skill pairs yet.
+                </div>
+                <div style={{ lineHeight: 1.7 }}>
+                  Skills usually fire one at a time. Run more sessions where a single skill triggers
+                  multiple sub-skills to populate this view.
+                </div>
+              </div>
             ) : (
-              <UsageList items={co.data?.skillPairs ?? []} nameClassName="w-44" />
+              <UsageList items={co.data?.skillPairs ?? []} cols="180px 1fr 56px" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -680,7 +741,13 @@ function SessionsTab({ days, projectPath }: Scope) {
 
   if (sessions.isLoading) return <Loading />
   if (sessions.isError)
-    return <p className="px-1 py-4 text-destructive text-sm">Failed to load sessions.</p>
+    return (
+      <p
+        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+      >
+        <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load sessions.
+      </p>
+    )
 
   // Rows arrive newest-first from the router (ordered by startedAt desc).
   const rows = sessions.data ?? []
@@ -692,97 +759,108 @@ function SessionsTab({ days, projectPath }: Scope) {
   const pageRows = rows.slice(start, start + SESSIONS_PAGE_SIZE)
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Sessions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground text-xs">
-                <th className="py-2 pr-4 font-medium">Project</th>
-                <th className="py-2 pr-4 font-medium">Started</th>
-                <th className="py-2 pr-4 text-right font-medium">Turns</th>
-                <th className="py-2 pr-4 text-right font-medium">Tokens</th>
-                <th className="py-2 pr-4 text-right font-medium">Complexity</th>
-                <th className="py-2 pr-4 text-right font-medium">КПД</th>
-                <th className="py-2 pr-4 font-medium">Difficulty</th>
-                <th className="py-2 pr-4 font-medium">Rating</th>
-                <th className="py-2 font-medium">Summary</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((s) => (
-                <tr key={s.sessionId} className="border-b align-top last:border-0">
-                  <td className="py-2 pr-4">
-                    <span className="font-medium" title={s.projectPath}>
-                      {s.project}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground tabular-nums">
-                    {fmtDate(s.startedAt)}
-                  </td>
-                  <td className="py-2 pr-4 text-right tabular-nums">{num(s.turnCount)}</td>
-                  <td className="py-2 pr-4 text-right tabular-nums">{num(s.totalTokens)}</td>
-                  <td
-                    className="py-2 pr-4 text-right tabular-nums"
-                    title={`files ${s.distinctFiles} · dirs ${s.distinctDirs} · tools ${s.distinctTools} · skills ${s.distinctSkills} · subagents ${s.subagentCount}`}
-                  >
-                    {dash(s.complexity, 1)}
-                  </td>
-                  <td
-                    className="py-2 pr-4 text-right tabular-nums"
-                    title="КПД vs frozen baseline — 100% = baseline efficiency, higher is leaner"
-                  >
-                    {pct(s.kpi)}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <DifficultyControl sessionId={s.sessionId} difficulty={s.difficulty} />
-                  </td>
-                  <td className="py-2 pr-4">
-                    <RatingControl sessionId={s.sessionId} score={s.score} />
-                  </td>
-                  <td className="max-w-xs py-2">
-                    <span className="line-clamp-2 text-muted-foreground" title={s.summary ?? ''}>
-                      {s.summary ?? '—'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {pageCount > 1 && (
-          <div className="mt-3 flex items-center justify-between text-muted-foreground text-xs">
+    <div className="panel mt-16">
+      <div className="panel-head">
+        <span className="ttl">sessions</span>
+        <span className="meta">{rows.length} in range · newest first</span>
+      </div>
+      <table className="tbl">
+        <thead>
+          <tr>
+            <th>project</th>
+            <th>started</th>
+            <th className="num">turns</th>
+            <th className="num">tokens</th>
+            <th className="num">complexity</th>
+            <th className="num">КПД</th>
+            <th>difficulty</th>
+            <th>rating</th>
+            <th>summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pageRows.map((s) => (
+            <tr key={s.sessionId}>
+              <td>
+                <span title={s.projectPath}>{s.project}</span>
+              </td>
+              <td className="whitespace-nowrap" style={{ color: 'var(--fg-4)' }}>
+                {fmtDate(s.startedAt)}
+              </td>
+              <td className="num">{num(s.turnCount)}</td>
+              <td className="num">{num(s.totalTokens)}</td>
+              <td
+                className="num"
+                title={`files ${s.distinctFiles} · dirs ${s.distinctDirs} · tools ${s.distinctTools} · skills ${s.distinctSkills} · subagents ${s.subagentCount}`}
+              >
+                {dash(s.complexity, 1)}
+              </td>
+              <td
+                className="num"
+                title="КПД vs frozen baseline — 100% = baseline efficiency, higher is leaner"
+              >
+                {pct(s.kpi)}
+              </td>
+              <td>
+                <DifficultyControl sessionId={s.sessionId} difficulty={s.difficulty} />
+              </td>
+              <td>
+                <RatingControl sessionId={s.sessionId} score={s.score} />
+              </td>
+              <td style={{ maxWidth: '20rem' }}>
+                <span
+                  className="line-clamp-2"
+                  style={{ color: 'var(--fg-3)' }}
+                  title={s.summary ?? ''}
+                >
+                  {s.summary ?? '—'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {pageCount > 1 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '10px 14px',
+            borderTop: '1px solid var(--line-dim)',
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            color: 'var(--fg-4)',
+          }}
+        >
+          <span className="tabular-nums">
+            {start + 1}–{Math.min(start + SESSIONS_PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              className="btn"
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+            >
+              ← PREV
+            </button>
             <span className="tabular-nums">
-              {start + 1}–{Math.min(start + SESSIONS_PAGE_SIZE, rows.length)} of {rows.length}
+              page {current + 1} / {pageCount}
             </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={current === 0}
-                onClick={() => setPage(current - 1)}
-              >
-                Prev
-              </Button>
-              <span className="tabular-nums">
-                Page {current + 1} / {pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={current >= pageCount - 1}
-                onClick={() => setPage(current + 1)}
-              >
-                Next
-              </Button>
-            </div>
+            <button
+              type="button"
+              className="btn"
+              disabled={current >= pageCount - 1}
+              onClick={() => setPage(current + 1)}
+            >
+              NEXT →
+            </button>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -797,7 +875,8 @@ function RatingControl({ sessionId, score }: { sessionId: string; score: number 
   return (
     <select
       aria-label={`Quality rating for session ${sessionId}`}
-      className="rounded border bg-background px-1 py-0.5 text-sm tabular-nums"
+      className="select tabular-nums"
+      style={{ width: 72 }}
       value={score ?? ''}
       disabled={setRating.isPending}
       onChange={(e) => {
@@ -832,7 +911,8 @@ function DifficultyControl({
   return (
     <select
       aria-label={`Task difficulty for session ${sessionId}`}
-      className="rounded border bg-background px-1 py-0.5 text-sm tabular-nums"
+      className="select tabular-nums"
+      style={{ width: 72 }}
       value={difficulty ?? ''}
       disabled={setDifficulty.isPending}
       onChange={(e) => {
@@ -850,16 +930,29 @@ function DifficultyControl({
   )
 }
 
+// Small mono bordered badge for ecosystem change types.
 function EcoBadge({ type }: { type: string }) {
   return (
-    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+    <span
+      style={{
+        flexShrink: 0,
+        border: '1px solid var(--line)',
+        color: 'var(--fg-3)',
+        fontFamily: 'var(--mono)',
+        fontSize: 10,
+        letterSpacing: '0.04em',
+        padding: '1px 6px',
+        textTransform: 'uppercase',
+        whiteSpace: 'nowrap',
+      }}
+    >
       {type.replace(/_/g, ' ')}
     </span>
   )
 }
 
 // Delta colouring. goodDirection='down' (default) = lower is better (tokens/turn);
-// 'up' = higher is better (KPI). The "good" direction is green, the other red.
+// 'up' = higher is better (КПД). The "good" direction is green, the other red.
 function ImpactDelta({
   pct,
   goodDirection = 'down',
@@ -867,16 +960,12 @@ function ImpactDelta({
   pct: number | null
   goodDirection?: 'up' | 'down'
 }) {
-  if (pct == null) return <span className="text-muted-foreground">—</span>
+  if (pct == null) return <span style={{ color: 'var(--fg-4)' }}>—</span>
   const sign = pct > 0 ? '+' : ''
   const good = goodDirection === 'down' ? pct < 0 : pct > 0
+  const color = pct === 0 ? 'var(--fg-4)' : good ? 'var(--ok)' : 'var(--warn)'
   return (
-    <span
-      className={cn(
-        'tabular-nums',
-        pct === 0 ? 'text-muted-foreground' : good ? 'text-emerald-500' : 'text-destructive',
-      )}
-    >
+    <span className="tabular-nums" style={{ color }}>
       {sign}
       {pct.toFixed(0)}%
     </span>
@@ -893,7 +982,13 @@ function EcosystemTab({ days }: { days: number }) {
 
   if (ecosystem.isLoading) return <Loading />
   if (ecosystem.isError)
-    return <p className="px-1 py-4 text-destructive text-sm">Failed to load ecosystem.</p>
+    return (
+      <p
+        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+      >
+        <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load ecosystem.
+      </p>
+    )
 
   const rows = ecosystem.data ?? []
   const impactRows = impact.data ?? []
@@ -912,162 +1007,198 @@ function EcosystemTab({ days }: { days: number }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Mark a change</CardTitle>
-          <p className="text-muted-foreground text-xs">
-            Auto-tracking (config / skill edits) needs the agent-analytics hooks installed
-            (scripts/agent-analytics/INSTALL.md). Until then log changes here — each becomes a
-            dashed line on “Tokens per day” and a row in Change impact.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-3">
-            <Input
+    <>
+      {/* MARK A CHANGE */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">mark a change</span>
+          <span className="meta">becomes a dashed line on tokens/day + a change-impact row</span>
+        </div>
+        <div className="panel-body">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+            <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-40"
+              className="input"
+              style={{ width: 160 }}
               aria-label="Change date"
             />
-            <Input
+            <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') submitNote()
               }}
               placeholder="What changed? e.g. Added context7 MCP"
-              className="min-w-56 flex-1"
+              className="input"
+              style={{ minWidth: 224, flex: 1 }}
               aria-label="Change note"
             />
-            <Button size="sm" onClick={submitNote} disabled={addNote.isPending || !note.trim()}>
-              Add note
-            </Button>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={submitNote}
+              disabled={addNote.isPending || !note.trim()}
+            >
+              ADD NOTE
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Change impact</CardTitle>
-          <p className="text-muted-foreground text-xs">
-            7 days before vs after each change (global). Tokens/turn: lower after = better. КПД:
-            higher after = better.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {impact.isLoading ? (
+      {/* CHANGE IMPACT */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">change impact</span>
+          <span className="meta">
+            7d before vs after · global · tok/turn lower = better · КПД higher = better
+          </span>
+        </div>
+        {impact.isLoading ? (
+          <div className="panel-body">
             <Loading />
-          ) : impactRows.length === 0 ? (
-            <p className="py-4 text-muted-foreground text-sm">No changes in the last 60 days.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground text-xs">
-                    <th className="py-2 pr-4 font-medium">When</th>
-                    <th className="py-2 pr-4 font-medium">Change</th>
-                    <th className="py-2 pr-4 text-right font-medium">tok/turn before</th>
-                    <th className="py-2 pr-4 text-right font-medium">after</th>
-                    <th className="py-2 pr-4 text-right font-medium">Δ tok</th>
-                    <th className="py-2 pr-4 text-right font-medium">КПД before</th>
-                    <th className="py-2 pr-4 text-right font-medium">after</th>
-                    <th className="py-2 pr-4 text-right font-medium">Δ КПД</th>
-                    <th className="py-2 text-right font-medium">Δ quality</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {impactRows.map((r) => (
-                    <tr key={r.id} className="border-b align-top last:border-0">
-                      <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground tabular-nums">
-                        {fmtDate(r.ts)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className="flex items-center gap-2">
-                          <EcoBadge type={r.type} />
-                          <span className="min-w-0 truncate" title={r.target ?? ''}>
-                            {r.target ?? '—'}
-                          </span>
+          </div>
+        ) : impactRows.length === 0 ? (
+          <div className="panel-body">
+            <NoteLine>no changes in the last 60 days.</NoteLine>
+          </div>
+        ) : (
+          <>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>when</th>
+                  <th>change</th>
+                  <th className="num">tok/turn before</th>
+                  <th className="num">after</th>
+                  <th className="num">Δ tok</th>
+                  <th className="num">КПД before</th>
+                  <th className="num">after</th>
+                  <th className="num">Δ КПД</th>
+                  <th className="num">Δ quality</th>
+                </tr>
+              </thead>
+              <tbody>
+                {impactRows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="whitespace-nowrap" style={{ color: 'var(--fg-4)' }}>
+                      {fmtDate(r.ts)}
+                    </td>
+                    <td>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <EcoBadge type={r.type} />
+                        <span className="min-w-0 truncate" title={r.target ?? ''}>
+                          {r.target ?? '—'}
                         </span>
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {tpt(r.tokPerTurnBefore)}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">
-                        {tpt(r.tokPerTurnAfter)}
-                      </td>
-                      <td className="py-2 pr-4 text-right">
-                        <ImpactDelta pct={r.tokPerTurnDeltaPct} />
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiBefore)}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiAfter)}</td>
-                      <td className="py-2 pr-4 text-right">
-                        <ImpactDelta pct={r.kpiDeltaPct} goodDirection="up" />
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {r.qualityDelta == null ? (
-                          '—'
-                        ) : (
-                          <span
-                            className={
+                      </span>
+                    </td>
+                    <td className="num">{tpt(r.tokPerTurnBefore)}</td>
+                    <td className="num">{tpt(r.tokPerTurnAfter)}</td>
+                    <td className="num">
+                      <ImpactDelta pct={r.tokPerTurnDeltaPct} />
+                    </td>
+                    <td className="num">{pct(r.kpiBefore)}</td>
+                    <td className="num">{pct(r.kpiAfter)}</td>
+                    <td className="num">
+                      <ImpactDelta pct={r.kpiDeltaPct} goodDirection="up" />
+                    </td>
+                    <td className="num">
+                      {r.qualityDelta == null ? (
+                        <span style={{ color: 'var(--fg-4)' }}>—</span>
+                      ) : (
+                        <span
+                          className="tabular-nums"
+                          style={{
+                            color:
                               r.qualityDelta > 0
-                                ? 'text-green-600'
+                                ? 'var(--ok)'
                                 : r.qualityDelta < 0
-                                  ? 'text-red-600'
-                                  : ''
-                            }
-                          >
-                            {r.qualityDelta > 0 ? '+' : ''}
-                            {r.qualityDelta.toFixed(1)}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="mt-3 text-muted-foreground text-xs">
-                Windows with no activity on a side show —.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Ecosystem changes</CardTitle>
-          <p className="text-muted-foreground text-xs">
-            Global — not affected by the project filter.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {rows.length === 0 ? (
-            <p className="py-4 text-muted-foreground text-sm">
-              No ecosystem changes yet. Install the agent-analytics hooks or add a note above.
+                                  ? 'var(--warn)'
+                                  : 'var(--fg-4)',
+                          }}
+                        >
+                          {r.qualityDelta > 0 ? '+' : ''}
+                          {r.qualityDelta.toFixed(1)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p
+              style={{
+                padding: '10px 14px',
+                fontFamily: 'var(--mono)',
+                fontSize: 10,
+                color: 'var(--fg-4)',
+                borderTop: '1px solid var(--line-dim)',
+              }}
+            >
+              Windows with no activity on a side show —.
             </p>
+          </>
+        )}
+      </div>
+
+      {/* ECOSYSTEM CHANGES */}
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">ecosystem changes</span>
+          <span className="meta">global · not affected by the project filter</span>
+        </div>
+        <div className="panel-body">
+          {rows.length === 0 ? (
+            <NoteLine>
+              no ecosystem changes yet. Install the agent-analytics hooks or add a note above.
+            </NoteLine>
           ) : (
-            <ol className="flex flex-col gap-3">
+            <ol style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {rows.map((c) => (
-                <li key={c.id} className="flex gap-3 border-b pb-3 last:border-0 last:pb-0">
-                  <span className="w-36 shrink-0 text-muted-foreground text-xs tabular-nums">
+                <li
+                  key={c.id}
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    paddingBottom: 12,
+                    borderBottom: '1px solid var(--line-dim)',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 150,
+                      flexShrink: 0,
+                      fontFamily: 'var(--mono)',
+                      fontSize: 10,
+                      color: 'var(--fg-4)',
+                    }}
+                    className="tabular-nums"
+                  >
                     {fmtDate(c.ts)}
                   </span>
                   <EcoBadge type={c.type} />
-                  <span className="min-w-0 flex-1 break-words text-sm">
+                  <span
+                    style={{
+                      minWidth: 0,
+                      flex: 1,
+                      wordBreak: 'break-word',
+                      fontSize: 13,
+                      color: 'var(--fg-2)',
+                    }}
+                  >
                     {c.target ?? c.note ?? '—'}
                     {c.target && c.note ? (
-                      <span className="text-muted-foreground"> — {c.note}</span>
+                      <span style={{ color: 'var(--fg-4)' }}> — {c.note}</span>
                     ) : null}
                   </span>
                 </li>
               ))}
             </ol>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -1094,88 +1225,70 @@ export function Productivity() {
   const projectList = projects.data ?? []
 
   return (
-    <div className="flex flex-col">
+    <>
       <PageHeader
-        title="Productivity"
-        description="Agent token use, complexity, and ecosystem changes."
-        action={
-          <Button size="sm" variant="outline" onClick={onRefresh} disabled={refresh.isPending}>
-            <RefreshCw className={cn('size-4', refresh.isPending && 'animate-spin')} />
-            Refresh
-          </Button>
+        num="03"
+        title="PRODUCTIVITY"
+        description={
+          <>
+            Agent token use, complexity, and ecosystem changes. Hover any bar in{' '}
+            <span style={{ color: 'var(--amber)' }}>tokens/day</span> for the breakdown.
+          </>
         }
-      />
-
-      <div className="flex flex-col gap-6 p-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <div
-            role="tablist"
-            aria-label="Productivity views"
-            className="inline-flex w-fit gap-1 rounded-lg bg-muted p-1"
-          >
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => setTab(id)}
-                className={cn(
-                  'rounded-md px-3 py-1.5 font-medium text-sm transition-colors',
-                  tab === id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="ml-auto flex items-center gap-3">
-            <Select
+        action={
+          <>
+            <select
+              className="select"
               value={projectPath ?? ALL_PROJECTS}
-              onValueChange={(v) => setProjectPath(v === ALL_PROJECTS ? undefined : v)}
+              onChange={(e) =>
+                setProjectPath(e.target.value === ALL_PROJECTS ? undefined : e.target.value)
+              }
+              aria-label="Project filter"
             >
-              <SelectTrigger size="sm" className="w-52" aria-label="Project filter">
-                <SelectValue placeholder="All projects" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-                {projectList.map((p) => (
-                  <SelectItem key={p.projectPath} value={p.projectPath}>
-                    {p.project}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <fieldset className="inline-flex w-fit gap-1 rounded-lg bg-muted p-1">
-              <legend className="sr-only">Time range</legend>
+              <option value={ALL_PROJECTS}>all projects · {projectList.length}</option>
+              {projectList.map((p) => (
+                <option key={p.projectPath} value={p.projectPath}>
+                  {p.project}
+                </option>
+              ))}
+            </select>
+            <div className="seg">
               {RANGES.map((r) => (
                 <button
                   key={r.days}
                   type="button"
-                  aria-pressed={days === r.days}
+                  className={days === r.days ? 'on' : ''}
                   onClick={() => setDays(r.days)}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 font-medium text-sm tabular-nums transition-colors',
-                    days === r.days
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
                 >
                   {r.label}
                 </button>
               ))}
-            </fieldset>
-          </div>
+            </div>
+            <button type="button" className="btn" onClick={onRefresh} disabled={refresh.isPending}>
+              ↻ REFRESH
+            </button>
+          </>
+        }
+      />
+
+      <div className="scroll">
+        <div className="tabs">
+          {TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? 'on' : ''}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {tab === 'overview' ? <OverviewTab days={days} projectPath={projectPath} /> : null}
         {tab === 'sessions' ? <SessionsTab days={days} projectPath={projectPath} /> : null}
         {tab === 'ecosystem' ? <EcosystemTab days={days} /> : null}
       </div>
-    </div>
+    </>
   )
 }
