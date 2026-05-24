@@ -2,7 +2,11 @@ import { basename } from 'node:path'
 import { db } from '@main/db/client'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { appPaths } from '@main/paths'
-import { ensureBaseline, type ScopedSession } from '@main/services/productivity/baseline'
+import {
+  ensureBaseline,
+  rebaseline as refitBaseline,
+  type ScopedSession,
+} from '@main/services/productivity/baseline'
 import { complexityFromPercentiles, percentileRanks } from '@main/services/productivity/complexity'
 import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
@@ -787,6 +791,55 @@ export const productivityRouter = router({
         .where(eq(agentSessions.sessionId, input.sessionId))
         .run()
       return { ok: true }
+    }),
+
+  // Set/clear the user's manual task-difficulty override (1–10).
+  setDifficulty: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string().min(1),
+        difficulty: z.number().int().min(1).max(10).nullable(),
+      }),
+    )
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(({ input }) => {
+      db()
+        .update(agentSessions)
+        .set({
+          difficulty: input.difficulty,
+          difficultySource: input.difficulty == null ? null : 'manual',
+        })
+        .where(eq(agentSessions.sessionId, input.sessionId))
+        .run()
+      return { ok: true }
+    }),
+
+  // Re-freeze the baseline over a chosen date range. The only operation that
+  // intentionally shifts historical КПД. scope = projectPath or global.
+  rebaseline: publicProcedure
+    .input(
+      z.object({
+        projectPath: z.string().optional(),
+        start: z.date(),
+        end: z.date(),
+      }),
+    )
+    .output(z.object({ ok: z.boolean(), method: z.string().nullable() }))
+    .mutation(({ input }) => {
+      const used = scopedKpdRows(input.projectPath).filter(
+        (r) => r.lastTs >= input.start.getTime() && r.lastTs <= input.end.getTime(),
+      )
+      const model = refitBaseline(
+        used.map((r) => ({
+          id: r.id,
+          difficulty: r.difficulty,
+          tokens: r.tokens,
+          score: r.score,
+          lastTs: r.lastTs,
+        })),
+        input.projectPath,
+      )
+      return { ok: model != null, method: model?.method ?? null }
     }),
 
   // Add a manual annotation to the ecosystem timeline.
