@@ -8,7 +8,7 @@ import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { expectedTokens, kpdByDay, rawEfficiency, sessionKpd } from '@shared/kpi'
+import { expectedTokens, kpdByDay, sessionKpd } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -86,35 +86,6 @@ function sessionComplexityMap(): Map<string, SessionComplexity> {
       subagentCount: r.subagentCount,
     })
   })
-  return map
-}
-
-// Per-session efficiency percentile (0..1) across the tracked corpus. rawEff =
-// (score ?? 5.5) × complexity / tokens, percentile-ranked the same way complexity
-// is. Sessions with no complexity or no tokens are unrankable → absent from the map.
-function sessionEfficiencyMap(
-  cmap: Map<string, SessionComplexity> = sessionComplexityMap(),
-): Map<string, number> {
-  const tracked = trackedProjects()
-  const rows = db()
-    .select({
-      id: agentSessions.sessionId,
-      score: agentSessions.score,
-      tin: agentSessions.totalTokensIn,
-      tout: agentSessions.totalTokensOut,
-    })
-    .from(agentSessions)
-    .where(tracked.length ? inArray(agentSessions.projectPath, tracked) : undefined)
-    .all()
-  const items = rows
-    .map((r) => ({
-      id: r.id,
-      e: rawEfficiency(r.score, cmap.get(r.id)?.complexity ?? null, r.tin + r.tout),
-    }))
-    .filter((x): x is { id: string; e: number } => x.e != null)
-  const ranks = percentileRanks(items.map((x) => x.e))
-  const map = new Map<string, number>()
-  for (let i = 0; i < items.length; i++) map.set(items[i].id, ranks[i])
   return map
 }
 
@@ -495,6 +466,7 @@ export const productivityRouter = router({
           startedAt: z.date().nullable(),
           endedAt: z.date().nullable(),
           score: z.number().nullable(),
+          difficulty: z.number().int().nullable(),
           summary: z.string().nullable(),
           turnCount: z.number(),
           totalTokens: z.number(),
@@ -538,7 +510,7 @@ export const productivityRouter = router({
         .all()
 
       const cmap = sessionComplexityMap()
-      const effMap = sessionEfficiencyMap(cmap)
+      const kpdMap = new Map(scopedKpdRows(input.projectPath).map((r) => [r.id, r.kpd]))
       const recency = (r: (typeof rows)[number]): number =>
         lastById.get(r.sessionId) ?? r.endedAt?.getTime() ?? r.startedAt?.getTime() ?? 0
 
@@ -546,7 +518,6 @@ export const productivityRouter = router({
         .sort((a, b) => recency(b) - recency(a))
         .map((r) => {
           const c = cmap.get(r.sessionId)
-          const eff = effMap.get(r.sessionId)
           const firstTs = firstById.get(r.sessionId)
           const lastTs = lastById.get(r.sessionId)
           return {
@@ -556,11 +527,12 @@ export const productivityRouter = router({
             startedAt: r.startedAt ?? (firstTs != null ? new Date(firstTs) : null),
             endedAt: r.endedAt ?? (lastTs != null ? new Date(lastTs) : null),
             score: r.score,
+            difficulty: r.difficulty,
             summary: r.summary,
             turnCount: r.turnCount,
             totalTokens: r.totalTokensIn + r.totalTokensOut,
             complexity: c?.complexity ?? null,
-            kpi: eff == null ? null : eff * 100,
+            kpi: kpdMap.get(r.sessionId) ?? null,
             distinctFiles: c?.distinctFiles ?? 0,
             distinctDirs: c?.distinctDirs ?? 0,
             distinctTools: c?.distinctTools ?? 0,
