@@ -891,16 +891,12 @@ function EcosystemTab({ days }: { days: number }) {
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">
                         {tpt(r.tokPerTurnBefore)}
-                        <span className="ml-1 text-muted-foreground text-xs">
-                          ({r.turnsBefore})
-                        </span>
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">
                         {tpt(r.tokPerTurnAfter)}
-                        <span className="ml-1 text-muted-foreground text-xs">({r.turnsAfter})</span>
                       </td>
                       <td className="py-2 pr-4 text-right">
-                        <ImpactDelta pct={r.deltaPct} />
+                        <ImpactDelta pct={r.tokPerTurnDeltaPct} />
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiBefore)}</td>
                       <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiAfter)}</td>
@@ -912,7 +908,7 @@ function EcosystemTab({ days }: { days: number }) {
                 </tbody>
               </table>
               <p className="mt-3 text-muted-foreground text-xs">
-                (n) = turns in each window. Rows with no turns on a side show —.
+                Windows with no activity on a side show —.
               </p>
             </div>
           )}

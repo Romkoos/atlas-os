@@ -8,7 +8,7 @@ import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { expectedTokens, kpdByDay, kpiCoefficient, rawEfficiency, sessionKpd } from '@shared/kpi'
+import { expectedTokens, kpdByDay, rawEfficiency, sessionKpd } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -688,11 +688,9 @@ export const productivityRouter = router({
         .sort((a, b) => a.date.localeCompare(b.date))
     }),
 
-  // Before/after impact of each ecosystem change: avg tokens-per-turn in the
-  // `window` days before vs after the change. The core thesis metric — does a
-  // skill/MCP/config edit move token efficiency? Global, respects the allowlist.
+  // Before/after impact of each ecosystem change: token/turn, КПД, quality.
   ecosystemImpact: publicProcedure
-    .input(z.object({ window: z.number().int().positive().default(7) }).default({ window: 7 }))
+    .input(z.object({ window: z.number().int().positive().default(7) }))
     .output(
       z.array(
         z.object({
@@ -700,20 +698,20 @@ export const productivityRouter = router({
           ts: z.date(),
           type: z.string(),
           target: z.string().nullable(),
-          turnsBefore: z.number(),
-          turnsAfter: z.number(),
+          source: z.string().nullable(),
+          note: z.string().nullable(),
           tokPerTurnBefore: z.number().nullable(),
           tokPerTurnAfter: z.number().nullable(),
-          deltaPct: z.number().nullable(),
+          tokPerTurnDeltaPct: z.number().nullable(),
           kpiBefore: z.number().nullable(),
           kpiAfter: z.number().nullable(),
           kpiDeltaPct: z.number().nullable(),
+          qualityDelta: z.number().nullable(),
         }),
       ),
     )
     .query(({ input }) => {
       const w = input.window * 24 * 60 * 60 * 1000
-      // Bound the change list to the last 60 days so the table stays digestible.
       const changes = db()
         .select()
         .from(ecosystemChanges)
@@ -722,8 +720,6 @@ export const productivityRouter = router({
         .all()
       if (changes.length === 0) return []
 
-      // Load every turn that could fall in any before/after window in one pass,
-      // then bucket in JS (variable per-change windows don't group well in SQL).
       const earliest = Math.min(...changes.map((c) => c.ts.getTime())) - w
       const turns = db()
         .select({ ts: agentTurns.ts, tin: agentTurns.tokensIn, tout: agentTurns.tokensOut })
@@ -731,64 +727,43 @@ export const productivityRouter = router({
         .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
         .all()
 
-      // Sessions for KPI before/after: last-turn ms + score/complexity/tokens,
-      // bounded by the same `earliest` as the turn pass.
-      const sessLast = db()
-        .select({ id: agentTurns.sessionId, last: sql<number>`max(${agentTurns.ts})` })
-        .from(agentTurns)
-        .where(and(gte(agentTurns.ts, new Date(earliest)), trackedCondition()))
-        .groupBy(agentTurns.sessionId)
-        .all()
-      const effMap = sessionEfficiencyMap()
-      const kpiSessions = sessLast.flatMap((s) => {
-        const percentile = effMap.get(s.id)
-        return percentile == null ? [] : [{ last: s.last, percentile }]
-      })
+      const kpdRows = scopedKpdRows().filter((r) => r.kpd != null)
 
       return changes.map((c) => {
-        const t = c.ts.getTime()
-        let nb = 0
-        let sb = 0
-        let na = 0
-        let sa = 0
-        for (const x of turns) {
-          const xt = x.ts.getTime()
-          if (xt >= t - w && xt < t) {
-            nb++
-            sb += x.tin + x.tout
-          } else if (xt >= t && xt < t + w) {
-            na++
-            sa += x.tin + x.tout
-          }
-        }
-        const before = nb ? sb / nb : null
-        const after = na ? sa / na : null
-        const deltaPct = before != null && after != null ? ((after - before) / before) * 100 : null
-        const kb: number[] = []
-        const ka: number[] = []
-        for (const s of kpiSessions) {
-          if (s.last >= t - w && s.last < t) kb.push(s.percentile)
-          else if (s.last >= t && s.last < t + w) ka.push(s.percentile)
-        }
-        const kpiBefore = kpiCoefficient(kb)
-        const kpiAfter = kpiCoefficient(ka)
-        const kpiDeltaPct =
-          kpiBefore != null && kpiAfter != null && kpiBefore !== 0
-            ? ((kpiAfter - kpiBefore) / kpiBefore) * 100
-            : null
+        const cTime = c.ts.getTime()
+        const before = turns.filter((t) => t.ts.getTime() >= cTime - w && t.ts.getTime() < cTime)
+        const after = turns.filter((t) => t.ts.getTime() >= cTime && t.ts.getTime() < cTime + w)
+        const tokBefore = before.length ? mean(before.map((t) => t.tin + t.tout)) : null
+        const tokAfter = after.length ? mean(after.map((t) => t.tin + t.tout)) : null
+        const tokDelta = tokBefore && tokAfter ? ((tokAfter - tokBefore) / tokBefore) * 100 : null
+
+        const inWin = (lo: number, hi: number) =>
+          kpdRows.filter((r) => r.lastTs >= lo && r.lastTs < hi)
+        const beforeRows = inWin(cTime - w, cTime)
+        const afterRows = inWin(cTime, cTime + w)
+
+        const kpiBefore = mean(beforeRows.map((r) => r.kpd as number))
+        const kpiAfter = mean(afterRows.map((r) => r.kpd as number))
+        const kpiDelta = kpiBefore && kpiAfter ? ((kpiAfter - kpiBefore) / kpiBefore) * 100 : null
+
+        const qBefore = mean(beforeRows.flatMap((r) => (r.score == null ? [] : [r.score])))
+        const qAfter = mean(afterRows.flatMap((r) => (r.score == null ? [] : [r.score])))
+        const qualityDelta = qBefore != null && qAfter != null ? qAfter - qBefore : null
+
         return {
           id: c.id,
           ts: c.ts,
           type: c.type,
           target: c.target,
-          turnsBefore: nb,
-          turnsAfter: na,
-          tokPerTurnBefore: before,
-          tokPerTurnAfter: after,
-          deltaPct,
+          source: c.source,
+          note: c.note,
+          tokPerTurnBefore: tokBefore,
+          tokPerTurnAfter: tokAfter,
+          tokPerTurnDeltaPct: tokDelta,
           kpiBefore,
           kpiAfter,
-          kpiDeltaPct,
+          kpiDeltaPct: kpiDelta,
+          qualityDelta,
         }
       })
     }),
