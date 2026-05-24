@@ -54,3 +54,83 @@ export function kpiByDay(sessions: KpiDaySession[]): KpiDay[] {
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
 }
+
+// ── Frozen-baseline КПД model ────────────────────────────────────────────────
+// КПД = expectedTokens(difficulty) / actualTokens × 100. expectedTokens comes
+// from a baseline frozen at the project's starting period. Two methods:
+//   - global-median: expected = median baseline tokens (difficulty ignored).
+//     Used until enough difficulty-tagged data exists. Makes КПД work day one.
+//   - loglinear: expected = exp(a + b·difficulty), fit on baseline medians.
+//     Used once ≥8 difficulty-tagged sessions span ≥2 difficulty levels.
+
+export type BaselineMethod = 'loglinear' | 'global-median'
+export interface BaselineParams {
+  a?: number
+  b?: number
+  median?: number
+}
+export interface BaselineModel {
+  method: BaselineMethod
+  params: BaselineParams
+}
+export interface BaselineSample {
+  difficulty: number | null
+  tokens: number
+}
+
+const MIN_DIFFICULTY_COVERAGE = 8
+
+function medianOf(xs: number[]): number {
+  const s = [...xs].sort((a, b) => a - b)
+  const m = s.length >> 1
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+// Fit a frozen baseline from starting-period samples. Null if no usable tokens.
+export function fitBaseline(samples: BaselineSample[]): BaselineModel | null {
+  const valid = samples.filter((s) => s.tokens > 0)
+  if (valid.length === 0) return null
+
+  const withDiff = valid.filter(
+    (s): s is { difficulty: number; tokens: number } => s.difficulty != null,
+  )
+  if (withDiff.length >= MIN_DIFFICULTY_COVERAGE) {
+    const byD = new Map<number, number[]>()
+    for (const s of withDiff) {
+      const arr = byD.get(s.difficulty) ?? []
+      arr.push(Math.log(s.tokens))
+      byD.set(s.difficulty, arr)
+    }
+    if (byD.size >= 2) {
+      // Least squares on per-difficulty medians of log(tokens) → robust slope.
+      const pts = [...byD.entries()].map(([x, logs]) => ({ x, y: medianOf(logs) }))
+      const n = pts.length
+      const sx = pts.reduce((a, p) => a + p.x, 0)
+      const sy = pts.reduce((a, p) => a + p.y, 0)
+      const sxx = pts.reduce((a, p) => a + p.x * p.x, 0)
+      const sxy = pts.reduce((a, p) => a + p.x * p.y, 0)
+      const denom = n * sxx - sx * sx
+      if (denom !== 0) {
+        const b = (n * sxy - sx * sy) / denom
+        const a = (sy - b * sx) / n
+        if (b > 0) return { method: 'loglinear', params: { a, b } }
+      }
+    }
+  }
+  return { method: 'global-median', params: { median: medianOf(valid.map((s) => s.tokens)) } }
+}
+
+// Expected token cost for a task of the given difficulty under the frozen model.
+export function expectedTokens(model: BaselineModel, difficulty: number | null): number | null {
+  if (model.method === 'global-median') return model.params.median ?? null
+  if (difficulty == null) return null
+  const { a, b } = model.params
+  if (a == null || b == null) return null
+  return Math.exp(a + b * difficulty)
+}
+
+// Per-session КПД (%). >100 = leaner than baseline. Null on unusable inputs.
+export function sessionKpd(expected: number | null, actualTokens: number): number | null {
+  if (expected == null || expected <= 0 || actualTokens <= 0) return null
+  return (expected / actualTokens) * 100
+}
