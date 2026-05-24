@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   usePlotArea,
@@ -130,7 +131,9 @@ function TokensTooltip(props: {
 function KpiTooltip(props: {
   active?: boolean
   label?: string | number
-  payload?: { payload: { kpi: number | null; sessions: number; event: string | null } }[]
+  payload?: {
+    payload: { kpi: number | null; quality: number | null; sessions: number; event: string | null }
+  }[]
 }) {
   const row = props.payload?.[0]?.payload
   if (!props.active || !row) return null
@@ -140,6 +143,10 @@ function KpiTooltip(props: {
       <div className="flex justify-between gap-6">
         <span className="text-muted-foreground">KPI</span>
         <span className="tabular-nums">{row.kpi == null ? '—' : `${row.kpi.toFixed(0)}%`}</span>
+      </div>
+      <div className="flex justify-between gap-6">
+        <span className="text-muted-foreground">Quality</span>
+        <span className="tabular-nums">{row.quality == null ? '—' : row.quality.toFixed(1)}</span>
       </div>
       <div className="flex justify-between gap-6">
         <span className="text-muted-foreground">Sessions</span>
@@ -276,6 +283,7 @@ function OverviewTab({ days, projectPath }: Scope) {
   const kpiChartData = kpiDates.map((date) => ({
     date,
     kpi: kpiByDate.get(date)?.kpi ?? null,
+    quality: kpiByDate.get(date)?.quality ?? null,
     sessions: kpiByDate.get(date)?.sessions ?? 0,
     event: ecoMap.get(date)?.label ?? null,
   }))
@@ -448,8 +456,8 @@ function OverviewTab({ days, projectPath }: Scope) {
           <CardTitle className="text-base">KPI (efficiency)</CardTitle>
           <p className="text-muted-foreground text-xs">
             Efficiency percentile (quality × complexity per token, ranked across all sessions),
-            averaged per day — higher is better.{' '}
-            {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
+            averaged per day — higher is better. Dashed line: avg quality (0–10, right axis); dashed
+            reference at 100%. {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
           </p>
         </CardHeader>
         <CardContent>
@@ -475,23 +483,51 @@ function OverviewTab({ days, projectPath }: Scope) {
                     minTickGap={16}
                   />
                   <YAxis
-                    domain={[0, 100]}
+                    yAxisId="kpi"
+                    domain={[0, 'auto']}
                     tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={44}
                     tickFormatter={(value: number) => `${value}%`}
+                  />
+                  <YAxis
+                    yAxisId="quality"
+                    orientation="right"
+                    domain={[0, 10]}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    width={32}
+                  />
+                  <ReferenceLine
+                    yAxisId="kpi"
+                    y={100}
+                    stroke="var(--color-muted-foreground)"
+                    strokeDasharray="4 4"
                   />
                   <Tooltip
                     cursor={{ stroke: 'var(--color-muted)', strokeWidth: 1 }}
                     content={<KpiTooltip />}
                   />
                   <Line
+                    yAxisId="kpi"
                     type="monotone"
                     dataKey="kpi"
                     stroke="var(--color-chart-1)"
                     strokeWidth={2}
                     dot={false}
                     connectNulls
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    yAxisId="quality"
+                    type="monotone"
+                    dataKey="quality"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2}
+                    strokeDasharray="5 3"
+                    dot={false}
+                    connectNulls
+                    isAnimationActive={false}
                   />
                   <EcoMarkers events={eventDays} />
                 </LineChart>
