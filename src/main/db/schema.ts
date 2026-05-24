@@ -58,7 +58,9 @@ export const agentSessions = sqliteTable(
     startedAt: integer('started_at', { mode: 'timestamp_ms' }),
     endedAt: integer('ended_at', { mode: 'timestamp_ms' }),
     endReason: text('end_reason'),
-    score: integer('score'), // 1–10 from /done; null until rated
+    score: integer('score'), // 1–10, user-set via setRating
+    difficulty: integer('difficulty'), // 1–10 intrinsic task difficulty; null = unknown
+    difficultySource: text('difficulty_source'), // 'llm' | 'manual' | null
     summary: text('summary'),
     totalTokensIn: integer('total_tokens_in').notNull().default(0),
     totalTokensOut: integer('total_tokens_out').notNull().default(0),
@@ -91,6 +93,30 @@ export const ecosystemChanges = sqliteTable(
   },
   (t) => [index('idx_eco_ts').on(t.ts), index('idx_eco_type').on(t.type)],
 )
+
+// A frozen efficiency baseline per scope (project path or '__global__').
+// `expectedTokens(difficulty)` is derived from `method` + `params`; the latest
+// row per scope is active. New rows are written only on first use or explicit
+// re-baseline, so historical КПД never mutates on its own.
+export const kpiBaseline = sqliteTable(
+  'kpi_baseline',
+  {
+    id: text('id').primaryKey(),
+    scope: text('scope').notNull(), // projectPath or '__global__'
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    periodStart: integer('period_start', { mode: 'timestamp_ms' }),
+    periodEnd: integer('period_end', { mode: 'timestamp_ms' }),
+    method: text('method').notNull(), // 'loglinear' | 'global-median'
+    params: text('params', { mode: 'json' })
+      .$type<{ a?: number; b?: number; median?: number }>()
+      .notNull(),
+    sessionCount: integer('session_count').notNull(),
+  },
+  (t) => [index('idx_kpi_baseline_scope').on(t.scope)],
+)
+
+export type KpiBaselineRow = typeof kpiBaseline.$inferSelect
+export type NewKpiBaselineRow = typeof kpiBaseline.$inferInsert
 
 export type AgentTurnRow = typeof agentTurns.$inferSelect
 export type NewAgentTurnRow = typeof agentTurns.$inferInsert
