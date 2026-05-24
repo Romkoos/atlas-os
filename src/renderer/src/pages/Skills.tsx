@@ -1,120 +1,243 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { cn } from '@renderer/lib/utils'
+import type { SkillMeta } from '@shared/skills'
 import { skipToken } from '@tanstack/react-query'
+import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-// Tailwind descendant styling for rendered SKILL.md (no typography plugin needed).
-const PROSE = cn(
-  'max-w-3xl text-sm leading-relaxed',
-  '[&_h1]:mt-6 [&_h1]:mb-3 [&_h1]:font-semibold [&_h1]:text-xl',
-  '[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:font-semibold [&_h2]:text-lg',
-  '[&_h3]:mt-4 [&_h3]:mb-2 [&_h3]:font-medium [&_h3]:text-base',
-  '[&_p]:my-3 [&_a]:text-primary [&_a]:underline',
-  '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1',
-  '[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs',
-  '[&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-4',
-  '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
-  '[&_table]:my-3 [&_table]:w-full [&_table]:text-xs',
-  '[&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:px-2 [&_td]:py-1',
-  '[&_blockquote]:border-l-2 [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground',
-)
+function titleCase(tag: string): string {
+  return tag.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
-function Badge({ children, tone = 'muted' }: { children: string; tone?: 'muted' | 'primary' }) {
+// Many skills wrap sections in pseudo-XML tags (<objective> … </objective>).
+// react-markdown renders those as raw tags; convert each standalone opening tag
+// into a heading and drop the closing tag so the body reads as clean markdown.
+function formatSkillMarkdown(md: string): string {
+  return md
+    .replace(/^[ \t]*<\/[a-zA-Z][\w-]*>[ \t]*$/gm, '')
+    .replace(
+      /^[ \t]*<([a-zA-Z][\w-]*)(?:\s[^>]*)?>[ \t]*$/gm,
+      (_match, tag: string) => `\n### ${titleCase(tag)}\n`,
+    )
+}
+
+// Group skills by the segment before the first dash in their id (all `gsd-*`
+// collapse into one "gsd" group). Single-skill prefixes come first, then
+// multi-skill (collapsible) groups; both alphabetical by prefix. Members keep
+// the backend's name order.
+function groupByPrefix(items: SkillMeta[]): Array<[string, SkillMeta[]]> {
+  const groups = new Map<string, SkillMeta[]>()
+  for (const skill of items) {
+    const dash = skill.id.indexOf('-')
+    const prefix = dash > 0 ? skill.id.slice(0, dash) : skill.id
+    const arr = groups.get(prefix)
+    if (arr) arr.push(skill)
+    else groups.set(prefix, [skill])
+  }
+  return [...groups.entries()].sort((a, b) => {
+    const aMulti = a[1].length > 1 ? 1 : 0
+    const bMulti = b[1].length > 1 ? 1 : 0
+    return aMulti - bMulti || a[0].localeCompare(b[0])
+  })
+}
+
+const hintStyle = {
+  padding: '20px 14px',
+  fontFamily: 'var(--mono)',
+  fontSize: 11,
+  color: 'var(--fg-4)',
+} as const
+
+function SkillItem({
+  skill,
+  selected,
+  onSelect,
+}: {
+  skill: SkillMeta
+  selected: boolean
+  onSelect: () => void
+}) {
   return (
-    <span
-      className={cn(
-        'shrink-0 rounded px-1.5 py-0.5 text-[10px]',
-        tone === 'primary' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {children}
-    </span>
+    <button type="button" className={`skill-item${selected ? ' on' : ''}`} onClick={onSelect}>
+      <span className="nm">{skill.name}</span>
+      {skill.description ? (
+        <span className="desc">
+          {skill.description.slice(0, 88)}
+          {skill.description.length > 88 ? '…' : ''}
+        </span>
+      ) : null}
+      {skill.trigger ? <span className="tag">{skill.trigger}</span> : null}
+    </button>
   )
 }
 
 export function Skills() {
   const skills = trpc.skills.list.useQuery()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
   const detail = trpc.skills.get.useQuery(selectedId ? { id: selectedId } : skipToken)
 
-  const items = skills.data ?? []
+  const allItems = skills.data ?? []
+  const items = filter
+    ? allItems.filter(
+        (s) =>
+          s.id.toLowerCase().includes(filter.toLowerCase()) ||
+          s.name.toLowerCase().includes(filter.toLowerCase()),
+      )
+    : allItems
 
   return (
-    <div className="flex h-full flex-col">
+    <>
       <PageHeader
-        title="Skills"
-        description="Skills in your global ~/.claude/skills folder."
+        num="04"
+        title="SKILLS"
+        description={
+          <>
+            Skills in your global <span style={{ color: 'var(--amber)' }}>~/.claude/skills</span>{' '}
+            folder.{' '}
+            {allItems.length > 0 ? (
+              <span style={{ color: 'var(--fg-3)' }}>
+                {allItems.length} available · auto-loaded on start.
+              </span>
+            ) : null}
+          </>
+        }
         action={
-          items.length > 0 ? (
-            <span className="text-muted-foreground text-sm">{items.length} skills</span>
-          ) : null
+          <input
+            className="input"
+            style={{ width: 200 }}
+            placeholder="/ filter skills…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
         }
       />
 
-      <div className="flex min-h-0 flex-1">
-        <div className="w-80 shrink-0 overflow-y-auto border-r p-3">
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          display: 'grid',
+          gridTemplateColumns: '300px 1fr',
+        }}
+      >
+        {/* LEFT: skill list */}
+        <div style={{ overflow: 'auto', borderRight: '1px solid var(--line-dim)' }}>
           {skills.isLoading ? (
-            <p className="px-2 py-4 text-muted-foreground text-sm">Loading…</p>
+            <div style={hintStyle}>{'// loading…'}</div>
           ) : skills.isError ? (
-            <p className="px-2 py-4 text-destructive text-sm">Failed to load skills.</p>
+            <div style={{ ...hintStyle, color: 'var(--amber)' }}>{'// error loading skills'}</div>
           ) : items.length === 0 ? (
-            <p className="px-2 py-4 text-muted-foreground text-sm">
-              No skills found in ~/.claude/skills.
-            </p>
+            <div style={hintStyle}>{'// no skills found in ~/.claude/skills'}</div>
           ) : (
-            <ul aria-label="Skills" className="flex flex-col gap-1">
-              {items.map((skill) => (
-                <li key={skill.id}>
-                  <button
-                    type="button"
-                    aria-pressed={selectedId === skill.id}
-                    onClick={() => setSelectedId(skill.id)}
-                    className={cn(
-                      'w-full rounded-md px-3 py-2 text-left transition-colors',
-                      selectedId === skill.id ? 'bg-accent' : 'hover:bg-accent/60',
-                    )}
+            groupByPrefix(items).map(([prefix, group]) =>
+              group.length === 1 ? (
+                <SkillItem
+                  key={prefix}
+                  skill={group[0]}
+                  selected={selectedId === group[0].id}
+                  onSelect={() => setSelectedId(group[0].id)}
+                />
+              ) : (
+                <details key={prefix} className="group" open>
+                  <summary
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 14px',
+                      fontFamily: 'var(--mono)',
+                      fontSize: 10,
+                      color: 'var(--fg-4)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      cursor: 'pointer',
+                      listStyle: 'none',
+                      borderBottom: '1px solid var(--line-dim)',
+                      userSelect: 'none',
+                    }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-medium text-sm">{skill.name}</span>
-                      {skill.allowedToolsCount > 0 ? (
-                        <Badge>{`${skill.allowedToolsCount} tools`}</Badge>
-                      ) : null}
-                    </div>
-                    {skill.description ? (
-                      <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
-                        {skill.description}
-                      </p>
-                    ) : null}
-                    {skill.trigger || skill.argumentHint ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {skill.trigger ? <Badge tone="primary">{skill.trigger}</Badge> : null}
-                        {skill.argumentHint ? <Badge>{skill.argumentHint}</Badge> : null}
-                      </div>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <ChevronRight style={{ width: 10, height: 10 }} />
+                      {prefix}
+                    </span>
+                    <span>{group.length}</span>
+                  </summary>
+                  {group.map((skill) => (
+                    <SkillItem
+                      key={skill.id}
+                      skill={skill}
+                      selected={selectedId === skill.id}
+                      onSelect={() => setSelectedId(skill.id)}
+                    />
+                  ))}
+                </details>
+              ),
+            )
           )}
         </div>
 
-        <div className="min-w-0 flex-1 overflow-y-auto p-8">
-          {!selectedId ? (
-            <p className="text-muted-foreground text-sm">Select a skill to read its SKILL.md.</p>
-          ) : detail.isLoading ? (
-            <p className="text-muted-foreground text-sm">Loading…</p>
-          ) : detail.isError ? (
-            <p className="text-destructive text-sm">Failed to load skill.</p>
-          ) : detail.data ? (
-            <article className={PROSE}>
-              <Markdown remarkPlugins={[remarkGfm]}>{detail.data.content}</Markdown>
-            </article>
-          ) : null}
+        {/* RIGHT: rendered preview */}
+        <div className="split-pane">
+          <div className="pane-head">
+            <span className="ttl">preview · rendered</span>
+            <span className="meta">{selectedId ? `${selectedId}.md` : 'no selection'}</span>
+          </div>
+          <div className="pane-body">
+            {!selectedId ? (
+              <div style={{ ...hintStyle, padding: '20px 24px' }}>
+                {'// select a skill to read its SKILL.md'}
+              </div>
+            ) : detail.isLoading ? (
+              <div style={{ ...hintStyle, padding: '20px 24px' }}>{'// loading…'}</div>
+            ) : detail.isError ? (
+              <div style={{ ...hintStyle, padding: '20px 24px', color: 'var(--amber)' }}>
+                {'// error loading skill content'}
+              </div>
+            ) : detail.data ? (
+              <>
+                {detail.data.meta.allowedTools.length > 0 ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '16px 24px 0',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                      Tools:
+                    </span>
+                    {detail.data.meta.allowedTools.map((tool) => (
+                      <span
+                        key={tool}
+                        style={{
+                          fontFamily: 'var(--mono)',
+                          fontSize: 9,
+                          color: 'var(--amber)',
+                          border: '1px solid var(--amber-dim)',
+                          padding: '1px 6px',
+                        }}
+                      >
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="md-prose">
+                  <Markdown remarkPlugins={[remarkGfm]}>
+                    {formatSkillMarkdown(detail.data.content)}
+                  </Markdown>
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

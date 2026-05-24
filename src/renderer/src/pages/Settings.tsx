@@ -1,34 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent } from '@renderer/components/ui/card'
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@renderer/components/ui/form'
-import { Input } from '@renderer/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
-import { cn } from '@renderer/lib/utils'
 import { CLAUDE_MODELS } from '@shared/models'
 import { type AppSettings, LOG_LEVELS, settingsSchema, THEMES } from '@shared/settings'
-import { Check, FolderOpen, ShieldCheck } from 'lucide-react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
+
+// Render uptimeMs as a compact "4d 12h" / "12h 3m" / "3m" string.
+function formatUptime(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
 
 // Pick which projects the Productivity tracker counts. Empty selection = all.
 function TrackedProjectsCard() {
@@ -44,6 +34,7 @@ function TrackedProjectsCard() {
 
   const projects = discover.data ?? []
   const allPaths = projects.map((p) => p.projectPath)
+  const tracked = projects.filter((p) => p.tracked).length
   const allTracked = projects.length > 0 && projects.every((p) => p.tracked)
 
   const toggle = (path: string) => {
@@ -57,24 +48,36 @@ function TrackedProjectsCard() {
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3">
-        <div>
-          <h2 className="font-medium text-sm">Tracked projects</h2>
-          <p className="text-muted-foreground text-xs">
-            Productivity only counts these projects. None selected = all tracked.
-          </p>
+    <div className="panel mt-16">
+      <div className="panel-head">
+        <span className="ttl">tracked projects</span>
+        <span className="meta">
+          {tracked} / {projects.length} tracked · none selected = all tracked
+        </span>
+      </div>
+      <div className="panel-body">
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            color: 'var(--fg-3)',
+            marginBottom: 12,
+          }}
+        >
+          Productivity only counts these projects.
         </div>
 
         {discover.isLoading ? (
-          <p className="py-4 text-muted-foreground text-sm">Loading projects…</p>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+            Loading projects…
+          </div>
         ) : projects.length === 0 ? (
-          <p className="py-4 text-muted-foreground text-sm">
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
             No projects yet. Run Refresh on the Productivity page first.
-          </p>
+          </div>
         ) : (
           <>
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {projects.map((p) => (
                 <button
                   key={p.projectPath}
@@ -83,35 +86,82 @@ function TrackedProjectsCard() {
                   onClick={() => toggle(p.projectPath)}
                   disabled={setTracked.isPending}
                   title={p.projectPath}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm transition-colors disabled:opacity-50',
-                    p.tracked
-                      ? 'border-transparent bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted',
-                  )}
+                  className={`chip ${p.tracked ? 'on' : ''}`}
                 >
-                  {p.tracked ? <Check className="size-3.5" /> : null}
                   {p.project}
                 </button>
               ))}
             </div>
-            <div>
-              <Button
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
+                className="btn"
                 disabled={allTracked || setTracked.isPending}
                 onClick={() => setTracked.mutate({ trackedProjects: [] })}
               >
-                Track all
-              </Button>
+                TRACK ALL
+              </button>
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
+
+// Real runtime status sourced from health.ping (no fake pid/port/launchd).
+function RuntimeStatusCard({ model }: { model: string }) {
+  const ping = trpc.health.ping.useQuery(undefined, { refetchInterval: 5000 })
+  const data = ping.data
+  const online = !ping.isError && !!data
+
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <span className="ttl">runtime status</span>
+        <span className="meta">health.ping · 5s</span>
+      </div>
+      <div className="panel-body">
+        <div className="kv">
+          <div className="k">status</div>
+          <div className="v">
+            {online ? (
+              <>
+                <span className="dot ok" /> &nbsp;running
+              </>
+            ) : (
+              <>
+                <span className="dot warn" /> &nbsp;offline
+              </>
+            )}
+          </div>
+        </div>
+        <div className="kv">
+          <div className="k">version</div>
+          <div className="v">{data ? `v${data.version}` : '—'}</div>
+        </div>
+        <div className="kv">
+          <div className="k">mem</div>
+          <div className="v">{data ? `${data.memMB} MB` : '—'}</div>
+        </div>
+        <div className="kv">
+          <div className="k">uptime</div>
+          <div className="v">{data ? formatUptime(data.uptimeMs) : '—'}</div>
+        </div>
+        <div className="kv">
+          <div className="k">model</div>
+          <div className="v">{model}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const HOTKEYS: ReadonlyArray<readonly [label: string, key: string]> = [
+  ['run agent', '⌘ + ENTER'],
+  ['switch screens', '⌘ + 1..5'],
+  ['settings', '⌘ + ,'],
+]
 
 export function Settings() {
   const utils = trpc.useUtils()
@@ -161,155 +211,203 @@ export function Settings() {
 
   const onSubmit = form.handleSubmit((values) => saveMutation.mutate(values))
 
+  const currentModel = form.watch('model')
+
   return (
-    <div className="flex flex-col">
-      <PageHeader title="Settings" description="Model, output folder, theme, logging." />
-      <div className="flex max-w-2xl flex-col gap-4 p-8">
-        <div className="flex items-start gap-3 rounded-md border bg-muted/40 px-4 py-3 text-sm">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-          <div className="text-muted-foreground">
-            Atlas OS uses your{' '}
-            <span className="font-medium text-foreground">Claude subscription</span> via Claude Code
-            — no API key needed. If a run fails with an auth error, run{' '}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">claude login</code> in a
-            terminal.
+    <>
+      <PageHeader
+        num="05"
+        title="SETTINGS"
+        description={<>Model, output folder, theme, logging.</>}
+      />
+      <div className="scroll">
+        {/* AUTH banner */}
+        <div className="panel" style={{ borderColor: 'var(--amber-dim)', borderStyle: 'solid' }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              fontFamily: 'var(--mono)',
+              fontSize: 12,
+              color: 'var(--fg-2)',
+            }}
+          >
+            <span style={{ color: 'var(--amber)', fontSize: 14 }}>◇</span>
+            <div>
+              Atlas OS uses your <b style={{ color: 'var(--fg)' }}>Claude subscription</b> via
+              Claude Code — no API key needed. If a run fails with an auth error, run{' '}
+              <code
+                style={{ background: 'var(--bg-2)', padding: '1px 6px', color: 'var(--amber)' }}
+              >
+                claude login
+              </code>{' '}
+              in a terminal.
+            </div>
           </div>
         </div>
 
-        <Card>
-          <CardContent>
-            {settingsQuery.isLoading ? (
-              <p className="py-8 text-center text-muted-foreground text-sm">Loading settings…</p>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={onSubmit} className="grid gap-6">
-                  <FormField
-                    control={form.control}
-                    name="model"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Default model</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select a model" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {CLAUDE_MODELS.map((model) => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="outputDir"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Output folder</FormLabel>
-                        <div className="flex gap-2">
-                          <FormControl>
-                            <Input readOnly placeholder="Choose a folder" {...field} />
-                          </FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => chooseDir.mutate()}
-                            disabled={chooseDir.isPending}
-                          >
-                            <FolderOpen className="size-4" />
-                            Choose…
-                          </Button>
-                        </div>
-                        <FormDescription>Generated `.md` files are saved here.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="theme"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Theme</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {THEMES.map((theme) => (
-                                <SelectItem key={theme} value={theme}>
-                                  {capitalize(theme)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="logLevel"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Log level</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {LOG_LEVELS.map((level) => (
-                                <SelectItem key={level} value={level}>
-                                  {capitalize(level)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+        <div className="grid-2 mt-16">
+          {/* RUNTIME — form */}
+          <div className="panel">
+            <div className="panel-head">
+              <span className="ttl">runtime</span>
+              <span className="meta">config</span>
+            </div>
+            <div className="panel-body">
+              {settingsQuery.isLoading ? (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+                  Loading settings…
+                </div>
+              ) : (
+                <form
+                  onSubmit={onSubmit}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+                >
+                  <div className="label-block">
+                    <label htmlFor="settings-model">default model</label>
+                    <select id="settings-model" className="select" {...form.register('model')}>
+                      {CLAUDE_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
-                    <Button
+                  <div className="label-block">
+                    <label htmlFor="settings-outputDir">output folder</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        id="settings-outputDir"
+                        className="input"
+                        readOnly
+                        placeholder="Choose a folder"
+                        style={{ flex: 1 }}
+                        {...form.register('outputDir')}
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => chooseDir.mutate()}
+                        disabled={chooseDir.isPending}
+                      >
+                        ▢ CHOOSE…
+                      </button>
+                    </div>
+                    {form.formState.errors.outputDir ? (
+                      <div
+                        style={{
+                          fontFamily: 'var(--mono)',
+                          fontSize: 10,
+                          color: 'var(--warn)',
+                        }}
+                      >
+                        {form.formState.errors.outputDir.message}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          fontFamily: 'var(--mono)',
+                          fontSize: 10,
+                          color: 'var(--fg-4)',
+                        }}
+                      >
+                        generated <code style={{ color: 'var(--amber)' }}>.md</code> files are saved
+                        here.
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="label-block">
+                      <label htmlFor="settings-theme">theme</label>
+                      <select id="settings-theme" className="select" {...form.register('theme')}>
+                        {THEMES.map((theme) => (
+                          <option key={theme} value={theme}>
+                            {capitalize(theme)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="label-block">
+                      <label htmlFor="settings-logLevel">log level</label>
+                      <select
+                        id="settings-logLevel"
+                        className="select"
+                        {...form.register('logLevel')}
+                      >
+                        {LOG_LEVELS.map((level) => (
+                          <option key={level} value={level}>
+                            {capitalize(level)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                    <button
                       type="submit"
+                      className="btn primary"
                       disabled={saveMutation.isPending || !form.formState.isDirty}
                     >
-                      {saveMutation.isPending ? 'Saving…' : 'Save'}
-                    </Button>
-                    <Button
+                      {saveMutation.isPending ? '[ SAVING… ]' : '[ SAVE ]'}
+                    </button>
+                    <button
                       type="button"
-                      variant="ghost"
+                      className="btn"
                       onClick={() => resetMutation.mutate()}
                       disabled={resetMutation.isPending}
                     >
-                      Reset to defaults
-                    </Button>
+                      RESET TO DEFAULTS
+                    </button>
                   </div>
                 </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </div>
+          </div>
+
+          {/* RUNTIME STATUS — real health.ping */}
+          <RuntimeStatusCard model={currentModel} />
+        </div>
 
         <TrackedProjectsCard />
+
+        {/* HOTKEYS */}
+        <div className="panel mt-16">
+          <div className="panel-head">
+            <span className="ttl">hotkeys</span>
+            <span className="meta">global</span>
+          </div>
+          <div
+            className="panel-body"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px 24px',
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+            }}
+          >
+            {HOTKEYS.map(([label, key]) => (
+              <div
+                key={key}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '1px dashed var(--line-dim)',
+                  padding: '6px 0',
+                }}
+              >
+                <span style={{ color: 'var(--fg-4)' }}>{label}</span>
+                <span style={{ color: 'var(--amber)' }}>{key}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

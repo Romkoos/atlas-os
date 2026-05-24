@@ -7,7 +7,7 @@ export const skillMetaSchema = z.object({
   description: z.string(), // frontmatter `description`, '' if absent
   trigger: z.string().optional(), // frontmatter `trigger`, e.g. /graphify
   argumentHint: z.string().optional(), // frontmatter `argument-hint`
-  allowedToolsCount: z.number(), // length of frontmatter `allowed-tools`
+  allowedTools: z.array(z.string()), // tool names from frontmatter `allowed-tools`
   path: z.string(), // absolute path to the skill directory
 })
 

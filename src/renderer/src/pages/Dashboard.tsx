@@ -1,12 +1,7 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card'
-import { Textarea } from '@renderer/components/ui/textarea'
 import { trpc } from '@renderer/lib/trpc'
-import { cn } from '@renderer/lib/utils'
-import { CLAUDE_MODELS } from '@shared/models'
+import { CLAUDE_MODELS, type ClaudeModelId } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
-import { LoaderCircle, Play, Square } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -14,41 +9,50 @@ const DEFAULT_PROMPT = 'Сгенерируй идею для AI-инструме
 
 function HealthBadge() {
   const health = trpc.health.ping.useQuery()
-  const label = health.isLoading
-    ? 'Connecting…'
-    : health.isError
-      ? 'Backend offline'
-      : `Backend OK · v${health.data?.version}`
-  const dot = health.isError
-    ? 'bg-destructive'
-    : health.data
-      ? 'bg-emerald-500'
-      : 'bg-muted-foreground'
+
+  if (health.isLoading) {
+    return (
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+        <span className="dot" /> connecting…
+      </span>
+    )
+  }
+
+  if (health.isError || !health.data) {
+    return (
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)' }}>
+        <span className="dot warn" /> backend.offline
+      </span>
+    )
+  }
 
   return (
-    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-      <span className={cn('size-2 rounded-full', dot)} />
-      {label}
-    </div>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+      <span className="dot ok" /> {'backend.ok · '}
+      <span style={{ color: 'var(--amber)' }}>v{health.data.version}</span>
+    </span>
   )
 }
 
 export function Dashboard() {
   const settings = trpc.settings.get.useQuery()
   const utils = trpc.useUtils()
+  const health = trpc.health.ping.useQuery()
 
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
   const [output, setOutput] = useState('')
   const [running, setRunning] = useState(false)
   const [requestId, setRequestId] = useState<string | null>(null)
+  const [model, setModel] = useState<ClaudeModelId | undefined>(undefined)
+  const [startedAt] = useState(() => new Date().toLocaleString())
 
   const openFile = trpc.agent.openFile.useMutation()
 
-  const model = settings.data?.model ?? CLAUDE_MODELS[0].id
+  const effectiveModel = model ?? settings.data?.model ?? CLAUDE_MODELS[0].id
 
   const subInput = useMemo(
-    () => (running && requestId ? { requestId, prompt, model } : skipToken),
-    [running, requestId, prompt, model],
+    () => (running && requestId ? { requestId, prompt, model: effectiveModel } : skipToken),
+    [running, requestId, prompt, effectiveModel],
   )
 
   trpc.agent.run.useSubscription(subInput, {
@@ -94,62 +98,150 @@ export function Dashboard() {
   // unsubscribes → the main-side run is aborted in the observable teardown.
   const cancel = () => setRunning(false)
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      if (!running && prompt.trim().length > 0) {
+        start()
+      }
+    }
+  }
+
+  const responseMeta = running ? '● streaming…' : output ? '● complete' : '○ idle'
+
+  const authStatus = health.data ? 'claude.subscription · ok' : health.isError ? 'offline' : '…'
+
   return (
-    <div className="flex flex-col">
+    <>
       <PageHeader
-        title="Dashboard"
-        description="Run AI actions and see the latest result."
+        num="01"
+        title="DASHBOARD"
+        description={
+          <>Run AI actions and see the latest result. Output streams below in real time.</>
+        }
         action={<HealthBadge />}
       />
-
-      <div className="flex max-w-3xl flex-col gap-6 p-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Run agent</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={running}
-              rows={3}
-              placeholder="Prompt for Claude…"
-            />
-            <div className="flex items-center gap-3">
-              {running ? (
-                <Button variant="destructive" onClick={cancel}>
-                  <Square className="size-4" />
-                  Cancel
-                </Button>
-              ) : (
-                <Button onClick={start} disabled={prompt.trim().length === 0}>
-                  <Play className="size-4" />
-                  Run agent
-                </Button>
-              )}
-              {running ? (
-                <span className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <LoaderCircle className="size-4 animate-spin" />
-                  Streaming from {model}…
-                </span>
-              ) : (
-                <span className="text-muted-foreground text-xs">Model: {model}</span>
-              )}
+      <div className="scroll">
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+          {/* RUN AGENT */}
+          <div className="panel">
+            <div className="panel-head">
+              <span className="ttl">run agent</span>
+              <span className="meta">$ atlas run</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Response</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="min-h-40 whitespace-pre-wrap rounded-md border bg-muted/30 p-4 font-mono text-sm">
-              {output || <span className="text-muted-foreground">Output will stream here.</span>}
+            <div
+              className="panel-body"
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+            >
+              <div className="label-block">
+                <label htmlFor="dash-prompt">prompt</label>
+                <textarea
+                  id="dash-prompt"
+                  className="input"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={running}
+                  rows={4}
+                />
+              </div>
+              <div className="label-block">
+                <label htmlFor="dash-model">model</label>
+                <select
+                  id="dash-model"
+                  className="select"
+                  value={effectiveModel}
+                  onChange={(e) => setModel(e.target.value as ClaudeModelId)}
+                  disabled={running}
+                  style={{ width: '100%' }}
+                >
+                  {CLAUDE_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={start}
+                  disabled={running || prompt.trim().length === 0}
+                >
+                  <span className="arrow">▶</span>&nbsp;
+                  {running ? 'RUNNING…' : 'RUN AGENT'}
+                </button>
+                {running && (
+                  <button type="button" className="btn" onClick={cancel}>
+                    ■ CANCEL
+                  </button>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* SESSION */}
+          <div className="panel">
+            <div className="panel-head">
+              <span className="ttl">session</span>
+            </div>
+            <div className="panel-body">
+              <div className="kv">
+                <div className="k">started</div>
+                <div className="v">{startedAt}</div>
+              </div>
+              <div className="kv">
+                <div className="k">model</div>
+                <div className="v">{effectiveModel}</div>
+              </div>
+              <div className="kv">
+                <div className="k">output</div>
+                <div className="v" style={{ color: 'var(--amber)' }}>
+                  {settings.data?.outputDir ?? '—'}
+                </div>
+              </div>
+              <div className="kv">
+                <div className="k">auth</div>
+                <div className="v">{authStatus}</div>
+              </div>
+              <div className="kv">
+                <div className="k">version</div>
+                <div className="v">{health.data?.version ? `v${health.data.version}` : '—'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RESPONSE */}
+        <div className="panel mt-16">
+          <div className="panel-head">
+            <span className="ttl">response</span>
+            <span className="meta">{responseMeta}</span>
+          </div>
+          <div className="panel-body" style={{ minHeight: 180 }}>
+            {output ? (
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 13,
+                  lineHeight: 1.65,
+                  color: 'var(--fg)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                <span style={{ color: 'var(--fg-4)' }}>{'>> '}</span>
+                {output}
+                {running && <span className="caret" />}
+              </div>
+            ) : (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
+                <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
+                output will stream here. press RUN AGENT or ⌘+ENTER.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

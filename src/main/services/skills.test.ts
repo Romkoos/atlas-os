@@ -79,20 +79,20 @@ describe('listSkills', () => {
     expect(alpha?.description).toBe('First line of the description that folds onto one line.')
     expect(alpha?.trigger).toBe('/alpha')
     expect(alpha?.argumentHint).toBe('<file>')
-    expect(alpha?.allowedToolsCount).toBe(3)
+    expect(alpha?.allowedTools).toEqual(['Read', 'Write', 'Bash'])
   })
 
   it('falls back to folder id when name is absent', async () => {
     const skills = await listSkills(dir)
     const beta = skills.find((s) => s.id === 'beta')
     expect(beta?.name).toBe('beta')
-    expect(beta?.allowedToolsCount).toBe(0)
+    expect(beta?.allowedTools).toEqual([])
   })
 
-  it('counts comma-separated string allowed-tools', async () => {
+  it('parses comma-separated string allowed-tools', async () => {
     const skills = await listSkills(dir)
     const epsilon = skills.find((s) => s.id === 'epsilon')
-    expect(epsilon?.allowedToolsCount).toBe(2)
+    expect(epsilon?.allowedTools).toEqual(['Read', 'Write'])
   })
 
   it('returns [] when the directory does not exist', async () => {

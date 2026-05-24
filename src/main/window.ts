@@ -1,15 +1,34 @@
 import { join } from 'node:path'
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, ipcMain, shell } from 'electron'
+
+// The renderer draws its own terminal title bar (frame: false), so window
+// controls come back over IPC. Registered once for all windows.
+let controlsRegistered = false
+function registerWindowControls(): void {
+  if (controlsRegistered) return
+  controlsRegistered = true
+  const fromEvent = (event: Electron.IpcMainEvent) => BrowserWindow.fromWebContents(event.sender)
+  ipcMain.on('window:minimize', (event) => fromEvent(event)?.minimize())
+  ipcMain.on('window:toggle-maximize', (event) => {
+    const win = fromEvent(event)
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+  })
+  ipcMain.on('window:close', (event) => fromEvent(event)?.close())
+}
 
 export function createMainWindow(): BrowserWindow {
+  registerWindowControls()
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 940,
     minHeight: 600,
     show: false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
+    frame: false,
+    backgroundColor: '#28251f',
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
