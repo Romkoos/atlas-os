@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import type { NewAgentSessionRow, NewAgentTurnRow } from '@main/db/schema'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
+import { estimateDifficulty } from '@main/services/productivity/difficulty'
 import { turnId } from '@main/services/productivity/ids'
 import {
   type EcosystemChange,
@@ -11,7 +12,13 @@ import {
   readJsonlFile,
   type SessionBufferRecord,
 } from '@main/services/productivity/jsonl'
-import { type AgentTurn, parseTranscriptTurns } from '@main/services/productivity/transcript'
+import {
+  type AgentTurn,
+  firstUserPrompt,
+  parseTranscriptTurns,
+} from '@main/services/productivity/transcript'
+import { getSettings } from '@main/store'
+import { and, eq, isNull } from 'drizzle-orm'
 
 export interface SessionAggregate {
   projectPath: string
@@ -158,6 +165,9 @@ export interface IngestRows {
   turnRows: NewAgentTurnRow[]
   sessionRows: NewAgentSessionRow[]
   ecoRows: EcosystemChange[]
+  // Original ask per session, used only by the gated LLM difficulty pass. Does
+  // not affect any row/count output.
+  firstPromptBySession: Map<string, string>
 }
 
 async function safeReaddir(dir: string) {
@@ -188,9 +198,18 @@ export async function collectIngestRows(paths: IngestPaths): Promise<IngestRows>
   // 1. Transcripts → turns (source of truth for per-turn metrics).
   const transcripts = await findTranscripts(paths.projectsDir)
   const allTurns: AgentTurn[] = []
+  const firstPromptBySession = new Map<string, string>()
   for (const file of transcripts) {
     const lines = await readJsonlFile(file)
-    allTurns.push(...parseTranscriptTurns(lines))
+    const turns = parseTranscriptTurns(lines)
+    allTurns.push(...turns)
+    // Associate the original ask with this file's session (the sessionId shared
+    // by its turns). Skip empties. Used only by the gated difficulty pass.
+    const sessionId = turns[0]?.sessionId
+    if (sessionId) {
+      const prompt = firstUserPrompt(lines)
+      if (prompt) firstPromptBySession.set(sessionId, prompt)
+    }
   }
 
   // 2. Buffer → session lifecycle/score + ecosystem changes.
@@ -202,6 +221,7 @@ export async function collectIngestRows(paths: IngestPaths): Promise<IngestRows>
     turnRows: buildTurnRows(allTurns),
     sessionRows: buildSessionRows(aggregateBySession(allTurns), bufferRecords),
     ecoRows: parseEcosystemChanges(ecoLines),
+    firstPromptBySession,
   }
 }
 
@@ -262,6 +282,39 @@ export function writeRows(database: AppDatabase, rows: IngestRows): IngestResult
   return { turns: turnRows.length, sessions: sessionRows.length, ecosystem: ecoRows.length }
 }
 
+// Gated LLM pass: fill in `difficulty` for sessions that still lack it, using
+// the original ask. No-op unless the user enabled `estimateDifficulty`. Capped
+// per run and best-effort (estimateDifficulty never throws) so it can never
+// stall or break ingest. Behind the gate so the default path is unchanged.
+async function estimateMissingDifficulties(
+  database: AppDatabase,
+  firstPromptBySession: Map<string, string>,
+): Promise<void> {
+  if (!getSettings().estimateDifficulty) return
+  const missing = database
+    .select({ id: agentSessions.sessionId })
+    .from(agentSessions)
+    .where(isNull(agentSessions.difficulty))
+    .all()
+  let processed = 0
+  for (const { id } of missing) {
+    if (processed >= 20) break // safety cap per ingest run (avoid long hangs)
+    const prompt = firstPromptBySession.get(id)
+    if (!prompt) continue
+    const d = await estimateDifficulty(prompt)
+    if (d == null) continue
+    database
+      .update(agentSessions)
+      .set({ difficulty: d, difficultySource: 'llm' })
+      .where(and(eq(agentSessions.sessionId, id), isNull(agentSessions.difficulty)))
+      .run()
+    processed++
+  }
+}
+
 export async function ingestAll(database: AppDatabase, paths: IngestPaths): Promise<IngestResult> {
-  return writeRows(database, await collectIngestRows(paths))
+  const rows = await collectIngestRows(paths)
+  const result = writeRows(database, rows)
+  await estimateMissingDifficulties(database, rows.firstPromptBySession)
+  return result
 }
