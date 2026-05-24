@@ -134,3 +134,39 @@ export function sessionKpd(expected: number | null, actualTokens: number): numbe
   if (expected == null || expected <= 0 || actualTokens <= 0) return null
   return (expected / actualTokens) * 100
 }
+
+/** A session's КПД (%) for a local calendar day, plus optional quality score. */
+export interface KpdDaySession {
+  day: string
+  kpd: number
+  score: number | null
+}
+
+export interface KpdDay {
+  date: string
+  kpi: number // mean КПД (%)
+  quality: number | null // mean of rated scores that day, or null
+  sessions: number
+}
+
+// Group by day; mean КПД and mean rated quality per day; sort by date.
+export function kpdByDay(sessions: KpdDaySession[]): KpdDay[] {
+  const byDay = new Map<string, { kpds: number[]; scores: number[] }>()
+  for (const s of sessions) {
+    const e = byDay.get(s.day) ?? { kpds: [], scores: [] }
+    e.kpds.push(s.kpd)
+    if (s.score != null) e.scores.push(s.score)
+    byDay.set(s.day, e)
+  }
+  const out: KpdDay[] = []
+  for (const [date, e] of byDay) {
+    if (e.kpds.length === 0) continue
+    out.push({
+      date,
+      kpi: e.kpds.reduce((a, x) => a + x, 0) / e.kpds.length,
+      quality: e.scores.length ? e.scores.reduce((a, x) => a + x, 0) / e.scores.length : null,
+      sessions: e.kpds.length,
+    })
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}

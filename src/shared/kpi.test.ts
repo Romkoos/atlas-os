@@ -2,6 +2,7 @@ import {
   type BaselineModel,
   expectedTokens,
   fitBaseline,
+  kpdByDay,
   kpiByDay,
   kpiCoefficient,
   rawEfficiency,
@@ -114,5 +115,26 @@ describe('sessionKpd', () => {
     expect(sessionKpd(null, 100)).toBeNull()
     expect(sessionKpd(0, 100)).toBeNull()
     expect(sessionKpd(500, 0)).toBeNull()
+  })
+})
+
+describe('kpdByDay', () => {
+  it('averages КПД per day, averages rated quality, sorts by date', () => {
+    const out = kpdByDay([
+      { day: '2026-05-02', kpd: 120, score: 8 },
+      { day: '2026-05-01', kpd: 100, score: null },
+      { day: '2026-05-01', kpd: 140, score: 6 },
+    ])
+    expect(out).toEqual([
+      { date: '2026-05-01', kpi: 120, quality: 6, sessions: 2 },
+      { date: '2026-05-02', kpi: 120, quality: 8, sessions: 1 },
+    ])
+  })
+  it('quality is null when no rated sessions that day', () => {
+    const out = kpdByDay([{ day: '2026-05-01', kpd: 100, score: null }])
+    expect(out[0].quality).toBeNull()
+  })
+  it('returns [] for empty input', () => {
+    expect(kpdByDay([])).toEqual([])
   })
 })
