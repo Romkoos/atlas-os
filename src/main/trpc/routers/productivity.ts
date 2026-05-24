@@ -711,7 +711,10 @@ export const productivityRouter = router({
         const after = turns.filter((t) => t.ts.getTime() >= cTime && t.ts.getTime() < cTime + w)
         const tokBefore = before.length ? mean(before.map((t) => t.tin + t.tout)) : null
         const tokAfter = after.length ? mean(after.map((t) => t.tin + t.tout)) : null
-        const tokDelta = tokBefore && tokAfter ? ((tokAfter - tokBefore) / tokBefore) * 100 : null
+        const tokDelta =
+          tokBefore != null && tokAfter != null && tokBefore !== 0
+            ? ((tokAfter - tokBefore) / tokBefore) * 100
+            : null
 
         const inWin = (lo: number, hi: number) =>
           kpdRows.filter((r) => r.lastTs >= lo && r.lastTs < hi)
@@ -720,7 +723,10 @@ export const productivityRouter = router({
 
         const kpiBefore = mean(beforeRows.map((r) => r.kpd as number))
         const kpiAfter = mean(afterRows.map((r) => r.kpd as number))
-        const kpiDelta = kpiBefore && kpiAfter ? ((kpiAfter - kpiBefore) / kpiBefore) * 100 : null
+        const kpiDelta =
+          kpiBefore != null && kpiAfter != null && kpiBefore !== 0
+            ? ((kpiAfter - kpiBefore) / kpiBefore) * 100
+            : null
 
         const qBefore = mean(beforeRows.flatMap((r) => (r.score == null ? [] : [r.score])))
         const qAfter = mean(afterRows.flatMap((r) => (r.score == null ? [] : [r.score])))
@@ -778,7 +784,7 @@ export const productivityRouter = router({
     }),
 
   // Set/clear the user quality rating (1–10) for a session. Quality is
-  // user-only; null clears it (falls back to the imputed default in the UI).
+  // user-only; null clears it (unrated sessions are excluded from the quality line).
   setRating: publicProcedure
     .input(
       z.object({ sessionId: z.string().min(1), score: z.number().int().min(1).max(10).nullable() }),

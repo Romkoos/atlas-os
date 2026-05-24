@@ -141,7 +141,7 @@ function KpiTooltip(props: {
     <div style={tooltipStyle} className="px-2.5 py-2 text-xs">
       <div className="mb-1 font-medium">{props.label}</div>
       <div className="flex justify-between gap-6">
-        <span className="text-muted-foreground">KPI</span>
+        <span className="text-muted-foreground">КПД</span>
         <span className="tabular-nums">{row.kpi == null ? '—' : `${row.kpi.toFixed(0)}%`}</span>
       </div>
       <div className="flex justify-between gap-6">
@@ -307,7 +307,7 @@ function OverviewTab({ days, projectPath }: Scope) {
           value={scoreLabel(totals.avgScore, totals.ratedCount, totals.totalCount)}
         />
         <MetricCard label="Avg complexity" value={dash(totals.avgComplexity)} />
-        <MetricCard label="KPI" value={pct(kpi.data?.overall ?? null)} />
+        <MetricCard label="КПД" value={pct(kpi.data?.overall ?? null)} />
       </div>
 
       <Card>
@@ -463,7 +463,7 @@ function OverviewTab({ days, projectPath }: Scope) {
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
-            <CardTitle className="text-base">KPI (efficiency)</CardTitle>
+            <CardTitle className="text-base">КПД (efficiency)</CardTitle>
             <button
               type="button"
               className="rounded border px-2 py-1 text-xs"
@@ -490,7 +490,7 @@ function OverviewTab({ days, projectPath }: Scope) {
           {kpi.isLoading ? (
             <Loading />
           ) : (kpi.data?.byDay.length ?? 0) === 0 ? (
-            <p className="py-8 text-center text-muted-foreground text-sm">No KPI data yet.</p>
+            <p className="py-8 text-center text-muted-foreground text-sm">No КПД data yet.</p>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -706,7 +706,7 @@ function SessionsTab({ days, projectPath }: Scope) {
                 <th className="py-2 pr-4 text-right font-medium">Turns</th>
                 <th className="py-2 pr-4 text-right font-medium">Tokens</th>
                 <th className="py-2 pr-4 text-right font-medium">Complexity</th>
-                <th className="py-2 pr-4 text-right font-medium">KPI</th>
+                <th className="py-2 pr-4 text-right font-medium">КПД</th>
                 <th className="py-2 pr-4 font-medium">Difficulty</th>
                 <th className="py-2 pr-4 font-medium">Rating</th>
                 <th className="py-2 font-medium">Summary</th>
@@ -805,7 +805,7 @@ function RatingControl({ sessionId, score }: { sessionId: string; score: number 
         setRating.mutate({ sessionId, score: v })
       }}
     >
-      <option value="">— (5.5)</option>
+      <option value="">—</option>
       {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
         <option key={n} value={n}>
           {n}
@@ -952,7 +952,7 @@ function EcosystemTab({ days }: { days: number }) {
         <CardHeader>
           <CardTitle className="text-base">Change impact</CardTitle>
           <p className="text-muted-foreground text-xs">
-            7 days before vs after each change (global). Tokens/turn: lower after = better. KPI:
+            7 days before vs after each change (global). Tokens/turn: lower after = better. КПД:
             higher after = better.
           </p>
         </CardHeader>
@@ -971,9 +971,9 @@ function EcosystemTab({ days }: { days: number }) {
                     <th className="py-2 pr-4 text-right font-medium">tok/turn before</th>
                     <th className="py-2 pr-4 text-right font-medium">after</th>
                     <th className="py-2 pr-4 text-right font-medium">Δ tok</th>
-                    <th className="py-2 pr-4 text-right font-medium">KPI before</th>
+                    <th className="py-2 pr-4 text-right font-medium">КПД before</th>
                     <th className="py-2 pr-4 text-right font-medium">after</th>
-                    <th className="py-2 pr-4 text-right font-medium">Δ KPI</th>
+                    <th className="py-2 pr-4 text-right font-medium">Δ КПД</th>
                     <th className="py-2 text-right font-medium">Δ quality</th>
                   </tr>
                 </thead>
