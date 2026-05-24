@@ -10,7 +10,9 @@
 //   - global-median: expected = median baseline tokens (difficulty ignored).
 //     Used until enough difficulty-tagged data exists. Makes КПД work day one.
 //   - loglinear: expected = exp(a + b·difficulty), fit on baseline medians.
-//     Used once ≥8 difficulty-tagged sessions span ≥2 difficulty levels.
+//     Used only once difficulty coverage is high (absolute ≥8 AND ≥50% of the
+//     baseline); always carries a median fallback so untagged sessions still
+//     get a КПД instead of being dropped from the line.
 
 export type BaselineMethod = 'loglinear' | 'global-median'
 export interface BaselineParams {
@@ -27,7 +29,12 @@ export interface BaselineSample {
   tokens: number
 }
 
+// loglinear needs enough difficulty-tagged samples in absolute terms AND as a
+// fraction of the baseline. The fraction gate is critical: a handful of manually
+// rated sessions (e.g. 9 of 400) must NOT force a noisy loglinear fit that then
+// drops every untagged session from the КПД line.
 const MIN_DIFFICULTY_COVERAGE = 8
+const MIN_DIFFICULTY_FRACTION = 0.5
 
 function medianOf(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b)
@@ -36,14 +43,20 @@ function medianOf(xs: number[]): number {
 }
 
 // Fit a frozen baseline from starting-period samples. Null if no usable tokens.
+// `median` is always stored — even for loglinear — so untagged sessions have a
+// fallback expectation instead of being excluded.
 export function fitBaseline(samples: BaselineSample[]): BaselineModel | null {
   const valid = samples.filter((s) => s.tokens > 0)
   if (valid.length === 0) return null
 
+  const median = medianOf(valid.map((s) => s.tokens))
   const withDiff = valid.filter(
     (s): s is { difficulty: number; tokens: number } => s.difficulty != null,
   )
-  if (withDiff.length >= MIN_DIFFICULTY_COVERAGE) {
+  if (
+    withDiff.length >= MIN_DIFFICULTY_COVERAGE &&
+    withDiff.length >= MIN_DIFFICULTY_FRACTION * valid.length
+  ) {
     const byD = new Map<number, number[]>()
     for (const s of withDiff) {
       const arr = byD.get(s.difficulty) ?? []
@@ -62,19 +75,21 @@ export function fitBaseline(samples: BaselineSample[]): BaselineModel | null {
       if (denom !== 0) {
         const b = (n * sxy - sx * sy) / denom
         const a = (sy - b * sx) / n
-        if (b > 0) return { method: 'loglinear', params: { a, b } }
+        if (b > 0) return { method: 'loglinear', params: { a, b, median } }
       }
     }
   }
-  return { method: 'global-median', params: { median: medianOf(valid.map((s) => s.tokens)) } }
+  return { method: 'global-median', params: { median } }
 }
 
 // Expected token cost for a task of the given difficulty under the frozen model.
+// Loglinear sessions without a difficulty fall back to the stored median so they
+// still get a КПД (otherwise the line collapses to only the rated sessions).
 export function expectedTokens(model: BaselineModel, difficulty: number | null): number | null {
   if (model.method === 'global-median') return model.params.median ?? null
-  if (difficulty == null) return null
+  if (difficulty == null) return model.params.median ?? null
   const { a, b } = model.params
-  if (a == null || b == null) return null
+  if (a == null || b == null) return model.params.median ?? null
   return Math.exp(a + b * difficulty)
 }
 
