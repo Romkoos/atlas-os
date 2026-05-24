@@ -18,6 +18,8 @@ export const settingsSchema = z.object({
   // Required in the shape (default supplied by the store / DEFAULT_SETTINGS) so
   // the input and output types match for the renderer's react-hook-form.
   trackedProjects: z.array(z.string()),
+  // LLM-estimate task difficulty at ingest; off by default.
+  estimateDifficulty: z.boolean(),
 })
 
 export type AppSettings = z.infer<typeof settingsSchema>
@@ -27,4 +29,5 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'outputDir'> = {
   theme: 'system',
   logLevel: 'info',
   trackedProjects: [],
+  estimateDifficulty: false,
 }

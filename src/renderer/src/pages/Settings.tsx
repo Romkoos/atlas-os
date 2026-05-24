@@ -125,6 +125,7 @@ export function Settings() {
       theme: 'system',
       logLevel: 'info',
       trackedProjects: [],
+      estimateDifficulty: false,
     },
   })
 
@@ -285,6 +286,34 @@ export function Settings() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="estimateDifficulty"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              id="estimateDifficulty"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="size-4 cursor-pointer rounded border accent-primary"
+                            />
+                          </FormControl>
+                          <FormLabel htmlFor="estimateDifficulty" className="cursor-pointer">
+                            Estimate task difficulty with AI (experimental)
+                          </FormLabel>
+                        </div>
+                        <FormDescription>
+                          When enabled, Atlas uses an LLM call at ingest time to score task
+                          difficulty. Increases token usage.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <div className="flex items-center gap-2 pt-2">
                     <Button
