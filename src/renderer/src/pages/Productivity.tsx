@@ -480,9 +480,10 @@ function OverviewTab({ days, projectPath }: Scope) {
             </button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Efficiency percentile (quality × complexity per token, ranked across all sessions),
-            averaged per day — higher is better. Dashed line: avg quality (0–10, right axis); dashed
-            reference at 100%. {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
+            КПД vs frozen baseline (expected tokens for the task's difficulty ÷ actual tokens),
+            averaged per day. 100% = baseline efficiency; higher is leaner. Dashed line: avg quality
+            (0–10, right axis, guardrail).{' '}
+            {(ecoDays.data?.length ?? 0) > 0 ? '⚑ marks ecosystem changes.' : ''}
           </p>
         </CardHeader>
         <CardContent>
@@ -732,7 +733,7 @@ function SessionsTab({ days, projectPath }: Scope) {
                   </td>
                   <td
                     className="py-2 pr-4 text-right tabular-nums"
-                    title="Efficiency percentile across all sessions — higher is more efficient"
+                    title="КПД vs frozen baseline — 100% = baseline efficiency, higher is leaner"
                   >
                     {pct(s.kpi)}
                   </td>
