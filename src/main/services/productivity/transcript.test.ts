@@ -1,4 +1,4 @@
-import { parseTranscriptTurns } from '@main/services/productivity/transcript'
+import { firstUserPrompt, parseTranscriptTurns } from '@main/services/productivity/transcript'
 import { describe, expect, it } from 'vitest'
 
 // Minimal realistic Claude Code transcript lines. Real prompts carry a string
@@ -180,6 +180,47 @@ describe('parseTranscriptTurns', () => {
 
     expect(turns).toHaveLength(1)
     expect(turns[0].turnIndex).toBe(0)
+  })
+})
+
+describe('firstUserPrompt', () => {
+  it('returns string content of the first real user prompt', () => {
+    const lines = [
+      { type: 'user', message: { content: 'what is the answer?' } },
+      { type: 'assistant', message: { content: [{ type: 'text', text: '42' }] } },
+    ]
+    expect(firstUserPrompt(lines)).toBe('what is the answer?')
+  })
+
+  it('returns joined text from array content', () => {
+    const lines = [
+      {
+        type: 'user',
+        message: {
+          content: [
+            { type: 'text', text: 'line one' },
+            { type: 'text', text: 'line two' },
+          ],
+        },
+      },
+    ]
+    expect(firstUserPrompt(lines)).toBe('line one\nline two')
+  })
+
+  it('skips tool_result-only user lines and returns the next real prompt', () => {
+    const lines = [
+      {
+        type: 'user',
+        message: { content: [{ type: 'tool_result', content: 'ok' }] },
+      },
+      { type: 'user', message: { content: 'real ask' } },
+    ]
+    expect(firstUserPrompt(lines)).toBe('real ask')
+  })
+
+  it("returns '' when there are no real user prompts", () => {
+    const lines = [{ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }]
+    expect(firstUserPrompt(lines)).toBe('')
   })
 })
 

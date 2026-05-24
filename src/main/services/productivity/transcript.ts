@@ -28,6 +28,25 @@ function isRealUserPrompt(line: { type?: string; message?: { content?: unknown }
   return false
 }
 
+// The text of the first real user prompt in a transcript (the original ask),
+// or '' if none. Used for difficulty estimation.
+export function firstUserPrompt(lines: unknown[]): string {
+  for (const raw of lines) {
+    const line = raw as { type?: string; message?: { content?: unknown } }
+    if (!isRealUserPrompt(line)) continue
+    const content = line.message?.content
+    if (typeof content === 'string') return content
+    if (Array.isArray(content)) {
+      return content
+        .filter((b) => (b as { type?: string }).type === 'text')
+        .map((b) => (b as { text?: string }).text ?? '')
+        .join('\n')
+    }
+    return ''
+  }
+  return ''
+}
+
 export function parseTranscriptTurns(lines: unknown[]): AgentTurn[] {
   // turn_index advances per real user prompt and is independent of whether a
   // reply has arrived yet — so re-ingesting a growing transcript keeps indices
