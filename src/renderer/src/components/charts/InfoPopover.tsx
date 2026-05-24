@@ -25,6 +25,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
       <button
         type="button"
         aria-label={`What is ${label}?`}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         style={{
           fontFamily: 'var(--mono)',
@@ -42,6 +43,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
       </button>
       {open ? (
         <div
+          role="tooltip"
           style={{
             position: 'absolute',
             top: 20,

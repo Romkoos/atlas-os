@@ -8,6 +8,10 @@ interface HoverSyncValue {
 
 const HoverSyncCtx = createContext<HoverSyncValue | null>(null)
 
+// Inert value for charts rendered outside a provider; hoisted so each
+// useHoverSync call returns the same reference.
+const NOOP_HOVER: HoverSyncValue = { activeDate: null, setActiveDate: () => {} }
+
 export function HoverSyncProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(hoverReducer, initialHover)
   const value = useMemo<HoverSyncValue>(
@@ -22,5 +26,5 @@ export function HoverSyncProvider({ children }: { children: ReactNode }) {
 
 // Safe outside a provider: standalone charts get an inert no-op.
 export function useHoverSync(): HoverSyncValue {
-  return useContext(HoverSyncCtx) ?? { activeDate: null, setActiveDate: () => {} }
+  return useContext(HoverSyncCtx) ?? NOOP_HOVER
 }

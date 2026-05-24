@@ -20,6 +20,7 @@ export function LegendChips({
             key={s.key}
             type="button"
             title={s.definition}
+            aria-pressed={!off}
             onClick={() => onToggle(s.key)}
             style={{
               display: 'inline-flex',

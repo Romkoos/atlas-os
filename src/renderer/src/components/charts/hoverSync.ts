@@ -5,7 +5,7 @@ export interface HoverState {
   activeDate: string | null
 }
 
-export type HoverAction = { type: 'set'; date: string | null } | { type: 'clear' }
+export type HoverAction = { type: 'set'; date: string } | { type: 'clear' }
 
 export const initialHover: HoverState = { activeDate: null }
 
