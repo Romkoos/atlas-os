@@ -242,12 +242,21 @@ function EcoMarkers({ events }: { events: { date: string; count: number; label: 
 }
 
 function OverviewTab({ days, projectPath }: Scope) {
+  const utils = trpc.useUtils()
   const overview = trpc.productivity.overview.useQuery({ days, projectPath })
   const usage = trpc.productivity.toolSkillUsage.useQuery({ days, projectPath })
   const co = trpc.productivity.coOccurrence.useQuery({ days, projectPath })
   const ecoDays = trpc.productivity.ecosystemDays.useQuery({ days })
   const today = trpc.productivity.today.useQuery({ projectPath })
   const kpi = trpc.productivity.kpi.useQuery({ days, projectPath })
+
+  const rebaseline = trpc.productivity.rebaseline.useMutation({
+    onSuccess: async (r) => {
+      toast.success(r.ok ? `Re-baselined (${r.method})` : 'Not enough data to baseline')
+      await utils.productivity.invalidate()
+    },
+    onError: () => toast.error('Re-baseline failed'),
+  })
 
   if (overview.isLoading) return <Loading />
   if (overview.isError)
@@ -453,7 +462,23 @@ function OverviewTab({ days, projectPath }: Scope) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">KPI (efficiency)</CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="text-base">KPI (efficiency)</CardTitle>
+            <button
+              type="button"
+              className="rounded border px-2 py-1 text-xs"
+              disabled={rebaseline.isPending}
+              onClick={() =>
+                rebaseline.mutate({
+                  projectPath,
+                  start: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
+                  end: new Date(),
+                })
+              }
+            >
+              Re-baseline ({days}d)
+            </button>
+          </div>
           <p className="text-muted-foreground text-xs">
             Efficiency percentile (quality × complexity per token, ranked across all sessions),
             averaged per day — higher is better. Dashed line: avg quality (0–10, right axis); dashed
@@ -681,6 +706,7 @@ function SessionsTab({ days, projectPath }: Scope) {
                 <th className="py-2 pr-4 text-right font-medium">Tokens</th>
                 <th className="py-2 pr-4 text-right font-medium">Complexity</th>
                 <th className="py-2 pr-4 text-right font-medium">KPI</th>
+                <th className="py-2 pr-4 font-medium">Difficulty</th>
                 <th className="py-2 pr-4 font-medium">Rating</th>
                 <th className="py-2 font-medium">Summary</th>
               </tr>
@@ -709,6 +735,9 @@ function SessionsTab({ days, projectPath }: Scope) {
                     title="Efficiency percentile across all sessions — higher is more efficient"
                   >
                     {pct(s.kpi)}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <DifficultyControl sessionId={s.sessionId} difficulty={s.difficulty} />
                   </td>
                   <td className="py-2 pr-4">
                     <RatingControl sessionId={s.sessionId} score={s.score} />
@@ -776,6 +805,41 @@ function RatingControl({ sessionId, score }: { sessionId: string; score: number 
       }}
     >
       <option value="">— (5.5)</option>
+      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+        <option key={n} value={n}>
+          {n}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function DifficultyControl({
+  sessionId,
+  difficulty,
+}: {
+  sessionId: string
+  difficulty: number | null
+}) {
+  const utils = trpc.useUtils()
+  const setDifficulty = trpc.productivity.setDifficulty.useMutation({
+    onSuccess: async () => {
+      await utils.productivity.invalidate()
+    },
+    onError: () => toast.error('Failed to save difficulty'),
+  })
+  return (
+    <select
+      aria-label={`Task difficulty for session ${sessionId}`}
+      className="rounded border bg-background px-1 py-0.5 text-sm tabular-nums"
+      value={difficulty ?? ''}
+      disabled={setDifficulty.isPending}
+      onChange={(e) => {
+        const v = e.target.value === '' ? null : Number(e.target.value)
+        setDifficulty.mutate({ sessionId, difficulty: v })
+      }}
+    >
+      <option value="">—</option>
       {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
         <option key={n} value={n}>
           {n}
@@ -908,7 +972,8 @@ function EcosystemTab({ days }: { days: number }) {
                     <th className="py-2 pr-4 text-right font-medium">Δ tok</th>
                     <th className="py-2 pr-4 text-right font-medium">KPI before</th>
                     <th className="py-2 pr-4 text-right font-medium">after</th>
-                    <th className="py-2 text-right font-medium">Δ KPI</th>
+                    <th className="py-2 pr-4 text-right font-medium">Δ KPI</th>
+                    <th className="py-2 text-right font-medium">Δ quality</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -936,8 +1001,26 @@ function EcosystemTab({ days }: { days: number }) {
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiBefore)}</td>
                       <td className="py-2 pr-4 text-right tabular-nums">{pct(r.kpiAfter)}</td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 pr-4 text-right">
                         <ImpactDelta pct={r.kpiDeltaPct} goodDirection="up" />
+                      </td>
+                      <td className="py-2 text-right tabular-nums">
+                        {r.qualityDelta == null ? (
+                          '—'
+                        ) : (
+                          <span
+                            className={
+                              r.qualityDelta > 0
+                                ? 'text-green-600'
+                                : r.qualityDelta < 0
+                                  ? 'text-red-600'
+                                  : ''
+                            }
+                          >
+                            {r.qualityDelta > 0 ? '+' : ''}
+                            {r.qualityDelta.toFixed(1)}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
