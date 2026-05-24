@@ -2,12 +2,13 @@ import { basename } from 'node:path'
 import { db } from '@main/db/client'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { appPaths } from '@main/paths'
+import { ensureBaseline, type ScopedSession } from '@main/services/productivity/baseline'
 import { complexityFromPercentiles, percentileRanks } from '@main/services/productivity/complexity'
 import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { type KpiDaySession, kpiByDay, kpiCoefficient, rawEfficiency } from '@shared/kpi'
+import { expectedTokens, kpdByDay, kpiCoefficient, rawEfficiency, sessionKpd } from '@shared/kpi'
 import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -115,6 +116,67 @@ function sessionEfficiencyMap(
   const map = new Map<string, number>()
   for (let i = 0; i < items.length; i++) map.set(items[i].id, ranks[i])
   return map
+}
+
+interface KpdRow extends ScopedSession {
+  day: string
+  kpd: number | null
+}
+
+// Every scoped session with its last-turn day/ts, plus КПД against the frozen
+// baseline. Ascending by lastTs. Shared by kpi / ecosystemImpact / rebaseline.
+function scopedKpdRows(projectPath?: string): KpdRow[] {
+  const tracked = trackedProjects()
+  const scopeFilter = projectPath
+    ? eq(agentSessions.projectPath, projectPath)
+    : tracked.length
+      ? inArray(agentSessions.projectPath, tracked)
+      : undefined
+
+  const turnAgg = db()
+    .select({
+      id: agentTurns.sessionId,
+      lastTs: sql<number>`max(${agentTurns.ts})`,
+      day: sql<string>`date(max(${agentTurns.ts}) / 1000, 'unixepoch', 'localtime')`,
+    })
+    .from(agentTurns)
+    .groupBy(agentTurns.sessionId)
+    .all()
+  const aggById = new Map(turnAgg.map((r) => [r.id, r]))
+
+  const sessRows = db()
+    .select({
+      id: agentSessions.sessionId,
+      difficulty: agentSessions.difficulty,
+      score: agentSessions.score,
+      tin: agentSessions.totalTokensIn,
+      tout: agentSessions.totalTokensOut,
+    })
+    .from(agentSessions)
+    .where(scopeFilter)
+    .all()
+
+  const rows: ScopedSession[] = sessRows.flatMap((r) => {
+    const agg = aggById.get(r.id)
+    if (!agg) return []
+    return [
+      {
+        id: r.id,
+        difficulty: r.difficulty,
+        tokens: r.tin + r.tout,
+        score: r.score,
+        lastTs: Number(agg.lastTs),
+      },
+    ]
+  })
+  rows.sort((a, b) => a.lastTs - b.lastTs)
+
+  const model = ensureBaseline(rows, projectPath)
+  return rows.map((r) => {
+    const agg = aggById.get(r.id)
+    const kpd = model ? sessionKpd(expectedTokens(model, r.difficulty), r.tokens) : null
+    return { ...r, day: agg?.day ?? '', kpd }
+  })
 }
 
 const mean = (xs: number[]): number | null =>
@@ -314,37 +376,38 @@ export const productivityRouter = router({
       }
     }),
 
-  // Efficiency KPI (0–100% percentile coefficient) per day + overall, scoped by
-  // window + optional project. Each session bucketed on its last-turn local day.
+  // КПД per day (% vs frozen baseline) + quality guardrail + overall mean.
   kpi: publicProcedure
     .input(rangeInput)
     .output(
       z.object({
-        byDay: z.array(z.object({ date: z.string(), kpi: z.number(), sessions: z.number() })),
+        byDay: z.array(
+          z.object({
+            date: z.string(),
+            kpi: z.number(),
+            quality: z.number().nullable(),
+            sessions: z.number(),
+            tokens: z.number(),
+          }),
+        ),
         overall: z.number().nullable(),
       }),
     )
     .query(({ input }) => {
-      const scoped = turnFilter(cutoffDate(input.days), input.projectPath)
-      const day = sql<string>`date(max(${agentTurns.ts}) / 1000, 'unixepoch', 'localtime')`
-      const dayRows = db()
-        .select({ id: agentTurns.sessionId, day })
-        .from(agentTurns)
-        .where(scoped)
-        .groupBy(agentTurns.sessionId)
-        .all()
-      if (dayRows.length === 0) return { byDay: [], overall: null }
+      const cutoff = cutoffDate(input.days).getTime()
+      const rows = scopedKpdRows(input.projectPath).filter(
+        (r) => r.lastTs >= cutoff && r.kpd != null,
+      )
+      if (rows.length === 0) return { byDay: [], overall: null }
 
-      const effMap = sessionEfficiencyMap()
-      const sessions: KpiDaySession[] = dayRows.flatMap((r) => {
-        const percentile = effMap.get(r.id)
-        return percentile == null ? [] : [{ day: r.day, percentile }]
-      })
-      // Percentiles are corpus-wide; overall is their mean over the window — intentionally NOT re-ranked within the window.
-      return {
-        byDay: kpiByDay(sessions),
-        overall: kpiCoefficient(sessions.map((s) => s.percentile)),
-      }
+      const days = kpdByDay(rows.map((r) => ({ day: r.day, kpd: r.kpd as number, score: r.score })))
+
+      const tokByDay = new Map<string, number>()
+      for (const r of rows) tokByDay.set(r.day, (tokByDay.get(r.day) ?? 0) + r.tokens)
+      const byDay = days.map((d) => ({ ...d, tokens: tokByDay.get(d.date) ?? 0 }))
+
+      const overall = mean(rows.map((r) => r.kpd as number))
+      return { byDay, overall }
     }),
 
   // Current local calendar day broken down by hour (0–23). Always "today",
