@@ -89,20 +89,38 @@ describe('sessionKpd', () => {
 })
 
 describe('kpdByDay', () => {
-  it('averages Eff per day, averages rated quality, sorts by date', () => {
+  it('token-weights Eff per day (Σexpected/Σactual), averages quality, sorts by date', () => {
     const out = kpdByDay([
-      { day: '2026-05-02', kpd: 120, score: 8 },
-      { day: '2026-05-01', kpd: 100, score: null },
-      { day: '2026-05-01', kpd: 140, score: 6 },
+      { day: '2026-05-02', expected: 300, actual: 250, score: 8 },
+      { day: '2026-05-01', expected: 300, actual: 300, score: null }, // ratio 100%
+      { day: '2026-05-01', expected: 300, actual: 100, score: 6 }, // ratio 300%
     ])
+    // mean-of-ratios would give 200% for 2026-05-01; token-weighting gives
+    // (300+300)/(300+100)*100 = 150% — the small session no longer dominates.
     expect(out).toEqual([
-      { date: '2026-05-01', kpi: 120, quality: 6, sessions: 2 },
+      { date: '2026-05-01', kpi: 150, quality: 6, sessions: 2 },
       { date: '2026-05-02', kpi: 120, quality: 8, sessions: 1 },
     ])
   })
+  it('a single tiny-token session cannot blow up a busy day', () => {
+    const out = kpdByDay([
+      { day: '2026-05-01', expected: 200000, actual: 200000, score: null }, // big real session
+      { day: '2026-05-01', expected: 200000, actual: 17, score: null }, // 17-token noise
+    ])
+    // mean-of-ratios ≈ (100 + 1.18M) / 2 ≈ 588k%. Token-weighted stays sane.
+    expect(out[0].kpi).toBeCloseTo((400000 / 200017) * 100, 5)
+    expect(out[0].kpi).toBeLessThan(200)
+  })
   it('quality is null when no rated sessions that day', () => {
-    const out = kpdByDay([{ day: '2026-05-01', kpd: 100, score: null }])
+    const out = kpdByDay([{ day: '2026-05-01', expected: 100, actual: 100, score: null }])
     expect(out[0].quality).toBeNull()
+  })
+  it('skips sessions with non-positive expected or actual tokens', () => {
+    const out = kpdByDay([
+      { day: '2026-05-01', expected: 0, actual: 100, score: null },
+      { day: '2026-05-01', expected: 100, actual: 0, score: null },
+    ])
+    expect(out).toEqual([])
   })
   it('returns [] for empty input', () => {
     expect(kpdByDay([])).toEqual([])

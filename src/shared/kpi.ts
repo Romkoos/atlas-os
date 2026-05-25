@@ -99,37 +99,45 @@ export function sessionKpd(expected: number | null, actualTokens: number): numbe
   return (expected / actualTokens) * 100
 }
 
-/** A session's Eff (%) for a local calendar day, plus optional quality score. */
+/** A session's token counts for a local calendar day, plus optional quality. */
 export interface KpdDaySession {
   day: string
-  kpd: number
+  expected: number // expected tokens under the frozen baseline
+  actual: number // actual tokens the session consumed
   score: number | null
 }
 
 export interface KpdDay {
   date: string
-  kpi: number // mean Eff (%)
+  kpi: number // token-weighted Eff (%) = Σexpected / Σactual × 100
   quality: number | null // mean of rated scores that day, or null
   sessions: number
 }
 
-// Group by day; mean Eff and mean rated quality per day; sort by date.
+// Group by day; token-weighted Eff and mean rated quality per day; sort by date.
+// Token-weighting (Σexpected/Σactual) instead of mean-of-ratios stops a single
+// tiny-token session from blowing the daily Eff up to 800–1000%: a near-empty
+// session contributes almost nothing to the denominator instead of dominating
+// an unweighted average. Sessions with non-positive expected/actual are dropped.
 export function kpdByDay(sessions: KpdDaySession[]): KpdDay[] {
-  const byDay = new Map<string, { kpds: number[]; scores: number[] }>()
+  const byDay = new Map<string, { exp: number; act: number; n: number; scores: number[] }>()
   for (const s of sessions) {
-    const e = byDay.get(s.day) ?? { kpds: [], scores: [] }
-    e.kpds.push(s.kpd)
+    if (!(s.expected > 0) || !(s.actual > 0)) continue
+    const e = byDay.get(s.day) ?? { exp: 0, act: 0, n: 0, scores: [] }
+    e.exp += s.expected
+    e.act += s.actual
+    e.n += 1
     if (s.score != null) e.scores.push(s.score)
     byDay.set(s.day, e)
   }
   const out: KpdDay[] = []
   for (const [date, e] of byDay) {
-    if (e.kpds.length === 0) continue
+    if (e.n === 0 || e.act <= 0) continue
     out.push({
       date,
-      kpi: e.kpds.reduce((a, x) => a + x, 0) / e.kpds.length,
+      kpi: (e.exp / e.act) * 100,
       quality: e.scores.length ? e.scores.reduce((a, x) => a + x, 0) / e.scores.length : null,
-      sessions: e.kpds.length,
+      sessions: e.n,
     })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
