@@ -36,6 +36,13 @@
       "when": 1779630751987,
       "tag": "0004_slim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1779694956860,
+      "tag": "0005_complex_epoch",
+      "breakpoints": true
     }
   ]
 }

@@ -124,3 +124,39 @@ export type AgentSessionRow = typeof agentSessions.$inferSelect
 export type NewAgentSessionRow = typeof agentSessions.$inferInsert
 export type EcosystemChangeRow = typeof ecosystemChanges.$inferSelect
 export type NewEcosystemChangeRow = typeof ecosystemChanges.$inferInsert
+
+// One row per benchmark run (task × rep). Frozen-task token cost stamped with an
+// infra fingerprint so cost is comparable across infra versions. See
+// docs/superpowers/specs/2026-05-25-benchmark-suite-design.md.
+export const benchmarkRuns = sqliteTable(
+  'benchmark_runs',
+  {
+    id: text('id').primaryKey(),
+    batchId: text('batch_id').notNull(),
+    ts: integer('ts', { mode: 'timestamp_ms' }).notNull(),
+    taskId: text('task_id').notNull(),
+    rep: integer('rep').notNull(),
+    infraHash: text('infra_hash').notNull(),
+    infraSnapshot: text('infra_snapshot', { mode: 'json' })
+      .$type<import('@main/services/productivity/infra').InfraState>()
+      .notNull(),
+    repoCommit: text('repo_commit').notNull(),
+    model: text('model').notNull(),
+    tokensIn: integer('tokens_in').notNull().default(0),
+    tokensOut: integer('tokens_out').notNull().default(0),
+    cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+    cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+    totalCostUsd: real('total_cost_usd').notNull().default(0),
+    numTurns: integer('num_turns').notNull().default(0),
+    durationMs: integer('duration_ms').notNull().default(0),
+    success: integer('success', { mode: 'boolean' }).notNull(),
+    failReason: text('fail_reason'),
+    transcriptPath: text('transcript_path'),
+  },
+  (t) => [
+    index('idx_bench_task').on(t.taskId),
+    index('idx_bench_infra').on(t.infraHash),
+    index('idx_bench_batch').on(t.batchId),
+    index('idx_bench_ts').on(t.ts),
+  ],
+)
