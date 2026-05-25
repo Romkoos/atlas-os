@@ -98,7 +98,7 @@ interface KpdRow extends ScopedSession {
   kpd: number | null
 }
 
-// Every scoped session with its last-turn day/ts, plus КПД against the frozen
+// Every scoped session with its last-turn day/ts, plus Eff against the frozen
 // baseline. Ascending by lastTs. Shared by kpi / ecosystemImpact / rebaseline.
 function scopedKpdRows(projectPath?: string): KpdRow[] {
   const tracked = trackedProjects()
@@ -351,7 +351,7 @@ export const productivityRouter = router({
       }
     }),
 
-  // КПД per day (% vs frozen baseline) + quality guardrail + overall mean.
+  // Eff per day (% vs frozen baseline) + quality guardrail + overall mean.
   kpi: publicProcedure
     .input(rangeInput)
     .output(
@@ -664,7 +664,7 @@ export const productivityRouter = router({
         .sort((a, b) => a.date.localeCompare(b.date))
     }),
 
-  // Before/after impact of each ecosystem change: token/turn, КПД, quality.
+  // Before/after impact of each ecosystem change: token/turn, Eff, quality.
   ecosystemImpact: publicProcedure
     .input(z.object({ window: z.number().int().positive().default(7) }))
     .output(
@@ -821,7 +821,7 @@ export const productivityRouter = router({
     }),
 
   // Re-freeze the baseline over a chosen date range. The only operation that
-  // intentionally shifts historical КПД. scope = projectPath or global.
+  // intentionally shifts historical Eff. scope = projectPath or global.
   rebaseline: publicProcedure
     .input(
       z.object({

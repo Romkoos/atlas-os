@@ -97,7 +97,7 @@ export const ecosystemChanges = sqliteTable(
 // A frozen efficiency baseline per scope (project path or '__global__').
 // `expectedTokens(difficulty)` is derived from `method` + `params`; the latest
 // row per scope is active. New rows are written only on first use or explicit
-// re-baseline, so historical КПД never mutates on its own.
+// re-baseline, so historical Eff never mutates on its own.
 export const kpiBaseline = sqliteTable(
   'kpi_baseline',
   {

@@ -45,17 +45,17 @@ export const tokensPerDayMeta: ChartMeta = {
 
 export const kpiMeta: ChartMeta = {
   id: 'kpi',
-  title: 'КПД · efficiency',
-  caption: 'КПД vs frozen baseline · 100% = baseline · ⚑ = ecosystem change',
+  title: 'token efficiency',
+  caption: 'token efficiency vs frozen baseline · 100% = baseline · ⚑ = ecosystem change',
   syncGroup: DAILY_SYNC,
   formula: {
-    label: 'КПД',
-    body: 'КПД = expected ÷ actual tokens × 100, vs a frozen baseline. 100% = on baseline; higher = more efficient (fewer tokens than expected for the task difficulty).',
+    label: 'Token Efficiency',
+    body: 'Token Efficiency = expected ÷ actual tokens × 100, vs a frozen baseline. 100% = on baseline; higher = more efficient (fewer tokens than expected for the task difficulty).',
   },
   series: [
     {
       key: 'kpi',
-      label: 'КПД',
+      label: 'Eff',
       color: 'var(--color-chart-1)',
       definition: 'efficiency % vs frozen baseline',
       axis: 'left',

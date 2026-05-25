@@ -130,7 +130,7 @@ function TokensTooltip(props: {
   )
 }
 
-// KPI-per-day tooltip: КПД value + quality guardrail + session count + ecosystem change.
+// KPI-per-day tooltip: Eff value + quality guardrail + session count + ecosystem change.
 function KpiTooltip(props: {
   active?: boolean
   label?: string | number
@@ -144,7 +144,7 @@ function KpiTooltip(props: {
     <div style={tooltipStyle} className="px-2.5 py-2 text-xs">
       <div className="mb-1 font-medium">{props.label}</div>
       <div className="flex justify-between gap-6">
-        <span className="text-muted-foreground">КПД</span>
+        <span className="text-muted-foreground">Efficiency</span>
         <span className="tabular-nums">{row.kpi == null ? '—' : `${row.kpi.toFixed(0)}%`}</span>
       </div>
       <div className="flex justify-between gap-6">
@@ -242,7 +242,7 @@ function EcoMarkers({ events }: { events: { date: string; count: number; label: 
   )
 }
 
-// The two date-axis charts (tokens-per-day + КПД). Rendered inside a
+// The two date-axis charts (tokens-per-day + efficiency). Rendered inside a
 // HoverSyncProvider so a crosshair on one chart drives the readout on both:
 // each chart publishes its hovered category via onMouseMove, and ChartFrame's
 // readout (fed the same data) renders the matching day's values.
@@ -345,7 +345,7 @@ function DailyCharts({
         }
       </ChartFrame>
 
-      {/* КПД (EFFICIENCY) */}
+      {/* TOKEN EFFICIENCY */}
       <ChartFrame
         meta={kpiMeta}
         rows={kpiChartData}
@@ -371,7 +371,7 @@ function DailyCharts({
           kpiLoading ? (
             <Loading />
           ) : kpiEmpty ? (
-            <NoteLine>no КПД data yet.</NoteLine>
+            <NoteLine>no efficiency data yet.</NoteLine>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -564,7 +564,7 @@ function OverviewTab({ days, projectPath }: Scope) {
         </div>
         <div className="kpi">
           <div className="label">
-            <span className="id">[05]</span>КПД · EFFICIENCY
+            <span className="id">[05]</span>TOKEN EFFICIENCY
           </div>
           <div className="val amber">{pct(kpi.data?.overall ?? null)}</div>
           <div className="delta">vs baseline</div>
@@ -670,7 +670,7 @@ function OverviewTab({ days, projectPath }: Scope) {
         }
       </ChartFrame>
 
-      {/* TOKENS PER DAY + КПД — synced crosshair + readout */}
+      {/* TOKENS PER DAY + efficiency — synced crosshair + readout */}
       <HoverSyncProvider>
         <DailyCharts
           chartData={chartData}
@@ -857,7 +857,7 @@ function SessionsTab({ days, projectPath }: Scope) {
             <th className="num">turns</th>
             <th className="num">tokens</th>
             <th className="num">complexity</th>
-            <th className="num">КПД</th>
+            <th className="num">Eff</th>
             <th>difficulty</th>
             <th>rating</th>
             <th>summary</th>
@@ -882,7 +882,7 @@ function SessionsTab({ days, projectPath }: Scope) {
               </td>
               <td
                 className="num"
-                title="КПД vs frozen baseline — 100% = baseline efficiency, higher is leaner"
+                title="Token Efficiency vs frozen baseline — 100% = baseline efficiency, higher is leaner"
               >
                 {pct(s.kpi)}
               </td>
@@ -1037,7 +1037,7 @@ function EcoBadge({ type }: { type: string }) {
 }
 
 // Delta colouring. goodDirection='down' (default) = lower is better (tokens/turn);
-// 'up' = higher is better (КПД). The "good" direction is green, the other red.
+// 'up' = higher is better (Eff). The "good" direction is green, the other red.
 function ImpactDelta({
   pct,
   goodDirection = 'down',
@@ -1137,7 +1137,7 @@ function EcosystemTab({ days }: { days: number }) {
         <div className="panel-head">
           <span className="ttl">change impact</span>
           <span className="meta">
-            7d before vs after · global · tok/turn lower = better · КПД higher = better
+            7d before vs after · global · tok/turn lower = better · Eff higher = better
           </span>
         </div>
         {impact.isLoading ? (
@@ -1158,9 +1158,9 @@ function EcosystemTab({ days }: { days: number }) {
                   <th className="num">tok/turn before</th>
                   <th className="num">after</th>
                   <th className="num">Δ tok</th>
-                  <th className="num">КПД before</th>
+                  <th className="num">Eff before</th>
                   <th className="num">after</th>
-                  <th className="num">Δ КПД</th>
+                  <th className="num">Δ Eff</th>
                   <th className="num">Δ quality</th>
                 </tr>
               </thead>

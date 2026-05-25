@@ -10,7 +10,7 @@ describe('chartMeta', () => {
     }
   })
 
-  it('КПД chart exposes a formula for the ? popover', () => {
+  it('Eff chart exposes a formula for the ? popover', () => {
     expect(kpiMeta.formula).toBeDefined()
     expect(kpiMeta.formula?.body).toMatch(/baseline/i)
   })
