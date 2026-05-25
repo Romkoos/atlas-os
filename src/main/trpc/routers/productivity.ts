@@ -146,6 +146,8 @@ function scopedKpdRows(projectPath?: string): KpdRow[] {
     .select({
       id: agentSessions.sessionId,
       difficulty: agentSessions.difficulty,
+      files: agentSessions.distinctFiles,
+      dirs: agentSessions.distinctDirs,
       score: agentSessions.score,
       tin: agentSessions.totalTokensIn,
       tout: agentSessions.totalTokensOut,
@@ -161,6 +163,8 @@ function scopedKpdRows(projectPath?: string): KpdRow[] {
       {
         id: r.id,
         difficulty: r.difficulty,
+        files: r.files,
+        dirs: r.dirs,
         tokens: r.tin + r.tout,
         score: r.score,
         lastTs: Number(agg.lastTs),
@@ -172,7 +176,7 @@ function scopedKpdRows(projectPath?: string): KpdRow[] {
   const model = ensureBaseline(rows, projectPath)
   return rows.map((r) => {
     const agg = aggById.get(r.id)
-    const expected = model ? expectedTokens(model, r.difficulty) : null
+    const expected = model ? expectedTokens(model, { files: r.files, dirs: r.dirs }) : null
     const kpd = sessionKpd(expected, r.tokens)
     return { ...r, day: agg?.day ?? '', expected, kpd }
   })
@@ -388,6 +392,7 @@ export const productivityRouter = router({
           z.object({
             date: z.string(),
             kpi: z.number(),
+            kpiSmooth: z.number(),
             quality: z.number().nullable(),
             sessions: z.number(),
             tokens: z.number(),
@@ -878,6 +883,8 @@ export const productivityRouter = router({
         used.map((r) => ({
           id: r.id,
           difficulty: r.difficulty,
+          files: r.files,
+          dirs: r.dirs,
           tokens: r.tokens,
           score: r.score,
           lastTs: r.lastTs,

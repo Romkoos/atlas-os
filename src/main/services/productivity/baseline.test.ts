@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 const s = (id: string, lastTs: number): ScopedSession => ({
   id,
   difficulty: null,
+  files: 0,
+  dirs: 0,
   tokens: 1000,
   score: null,
   lastTs,
