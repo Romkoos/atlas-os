@@ -377,7 +377,7 @@ function DailyCharts({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={kpiChartData}
-                  syncId={tokensPerDayMeta.syncGroup}
+                  syncId={kpiMeta.syncGroup}
                   onMouseMove={onMove}
                   onMouseLeave={onLeave}
                   margin={{ top: 8, right: 8, bottom: 8, left: -16 }}

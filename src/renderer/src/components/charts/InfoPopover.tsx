@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 // Small "?" affixed to a chart title. Click toggles a terminal-styled card with
 // the metric definition. Closes on Escape or outside-click. No external dep.
 export function InfoPopover({ label, body }: { label: string; body: string }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -26,6 +27,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
         type="button"
         aria-label={`What is ${label}?`}
         aria-expanded={open}
+        aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
         style={{
           fontFamily: 'var(--mono)',
@@ -43,7 +45,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
       </button>
       {open ? (
         <div
-          role="tooltip"
+          id={panelId}
           style={{
             position: 'absolute',
             top: 20,
