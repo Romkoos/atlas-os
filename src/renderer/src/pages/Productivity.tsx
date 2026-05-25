@@ -1644,7 +1644,7 @@ function BenchmarkTab() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <span className="ttl">results</span>
             <span className="meta">
-              median tokens per task × infra version · k reps · lower = better
+              median total tokens (incl cached infra prefix) · k reps · lower = better
             </span>
           </span>
           <button
@@ -1673,6 +1673,7 @@ function BenchmarkTab() {
                 <th>model</th>
                 <th className="num">n</th>
                 <th className="num">median tokens</th>
+                <th className="num">cached</th>
                 <th className="num">spread</th>
                 <th className="num">median cost</th>
               </tr>
@@ -1685,6 +1686,9 @@ function BenchmarkTab() {
                   <td style={{ color: 'var(--fg-4)' }}>{r.model}</td>
                   <td className="num">{r.n}</td>
                   <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
+                  <td className="num" style={{ color: 'var(--fg-4)' }}>
+                    {r.n === 0 ? '—' : num(Math.round(r.medianCacheTokens))}
+                  </td>
                   <td className="num">{r.n === 0 ? '—' : num(Math.round(r.spreadTokens))}</td>
                   <td className="num">{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
                 </tr>

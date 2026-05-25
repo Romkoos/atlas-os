@@ -53,6 +53,7 @@ export const benchmarkRouter = router({
           n: z.number(),
           medianTokens: z.number(),
           spreadTokens: z.number(),
+          medianCacheTokens: z.number(),
           medianCostUsd: z.number(),
         }),
       ),
@@ -75,6 +76,8 @@ export const benchmarkRouter = router({
             g.map((r) => ({
               tokensIn: r.tokensIn,
               tokensOut: r.tokensOut,
+              cacheReadTokens: r.cacheReadTokens,
+              cacheCreationTokens: r.cacheCreationTokens,
               totalCostUsd: r.totalCostUsd,
               success: r.success,
             })),
