@@ -1585,7 +1585,7 @@ function BenchmarkTab() {
         </button>
         {progress.data ? (
           <span className="bench-progress">
-            {progress.data.done}/{progress.data.total}
+            {progress.data.done}/{progress.data.total} done · {progress.data.failed} failed
           </span>
         ) : null}
         {progress.data?.error ? (
@@ -1606,7 +1606,7 @@ function BenchmarkTab() {
         </thead>
         <tbody>
           {(results.data ?? []).map((r) => (
-            <tr key={`${r.taskId}-${r.infraHash}`}>
+            <tr key={`${r.taskId}-${r.infraHash}-${r.model}`}>
               <td>{r.taskId}</td>
               <td>{r.infraHash}</td>
               <td>{r.model}</td>
