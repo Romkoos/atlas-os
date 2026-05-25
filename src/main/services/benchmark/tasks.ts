@@ -30,9 +30,9 @@ export const TASKS: BenchmarkTask[] = [
     assert: { type: 'regex', value: 'ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN' },
   },
   {
-    id: 'productivity-tabs',
+    id: 'app-paths',
     prompt:
-      'What tabs does the Productivity page (src/renderer/src/pages/Productivity.tsx) render? List them.',
-    assert: { type: 'regex', value: 'overview|sessions|ecosystem' },
+      'Read src/main/paths.ts. What does appPaths() return? List a few of the path keys it provides.',
+    assert: { type: 'regex', value: 'userData|claudeDir|migrations' },
   },
 ]
