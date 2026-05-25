@@ -9,6 +9,9 @@ export interface AppPaths {
   // Productivity tracker raw sources (see docs/agent-productivity-tracker.md).
   claudeProjectsDir: string // ~/.claude/projects — Claude Code transcripts
   analyticsBufferDir: string // ~/agent-analytics — hook JSONL buffer
+  claudeDir: string // ~/.claude — infra watcher root (settings.json, skills/)
+  claudeJson: string // ~/.claude.json — MCP server config
+  infraSnapshot: string // userData/infra-snapshot.json — last seen infra state
 }
 
 // Must be called after app is ready (depends on app.getPath).
@@ -25,5 +28,8 @@ export function appPaths(): AppPaths {
       : join(app.getAppPath(), 'drizzle'),
     claudeProjectsDir: join(home, '.claude', 'projects'),
     analyticsBufferDir: join(home, 'agent-analytics'),
+    claudeDir: join(home, '.claude'),
+    claudeJson: join(home, '.claude.json'),
+    infraSnapshot: join(userData, 'infra-snapshot.json'),
   }
 }

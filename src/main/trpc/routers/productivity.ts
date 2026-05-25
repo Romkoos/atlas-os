@@ -186,10 +186,14 @@ export const productivityRouter = router({
   refresh: publicProcedure
     .output(z.object({ turns: z.number(), sessions: z.number(), ecosystem: z.number() }))
     .mutation(async () => {
-      const { claudeProjectsDir, analyticsBufferDir } = appPaths()
+      const { claudeProjectsDir, analyticsBufferDir, claudeDir, claudeJson, infraSnapshot } =
+        appPaths()
       return await ingestAll(db(), {
         projectsDir: claudeProjectsDir,
         bufferDir: analyticsBufferDir,
+        claudeDir,
+        claudeJson,
+        infraSnapshotPath: infraSnapshot,
       })
     }),
 
@@ -903,5 +907,18 @@ export const productivityRouter = router({
         .onConflictDoNothing()
         .run()
       return { id }
+    }),
+
+  // Delete a manual annotation. Restricted to source='manual' so auto-detected
+  // and backfilled infra changes can never be removed through this path.
+  deleteNote: publicProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .output(z.object({ deleted: z.number() }))
+    .mutation(({ input }) => {
+      const res = db()
+        .delete(ecosystemChanges)
+        .where(and(eq(ecosystemChanges.id, input.id), eq(ecosystemChanges.source, 'manual')))
+        .run()
+      return { deleted: res.changes }
     }),
 })
