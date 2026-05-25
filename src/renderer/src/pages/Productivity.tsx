@@ -1690,6 +1690,7 @@ function BenchmarkTab() {
                 <th className="num">n</th>
                 <th className="num">median tokens</th>
                 <th className="num">cached</th>
+                <th className="num">output</th>
                 <th className="num">Δ vs prev</th>
                 <th className="num">spread</th>
                 <th className="num">cost</th>
@@ -1715,6 +1716,9 @@ function BenchmarkTab() {
                     <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
                     <td className="num" style={{ color: 'var(--fg-4)' }}>
                       {r.n === 0 ? '—' : num(Math.round(r.medianCacheTokens))}
+                    </td>
+                    <td className="num">
+                      {r.n === 0 ? '—' : num(Math.round(r.medianOutputTokens))}
                     </td>
                     <td
                       className="num"

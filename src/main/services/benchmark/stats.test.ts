@@ -38,12 +38,14 @@ describe('summarize', () => {
     expect(s.n).toBe(2)
     expect(s.medianTokens).toBe(1300) // totals incl cache: 1200 and 1400 -> 1300
     expect(s.medianCacheTokens).toBe(1000) // cache 1000 and 1000 -> 1000
+    expect(s.medianOutputTokens).toBe(100) // output 100 and 100 -> 100
   })
   it('returns n=0 and NaN tokens when all reps fail', () => {
     const s = summarize('t1', 'abc', [rep(0, 0, 0, 0, false), rep(0, 0, 0, 0, false)])
     expect(s.n).toBe(0)
     expect(Number.isNaN(s.medianTokens)).toBe(true)
     expect(Number.isNaN(s.medianCacheTokens)).toBe(true)
+    expect(Number.isNaN(s.medianOutputTokens)).toBe(true)
   })
 })
 
