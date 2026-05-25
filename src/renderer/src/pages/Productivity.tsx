@@ -37,6 +37,11 @@ const RANGES: ReadonlyArray<{ days: number; label: string }> = [
 
 const ALL_PROJECTS = 'all'
 
+// Stable empty fallback for overview.data?.tokensByDay. A fresh `[]` per render
+// would change the chartData useMemo dep on every render during loading,
+// defeating memoization. Typed to match the overview router output.
+const NO_TOKENS_BY_DAY: { date: string; tokensIn: number; tokensOut: number }[] = []
+
 // Scope shared by every tab: time window + optional project filter.
 interface Scope {
   days: number
@@ -469,7 +474,7 @@ function OverviewTab({ days, projectPath }: Scope) {
     onError: () => toast.error('Re-baseline failed'),
   })
 
-  const tokensByDay = overview.data?.tokensByDay ?? []
+  const tokensByDay = overview.data?.tokensByDay ?? NO_TOKENS_BY_DAY
 
   // Ecosystem events are global; the daily bars are scoped (project/tracked
   // filter). So an event day may have no bar in scope. Union both date sets and
