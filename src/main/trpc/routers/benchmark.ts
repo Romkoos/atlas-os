@@ -1,11 +1,22 @@
 // src/main/trpc/routers/benchmark.ts
 import { db } from '@main/db/client'
 import { benchmarkRuns } from '@main/db/schema'
-import { getProgress, startBatch } from '@main/services/benchmark/batch'
+import { getLatest, getProgress, startBatch } from '@main/services/benchmark/batch'
 import { summarize, type TaskInfraSummary } from '@main/services/benchmark/stats'
 import { TASKS } from '@main/services/benchmark/tasks'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { z } from 'zod'
+
+const progressShape = z
+  .object({
+    batchId: z.string(),
+    total: z.number(),
+    done: z.number(),
+    failed: z.number(),
+    running: z.boolean(),
+    error: z.string().nullable(),
+  })
+  .nullable()
 
 export const benchmarkRouter = router({
   tasks: publicProcedure
@@ -25,19 +36,12 @@ export const benchmarkRouter = router({
 
   progress: publicProcedure
     .input(z.object({ batchId: z.string() }))
-    .output(
-      z
-        .object({
-          batchId: z.string(),
-          total: z.number(),
-          done: z.number(),
-          failed: z.number(),
-          running: z.boolean(),
-          error: z.string().nullable(),
-        })
-        .nullable(),
-    )
+    .output(progressShape)
     .query(({ input }) => getProgress(input.batchId)),
+
+  // Most recent batch in memory, so the UI can re-attach progress after the tab
+  // remounts. Null after an app restart (results still come from `results`).
+  latest: publicProcedure.output(progressShape).query(() => getLatest()),
 
   results: publicProcedure
     .output(
