@@ -45,6 +45,7 @@ export const benchmarkRouter = router({
         z.object({
           taskId: z.string(),
           infraHash: z.string(),
+          model: z.string(),
           n: z.number(),
           medianTokens: z.number(),
           spreadTokens: z.number(),
@@ -56,15 +57,15 @@ export const benchmarkRouter = router({
       const rows = db().select().from(benchmarkRuns).all()
       const groups = new Map<string, typeof rows>()
       for (const r of rows) {
-        const key = `${r.taskId}::${r.infraHash}`
+        const key = `${r.taskId}::${r.infraHash}::${r.model}`
         const arr = groups.get(key) ?? []
         arr.push(r)
         groups.set(key, arr)
       }
-      const summaries: TaskInfraSummary[] = []
+      const summaries: (TaskInfraSummary & { model: string })[] = []
       for (const g of groups.values()) {
-        summaries.push(
-          summarize(
+        summaries.push({
+          ...summarize(
             g[0].taskId,
             g[0].infraHash,
             g.map((r) => ({
@@ -74,7 +75,8 @@ export const benchmarkRouter = router({
               success: r.success,
             })),
           ),
-        )
+          model: g[0].model,
+        })
       }
       return summaries
     }),
