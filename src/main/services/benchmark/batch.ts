@@ -20,8 +20,10 @@ export interface Progress {
   done: number
   failed: number
   running: boolean
+  error: string | null
 }
 
+// In-memory progress per batch. Not pruned (manual-trigger v1, few runs); concurrent batches share the same OAuth and are unsupported.
 const batches = new Map<string, Progress>()
 
 export function getProgress(batchId: string): Progress | null {
@@ -40,7 +42,7 @@ export function startBatch(opts: StartOptions): { batchId: string; total: number
   const tasks = opts.taskIds ? TASKS.filter((t) => opts.taskIds?.includes(t.id)) : TASKS
   const total = tasks.length * k
   const batchId = randomUUID()
-  const progress: Progress = { batchId, total, done: 0, failed: 0, running: true }
+  const progress: Progress = { batchId, total, done: 0, failed: 0, running: true, error: null }
   batches.set(batchId, progress)
   void runLoop(batchId, tasks, k, model, progress)
   return { batchId, total }
@@ -53,46 +55,52 @@ async function runLoop(
   model: string,
   progress: Progress,
 ): Promise<void> {
-  const repoRoot = app.getAppPath()
-  const commit = repoCommit(repoRoot)
-  const p = appPaths()
-  const infra = await readInfraState({
-    settingsPath: join(p.claudeDir, 'settings.json'),
-    claudeJsonPath: p.claudeJson,
-    skillsDir: join(p.claudeDir, 'skills'),
-  })
-  const infraHash = infraFingerprint(infra)
+  try {
+    const repoRoot = app.getAppPath()
+    const commit = repoCommit(repoRoot)
+    const p = appPaths()
+    const infra = await readInfraState({
+      settingsPath: join(p.claudeDir, 'settings.json'),
+      claudeJsonPath: p.claudeJson,
+      skillsDir: join(p.claudeDir, 'skills'),
+    })
+    const infraHash = infraFingerprint(infra)
 
-  for (const task of tasks) {
-    for (let rep = 0; rep < k; rep++) {
-      const result = await runBenchmarkTask(task, { model, repoRoot })
-      db()
-        .insert(benchmarkRuns)
-        .values({
-          id: randomUUID(),
-          batchId,
-          ts: new Date(),
-          taskId: task.id,
-          rep,
-          infraHash,
-          infraSnapshot: infra,
-          repoCommit: commit,
-          model,
-          tokensIn: result.tokensIn,
-          tokensOut: result.tokensOut,
-          cacheReadTokens: result.cacheReadTokens,
-          cacheCreationTokens: result.cacheCreationTokens,
-          totalCostUsd: result.totalCostUsd,
-          numTurns: result.numTurns,
-          durationMs: result.durationMs,
-          success: result.success,
-          failReason: result.failReason,
-          transcriptPath: result.sessionId,
-        })
-        .run()
-      progress.done += 1
-      if (!result.success) progress.failed += 1
+    for (const task of tasks) {
+      for (let rep = 0; rep < k; rep++) {
+        const result = await runBenchmarkTask(task, { model, repoRoot })
+        db()
+          .insert(benchmarkRuns)
+          .values({
+            id: randomUUID(),
+            batchId,
+            ts: new Date(),
+            taskId: task.id,
+            rep,
+            infraHash,
+            infraSnapshot: infra,
+            repoCommit: commit,
+            model,
+            tokensIn: result.tokensIn,
+            tokensOut: result.tokensOut,
+            cacheReadTokens: result.cacheReadTokens,
+            cacheCreationTokens: result.cacheCreationTokens,
+            totalCostUsd: result.totalCostUsd,
+            numTurns: result.numTurns,
+            durationMs: result.durationMs,
+            success: result.success,
+            failReason: result.failReason,
+            transcriptPath: result.sessionId,
+          })
+          .run()
+        progress.done += 1
+        if (!result.success) progress.failed += 1
+      }
     }
+  } catch (err) {
+    progress.error = err instanceof Error ? err.message : String(err)
+    console.error('[benchmark] runLoop crashed:', err)
+  } finally {
+    progress.running = false
   }
-  progress.running = false
 }
