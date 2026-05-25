@@ -1,6 +1,8 @@
 import { ChartFrame } from '@renderer/components/charts/ChartFrame'
 import { kpiMeta, todayByHourMeta, tokensPerDayMeta } from '@renderer/components/charts/chartMeta'
 import { dailyDateAxis, overlayPrevious } from '@renderer/components/charts/compareSeries'
+import { DayDrawer, type DrawerSession } from '@renderer/components/charts/DayDrawer'
+import { inDayRange, localDay } from '@renderer/components/charts/daySessions'
 import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/HoverSyncContext'
 import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
@@ -290,6 +292,7 @@ function DailyCharts({
   comparePending,
   brushRange,
   onBrushChange,
+  onDayClick,
 }: {
   chartData: Array<{
     date: string
@@ -318,6 +321,7 @@ function DailyCharts({
   comparePending: boolean
   brushRange: BrushRange
   onBrushChange: (r: BrushRange) => void
+  onDayClick: (day: string) => void
 }) {
   const { setActiveDate } = useHoverSync()
   const onMove = (s: { activeLabel?: string | number }) =>
@@ -325,6 +329,9 @@ function DailyCharts({
   const onLeave = () => setActiveDate(null)
   const onBrush = (r: { startIndex?: number; endIndex?: number }) =>
     onBrushChange({ startIndex: r.startIndex, endIndex: r.endIndex })
+  const onChartClick = (s: { activeLabel?: string | number }) => {
+    if (s?.activeLabel != null) onDayClick(String(s.activeLabel))
+  }
   const tokenFmt = (_k: string, v: number) => num(v)
   const kpiFmt = (k: string, v: number) => (k === 'kpi' ? `${v.toFixed(0)}%` : v.toFixed(1))
 
@@ -358,6 +365,7 @@ function DailyCharts({
                   syncId={tokensPerDayMeta.syncGroup}
                   onMouseMove={onMove}
                   onMouseLeave={onLeave}
+                  onClick={onChartClick}
                   margin={{ top: 8, right: 8, bottom: 8, left: -16 }}
                 >
                   <CartesianGrid
@@ -461,6 +469,7 @@ function DailyCharts({
                   syncId={kpiMeta.syncGroup}
                   onMouseMove={onMove}
                   onMouseLeave={onLeave}
+                  onClick={onChartClick}
                   margin={{ top: 8, right: 8, bottom: 8, left: -16 }}
                 >
                   <CartesianGrid
@@ -568,6 +577,31 @@ function OverviewTab({ days, projectPath }: Scope) {
 
   const [compare, setCompare] = useState(false)
   const [brushRange, setBrushRange] = useState<BrushRange>({})
+  const [drawerDay, setDrawerDay] = useState<string | null>(null)
+
+  // Sessions for the drilldown drawer — fetched only while open, same window as
+  // the charts so a clicked (in-window) day is always covered.
+  const daySessions = trpc.productivity.sessions.useQuery(
+    { days, projectPath },
+    { enabled: drawerDay != null },
+  )
+
+  // Sessions whose local activity-day range includes the clicked day.
+  const drawerRows = useMemo<DrawerSession[]>(() => {
+    if (drawerDay == null) return []
+    return (daySessions.data ?? [])
+      .filter((s) => inDayRange(drawerDay, localDay(s.startedAt), localDay(s.endedAt)))
+      .map((s) => ({
+        sessionId: s.sessionId,
+        project: s.project,
+        projectPath: s.projectPath,
+        totalTokens: s.totalTokens,
+        kpi: s.kpi,
+        complexity: s.complexity,
+        turnCount: s.turnCount,
+        summary: s.summary,
+      }))
+  }, [drawerDay, daySessions.data])
 
   // Previous period = same window shifted back by `days`. Only fetched while
   // compare is on, so the toggle is the on/off switch for both ghost lines.
@@ -823,6 +857,7 @@ function OverviewTab({ days, projectPath }: Scope) {
           comparePending={compare && (overviewPrev.isFetching || kpiPrev.isFetching)}
           brushRange={brushRange}
           onBrushChange={setBrushRange}
+          onDayClick={setDrawerDay}
         />
       </HoverSyncProvider>
 
@@ -955,6 +990,12 @@ function OverviewTab({ days, projectPath }: Scope) {
           </div>
         </div>
       </div>
+      <DayDrawer
+        day={drawerDay}
+        sessions={drawerRows}
+        loading={daySessions.isLoading}
+        onClose={() => setDrawerDay(null)}
+      />
     </>
   )
 }
