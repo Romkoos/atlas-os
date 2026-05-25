@@ -304,6 +304,7 @@ function DailyCharts({
   kpiChartData: Array<{
     date: string
     kpi: number | null
+    kpiSmooth: number | null
     quality: number | null
     sessions: number
     event: string | null
@@ -512,16 +513,31 @@ function DailyCharts({
                     content={<KpiTooltip />}
                   />
                   {!hidden.has('kpi') ? (
-                    <Line
-                      yAxisId="kpi"
-                      type="monotone"
-                      dataKey="kpi"
-                      stroke="var(--color-chart-1)"
-                      strokeWidth={2}
-                      dot={false}
-                      connectNulls
-                      isAnimationActive={false}
-                    />
+                    <>
+                      {/* raw daily Eff — faint context (noisy by nature) */}
+                      <Line
+                        yAxisId="kpi"
+                        type="monotone"
+                        dataKey="kpi"
+                        stroke="var(--color-chart-1)"
+                        strokeOpacity={0.25}
+                        strokeWidth={1}
+                        dot={false}
+                        connectNulls
+                        isAnimationActive={false}
+                      />
+                      {/* 7-day trailing median — the readable trend line */}
+                      <Line
+                        yAxisId="kpi"
+                        type="monotone"
+                        dataKey="kpiSmooth"
+                        stroke="var(--color-chart-1)"
+                        strokeWidth={2}
+                        dot={false}
+                        connectNulls
+                        isAnimationActive={false}
+                      />
+                    </>
                   ) : null}
                   {!hidden.has('quality') ? (
                     <Line
@@ -660,6 +676,7 @@ function OverviewTab({ days, projectPath }: Scope) {
     const base = dailyDates.map((date) => ({
       date,
       kpi: kpiByDate.get(date)?.kpi ?? null,
+      kpiSmooth: kpiByDate.get(date)?.kpiSmooth ?? null,
       quality: kpiByDate.get(date)?.quality ?? null,
       sessions: kpiByDate.get(date)?.sessions ?? 0,
       event: ecoMap.get(date)?.label ?? null,

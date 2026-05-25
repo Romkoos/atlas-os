@@ -9,7 +9,9 @@ const BASELINE_FRACTION = 0.25
 
 export interface ScopedSession {
   id: string
-  difficulty: number | null
+  difficulty: number | null // kept for display/other endpoints; not used by Eff
+  files: number // distinct files touched — task-scope predictor for expected
+  dirs: number // distinct dirs touched — task-scope predictor for expected
   tokens: number
   score: number | null
   lastTs: number // ms epoch of the session's last turn
@@ -64,17 +66,25 @@ export function ensureBaseline(
 ): BaselineModel | null {
   const scope = scopeKey(projectPath)
   const existing = getActiveBaseline(scope)
-  if (existing) return existing
+  if (existing && existing.method === 'scope') return existing
   const used = selectBaselineSamples(scopedSorted)
-  const model = fitBaseline(used.map((sx) => ({ difficulty: sx.difficulty, tokens: sx.tokens })))
-  if (!model) return null
+  const model = fitBaseline(
+    used.map((sx) => ({ files: sx.files, dirs: sx.dirs, tokens: sx.tokens })),
+  )
+  if (!model) return existing
+  // One-time upgrade: (re)freeze only when we can reach the scope model. If the
+  // new fit still can't (thin / no scope variation), keep the existing frozen
+  // baseline rather than churning a fresh global-median row on every call.
+  if (existing && model.method !== 'scope') return existing
   saveBaseline(scope, model, used)
   return model
 }
 
 // Explicit user re-baseline over a chosen set of sessions. Refits + freezes.
 export function rebaseline(used: ScopedSession[], projectPath?: string): BaselineModel | null {
-  const model = fitBaseline(used.map((sx) => ({ difficulty: sx.difficulty, tokens: sx.tokens })))
+  const model = fitBaseline(
+    used.map((sx) => ({ files: sx.files, dirs: sx.dirs, tokens: sx.tokens })),
+  )
   if (!model) return null
   saveBaseline(scopeKey(projectPath), model, used)
   return model

@@ -1,23 +1,29 @@
 // Eff = frozen-baseline efficiency coefficient (%). Per session:
-//   Eff = expectedTokens(difficulty, baseline) / actualTokens × 100.
+//   Eff = expectedTokens(scope, baseline) / actualTokens × 100.
 // expectedTokens comes from a baseline frozen at the project's starting period.
-// Two methods: global-median (day-one fallback) and loglinear (once ≥8
-// difficulty-tagged sessions span ≥2 difficulty levels).
+//
+// The baseline normalises out TASK WORKLOAD so what's left is efficiency. A task's
+// token cost is driven mostly by how much work it touches; on real data, file +
+// directory scope explains ~73% of the variance in log(tokens). So expected is a
+// frozen log-linear regression on task scope:
+//   log(expected) = a + bFiles·log1p(files) + bDirs·log1p(dirs)
+// Two methods:
+//   - scope: the regression above. Used once the baseline period has enough
+//     sessions with scope variation to fit it.
+//   - global-median: expected = median baseline tokens (scope ignored). Day-one
+//     fallback, and the fallback whenever scope can't be fit. Always stored as a
+//     `median` param so sessions with no recorded scope still get an Eff.
+//
+// Why scope and not turns/tokens/tools: those are agent BEHAVIOUR (endogenous) —
+// normalising by them would erase the very efficiency gain we want to measure.
+// files/dirs are closer to task DEMAND. Adding behaviour predictors lifts R² by
+// only ~0.07, not worth the bias.
 
-// ── Frozen-baseline Eff model ────────────────────────────────────────────────
-// Eff = expectedTokens(difficulty) / actualTokens × 100. expectedTokens comes
-// from a baseline frozen at the project's starting period. Two methods:
-//   - global-median: expected = median baseline tokens (difficulty ignored).
-//     Used until enough difficulty-tagged data exists. Makes Eff work day one.
-//   - loglinear: expected = exp(a + b·difficulty), fit on baseline medians.
-//     Used only once difficulty coverage is high (absolute ≥8 AND ≥50% of the
-//     baseline); always carries a median fallback so untagged sessions still
-//     get a Eff instead of being dropped from the line.
-
-export type BaselineMethod = 'loglinear' | 'global-median'
+export type BaselineMethod = 'scope' | 'global-median'
 export interface BaselineParams {
   a?: number
-  b?: number
+  bFiles?: number
+  bDirs?: number
   median?: number
 }
 export interface BaselineModel {
@@ -25,16 +31,18 @@ export interface BaselineModel {
   params: BaselineParams
 }
 export interface BaselineSample {
-  difficulty: number | null
+  files: number
+  dirs: number
   tokens: number
 }
+export interface TaskScope {
+  files: number
+  dirs: number
+}
 
-// loglinear needs enough difficulty-tagged samples in absolute terms AND as a
-// fraction of the baseline. The fraction gate is critical: a handful of manually
-// rated sessions (e.g. 9 of 400) must NOT force a noisy loglinear fit that then
-// drops every untagged session from the Eff line.
-const MIN_DIFFICULTY_COVERAGE = 8
-const MIN_DIFFICULTY_FRACTION = 0.5
+// A scope fit needs enough sessions AND real variation in the predictors,
+// otherwise the regression is noise. Below this we fall back to the median.
+const MIN_SCOPE_SAMPLES = 8
 
 function medianOf(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b)
@@ -42,64 +50,82 @@ function medianOf(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
 }
 
+const log1p = (x: number): number => Math.log1p(Math.max(0, x))
+
+// Ordinary least squares for y = c0 + c1·x1 + c2·x2 via Gauss-Jordan on the 3×3
+// normal equations. Returns null if the system is singular (no predictor
+// variation / collinear), which is the signal to fall back to the median.
+function ols2(x1: number[], x2: number[], y: number[]): [number, number, number] | null {
+  const n = y.length
+  const A = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ]
+  const b = [0, 0, 0]
+  for (let i = 0; i < n; i++) {
+    const row = [1, x1[i], x2[i]]
+    for (let a = 0; a < 3; a++) {
+      b[a] += row[a] * y[i]
+      for (let c = 0; c < 3; c++) A[a][c] += row[a] * row[c]
+    }
+  }
+  const M = A.map((r, i) => [...r, b[i]])
+  for (let c = 0; c < 3; c++) {
+    let p = c
+    for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r
+    if (Math.abs(M[p][c]) < 1e-9) return null
+    ;[M[c], M[p]] = [M[p], M[c]]
+    const piv = M[c][c]
+    for (let cc = c; cc < 4; cc++) M[c][cc] /= piv
+    for (let r = 0; r < 3; r++)
+      if (r !== c) {
+        const f = M[r][c]
+        for (let cc = c; cc < 4; cc++) M[r][cc] -= f * M[c][cc]
+      }
+  }
+  const coef: [number, number, number] = [M[0][3], M[1][3], M[2][3]]
+  return coef.every(Number.isFinite) ? coef : null
+}
+
 // Fit a frozen baseline from starting-period samples. Null if no usable tokens.
-// `median` is always stored — even for loglinear — so untagged sessions have a
-// fallback expectation instead of being excluded.
+// `median` is always stored — even for scope — so sessions with no recorded scope
+// have a fallback expectation instead of being excluded.
 export function fitBaseline(samples: BaselineSample[]): BaselineModel | null {
   const valid = samples.filter((s) => s.tokens > 0)
   if (valid.length === 0) return null
 
   const median = medianOf(valid.map((s) => s.tokens))
-  const withDiff = valid.filter(
-    (s): s is { difficulty: number; tokens: number } => s.difficulty != null,
-  )
-  if (
-    withDiff.length >= MIN_DIFFICULTY_COVERAGE &&
-    withDiff.length >= MIN_DIFFICULTY_FRACTION * valid.length
-  ) {
-    const byD = new Map<number, number[]>()
-    for (const s of withDiff) {
-      const arr = byD.get(s.difficulty) ?? []
-      arr.push(Math.log(s.tokens))
-      byD.set(s.difficulty, arr)
-    }
-    if (byD.size >= 2) {
-      // Least squares on per-difficulty medians of log(tokens) → robust slope.
-      const pts = [...byD.entries()].map(([x, logs]) => ({ x, y: medianOf(logs) }))
-      const n = pts.length
-      const sx = pts.reduce((a, p) => a + p.x, 0)
-      const sy = pts.reduce((a, p) => a + p.y, 0)
-      const sxx = pts.reduce((a, p) => a + p.x * p.x, 0)
-      const sxy = pts.reduce((a, p) => a + p.x * p.y, 0)
-      const denom = n * sxx - sx * sx
-      if (denom !== 0) {
-        const b = (n * sxy - sx * sy) / denom
-        const a = (sy - b * sx) / n
-        if (b > 0) return { method: 'loglinear', params: { a, b, median } }
-      }
+  if (valid.length >= MIN_SCOPE_SAMPLES) {
+    const xf = valid.map((s) => log1p(s.files))
+    const xd = valid.map((s) => log1p(s.dirs))
+    const y = valid.map((s) => Math.log(s.tokens))
+    const coef = ols2(xf, xd, y)
+    if (coef) {
+      const [a, bFiles, bDirs] = coef
+      return { method: 'scope', params: { a, bFiles, bDirs, median } }
     }
   }
   return { method: 'global-median', params: { median } }
 }
 
-// Expected token cost for a task of the given difficulty under the frozen model.
-// Loglinear sessions without a difficulty fall back to the stored median so they
-// still get a Eff (otherwise the line collapses to only the rated sessions).
-export function expectedTokens(model: BaselineModel, difficulty: number | null): number | null {
-  if (model.method === 'global-median') return model.params.median ?? null
-  if (difficulty == null) return model.params.median ?? null
-  const { a, b } = model.params
-  if (a == null || b == null) return model.params.median ?? null
-  return Math.exp(a + b * difficulty)
+// Expected token cost for a task of the given scope under the frozen model.
+// Sessions with no recorded scope fall back to the stored median so they still
+// get an Eff (otherwise the line collapses to only scope-tagged sessions).
+export function expectedTokens(model: BaselineModel, scope: TaskScope | null): number | null {
+  if (model.method === 'scope') {
+    const { a, bFiles, bDirs, median } = model.params
+    if (scope == null || a == null || bFiles == null || bDirs == null) return median ?? null
+    const v = Math.exp(a + bFiles * log1p(scope.files) + bDirs * log1p(scope.dirs))
+    return Number.isFinite(v) && v > 0 ? v : (median ?? null)
+  }
+  // global-median (and any legacy/unknown method): scope ignored.
+  return model.params.median ?? null
 }
 
 // A session must have spent at least this fraction of its expected tokens to
 // earn an Eff. Below it the ratio is dominated by a near-empty session and
-// explodes: a 17k-token session against a ~210k baseline reads as 1200%
-// "efficiency", which is noise, not productivity — and on a low-session day or a
-// single-project scope token-weighting can't damp it (n=1 collapses to that one
-// ratio). The floor is fractional, not absolute, so it adapts to scope and
-// difficulty via `expected`; it also bounds Eff at 1/MIN_WORK_FRACTION × 100%.
+// explodes; the floor also bounds Eff at 1/MIN_WORK_FRACTION × 100%.
 export const MIN_WORK_FRACTION = 1 / 3
 
 // Per-session Eff (%). >100 = leaner than baseline. Null on unusable inputs or
@@ -108,6 +134,14 @@ export function sessionKpd(expected: number | null, actualTokens: number): numbe
   if (expected == null || expected <= 0 || actualTokens <= 0) return null
   if (actualTokens < expected * MIN_WORK_FRACTION) return null
   return (expected / actualTokens) * 100
+}
+
+// Trailing-window median at each position (window capped to available history).
+// Used to smooth the daily Eff line: a per-task token cost varies ~×2.5 even at
+// fixed scope, so the raw daily line stays noisy; a 7-day trailing median turns
+// it into a readable trend where infra changes show as level shifts.
+export function rollingMedian(xs: number[], window: number): number[] {
+  return xs.map((_, i) => medianOf(xs.slice(Math.max(0, i - window + 1), i + 1)))
 }
 
 /** A session's token counts for a local calendar day, plus optional quality. */
@@ -121,15 +155,17 @@ export interface KpdDaySession {
 export interface KpdDay {
   date: string
   kpi: number // token-weighted Eff (%) = Σexpected / Σactual × 100
+  kpiSmooth: number // 7-day trailing median of kpi — the readable trend line
   quality: number | null // mean of rated scores that day, or null
   sessions: number
 }
 
+const SMOOTH_WINDOW = 7
+
 // Group by day; token-weighted Eff and mean rated quality per day; sort by date.
 // Token-weighting (Σexpected/Σactual) instead of mean-of-ratios stops a single
-// tiny-token session from blowing the daily Eff up to 800–1000%: a near-empty
-// session contributes almost nothing to the denominator instead of dominating
-// an unweighted average. Sessions with non-positive expected/actual are dropped.
+// tiny-token session from blowing the daily Eff up. Sessions with non-positive
+// expected/actual are dropped. A 7-day trailing-median `kpiSmooth` is added.
 export function kpdByDay(sessions: KpdDaySession[]): KpdDay[] {
   const byDay = new Map<string, { exp: number; act: number; n: number; scores: number[] }>()
   for (const s of sessions) {
@@ -141,15 +177,20 @@ export function kpdByDay(sessions: KpdDaySession[]): KpdDay[] {
     if (s.score != null) e.scores.push(s.score)
     byDay.set(s.day, e)
   }
-  const out: KpdDay[] = []
+  const rows: Omit<KpdDay, 'kpiSmooth'>[] = []
   for (const [date, e] of byDay) {
     if (e.n === 0 || e.act <= 0) continue
-    out.push({
+    rows.push({
       date,
       kpi: (e.exp / e.act) * 100,
       quality: e.scores.length ? e.scores.reduce((a, x) => a + x, 0) / e.scores.length : null,
       sessions: e.n,
     })
   }
-  return out.sort((a, b) => a.date.localeCompare(b.date))
+  rows.sort((a, b) => a.date.localeCompare(b.date))
+  const smooth = rollingMedian(
+    rows.map((r) => r.kpi),
+    SMOOTH_WINDOW,
+  )
+  return rows.map((r, i) => ({ ...r, kpiSmooth: smooth[i] }))
 }

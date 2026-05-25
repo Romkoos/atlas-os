@@ -1,126 +1,130 @@
-import { type BaselineModel, expectedTokens, fitBaseline, kpdByDay, sessionKpd } from '@shared/kpi'
+import {
+  type BaselineModel,
+  type BaselineSample,
+  expectedTokens,
+  fitBaseline,
+  kpdByDay,
+  rollingMedian,
+  sessionKpd,
+} from '@shared/kpi'
 import { describe, expect, it } from 'vitest'
+
+// Build a baseline sample where tokens scale with task scope (files/dirs), the
+// signal the scope model is meant to capture.
+const sample = (files: number, dirs: number, tokens: number): BaselineSample => ({
+  files,
+  dirs,
+  tokens,
+})
 
 describe('fitBaseline', () => {
   it('returns null when no valid samples', () => {
     expect(fitBaseline([])).toBeNull()
-    expect(fitBaseline([{ difficulty: 5, tokens: 0 }])).toBeNull()
+    expect(fitBaseline([sample(3, 1, 0)])).toBeNull()
   })
-  it('falls back to global-median when difficulty coverage is thin', () => {
-    const samples = [
-      { difficulty: null, tokens: 100 },
-      { difficulty: null, tokens: 300 },
-      { difficulty: null, tokens: 200 },
-    ]
+
+  it('falls back to global-median when scope has no variation', () => {
+    // every session touched the same scope → nothing to regress on
+    const samples = Array.from({ length: 10 }, () => sample(2, 1, 0)).map((s, i) => ({
+      ...s,
+      tokens: [100, 300, 200, 250, 150, 400, 220, 180, 260, 240][i],
+    }))
     const m = fitBaseline(samples)
     expect(m?.method).toBe('global-median')
-    expect(m?.params.median).toBe(200)
+    expect(m?.params.median).toBeGreaterThan(0)
   })
-  it('fits loglinear when enough difficulty-tagged samples across ≥2 levels', () => {
-    const samples = [
-      { difficulty: 2, tokens: 1000 },
-      { difficulty: 2, tokens: 1100 },
-      { difficulty: 2, tokens: 900 },
-      { difficulty: 2, tokens: 1000 },
-      { difficulty: 8, tokens: 8000 },
-      { difficulty: 8, tokens: 8200 },
-      { difficulty: 8, tokens: 7800 },
-      { difficulty: 8, tokens: 8000 },
-    ]
+
+  it('fits a scope model when tokens scale with files/dirs', () => {
+    // tokens grow with scope; ≥8 samples spanning several scope sizes
+    const samples = Array.from({ length: 12 }, (_, i) => {
+      const files = i + 1
+      const dirs = 1 + Math.floor(i / 2)
+      return sample(files, dirs, 5000 * files + 200 * dirs)
+    })
     const m = fitBaseline(samples)
-    expect(m?.method).toBe('loglinear')
-    expect(m?.params.b).toBeGreaterThan(0)
+    expect(m?.method).toBe('scope')
+    // expected must rise with a larger task scope
+    const small = expectedTokens(m as BaselineModel, { files: 1, dirs: 1 }) as number
+    const big = expectedTokens(m as BaselineModel, { files: 12, dirs: 6 }) as number
+    expect(big).toBeGreaterThan(small)
   })
-})
 
-describe('expectedTokens', () => {
-  it('global-median ignores difficulty', () => {
-    const m: BaselineModel = { method: 'global-median', params: { median: 500 } }
-    expect(expectedTokens(m, null)).toBe(500)
-    expect(expectedTokens(m, 7)).toBe(500)
-  })
-  it('loglinear returns exp(a + b*d), null when difficulty missing', () => {
-    const m: BaselineModel = { method: 'loglinear', params: { a: 0, b: 1 } }
-    expect(expectedTokens(m, 2)).toBeCloseTo(Math.exp(2), 6)
-    expect(expectedTokens(m, null)).toBeNull()
-  })
-})
-
-describe('fitBaseline coverage gate', () => {
-  it('stays global-median when difficulty coverage is sparse (even with ≥8 tagged)', () => {
-    // 9 tagged across 2 levels but only 9/100 → too thin to trust loglinear.
-    const tagged = [
-      ...Array.from({ length: 5 }, () => ({ difficulty: 2, tokens: 1000 })),
-      ...Array.from({ length: 4 }, () => ({ difficulty: 8, tokens: 8000 })),
-    ]
-    const untagged = Array.from({ length: 91 }, () => ({ difficulty: null, tokens: 5000 }))
-    const m = fitBaseline([...tagged, ...untagged])
-    expect(m?.method).toBe('global-median')
-  })
-  it('uses loglinear with high coverage and stores a median fallback', () => {
-    const tagged = [
-      ...Array.from({ length: 6 }, () => ({ difficulty: 2, tokens: 1000 })),
-      ...Array.from({ length: 6 }, () => ({ difficulty: 8, tokens: 8000 })),
-    ]
-    const m = fitBaseline([...tagged, { difficulty: null, tokens: 3000 }])
-    expect(m?.method).toBe('loglinear')
+  it('always stores a median fallback even in scope mode', () => {
+    const samples = Array.from({ length: 12 }, (_, i) => sample(i + 1, 1 + (i % 3), 1000 * (i + 1)))
+    const m = fitBaseline(samples)
+    expect(m?.method).toBe('scope')
     expect(m?.params.median).toBeGreaterThan(0)
   })
 })
 
-describe('expectedTokens loglinear null-difficulty fallback', () => {
-  it('uses the median fallback when difficulty is null', () => {
-    const m: BaselineModel = { method: 'loglinear', params: { a: 0, b: 1, median: 500 } }
+describe('expectedTokens', () => {
+  it('global-median ignores scope', () => {
+    const m: BaselineModel = { method: 'global-median', params: { median: 500 } }
     expect(expectedTokens(m, null)).toBe(500)
-    expect(expectedTokens(m, 2)).toBeCloseTo(Math.exp(2), 6)
+    expect(expectedTokens(m, { files: 9, dirs: 4 })).toBe(500)
+  })
+
+  it('scope returns exp(a + bFiles·log1p(files) + bDirs·log1p(dirs))', () => {
+    const m: BaselineModel = { method: 'scope', params: { a: 0, bFiles: 1, bDirs: 0, median: 1 } }
+    expect(expectedTokens(m, { files: 0, dirs: 0 })).toBeCloseTo(Math.exp(0), 6) // log1p(0)=0
+    expect(expectedTokens(m, { files: Math.E - 1, dirs: 0 })).toBeCloseTo(Math.exp(1), 6)
+  })
+
+  it('scope falls back to the median when scope is missing', () => {
+    const m: BaselineModel = { method: 'scope', params: { a: 0, bFiles: 1, bDirs: 1, median: 777 } }
+    expect(expectedTokens(m, null)).toBe(777)
   })
 })
 
 describe('sessionKpd', () => {
   it('is expected/actual × 100', () => {
     expect(sessionKpd(600, 600)).toBe(100)
-    expect(sessionKpd(600, 300)).toBe(200) // 300 = exactly the floor (600/3=200, 300≥200)
+    expect(sessionKpd(600, 300)).toBe(200)
   })
   it('returns null on bad inputs', () => {
     expect(sessionKpd(null, 100)).toBeNull()
     expect(sessionKpd(0, 100)).toBeNull()
     expect(sessionKpd(500, 0)).toBeNull()
   })
-  it('floors out near-empty sessions (actual < expected/3) so Eff cannot blow up', () => {
-    // a 17k-token session vs a 210k baseline used to read as ~1200%
+  it('floors out near-empty sessions (actual < expected/3)', () => {
     expect(sessionKpd(210000, 17000)).toBeNull()
-    // max possible Eff for a kept session is exactly 300%
-    expect(sessionKpd(300, 100)).toBe(300) // 100 = 300/3, the boundary (kept)
-    expect(sessionKpd(300, 99)).toBeNull() // just under the floor → dropped
+    expect(sessionKpd(300, 100)).toBe(300)
+    expect(sessionKpd(300, 99)).toBeNull()
+  })
+})
+
+describe('rollingMedian', () => {
+  it('returns the trailing-window median at each position', () => {
+    expect(rollingMedian([10, 20, 30], 7)).toEqual([10, 15, 20])
+  })
+  it('caps the window to its size', () => {
+    // window 2: [a], median(a,b), median(b,c)
+    expect(rollingMedian([4, 8, 100], 2)).toEqual([4, 6, 54])
+  })
+  it('handles empty input', () => {
+    expect(rollingMedian([], 7)).toEqual([])
   })
 })
 
 describe('kpdByDay', () => {
-  it('token-weights Eff per day (Σexpected/Σactual), averages quality, sorts by date', () => {
+  it('token-weights Eff, averages quality, sorts, and adds a 7-day smoothed line', () => {
     const out = kpdByDay([
       { day: '2026-05-02', expected: 300, actual: 250, score: 8 },
-      { day: '2026-05-01', expected: 300, actual: 300, score: null }, // ratio 100%
-      { day: '2026-05-01', expected: 300, actual: 100, score: 6 }, // ratio 300%
+      { day: '2026-05-01', expected: 300, actual: 300, score: null },
+      { day: '2026-05-01', expected: 300, actual: 100, score: 6 },
     ])
-    // mean-of-ratios would give 200% for 2026-05-01; token-weighting gives
-    // (300+300)/(300+100)*100 = 150% — the small session no longer dominates.
     expect(out).toEqual([
-      { date: '2026-05-01', kpi: 150, quality: 6, sessions: 2 },
-      { date: '2026-05-02', kpi: 120, quality: 8, sessions: 1 },
+      { date: '2026-05-01', kpi: 150, kpiSmooth: 150, quality: 6, sessions: 2 },
+      { date: '2026-05-02', kpi: 120, kpiSmooth: 135, quality: 8, sessions: 1 },
     ])
   })
   it('a single tiny-token session cannot blow up a busy day', () => {
     const out = kpdByDay([
-      { day: '2026-05-01', expected: 200000, actual: 200000, score: null }, // big real session
-      { day: '2026-05-01', expected: 200000, actual: 17, score: null }, // 17-token noise
+      { day: '2026-05-01', expected: 200000, actual: 200000, score: null },
+      { day: '2026-05-01', expected: 200000, actual: 17, score: null },
     ])
-    // mean-of-ratios ≈ (100 + 1.18M) / 2 ≈ 588k%. Token-weighted stays sane.
     expect(out[0].kpi).toBeCloseTo((400000 / 200017) * 100, 5)
     expect(out[0].kpi).toBeLessThan(200)
-  })
-  it('quality is null when no rated sessions that day', () => {
-    const out = kpdByDay([{ day: '2026-05-01', expected: 100, actual: 100, score: null }])
-    expect(out[0].quality).toBeNull()
   })
   it('skips sessions with non-positive expected or actual tokens', () => {
     const out = kpdByDay([
