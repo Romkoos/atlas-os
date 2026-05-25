@@ -27,7 +27,10 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? TIMEOUT_MS)
 
-  let resultText = ''
+  // Aggregate metrics across ALL turns of the session, so the totals reflect the
+  // amortized cost of a multi-turn conversation (prefix created on turn 1, read
+  // on turns 2+). Single-turn tasks behave identically to before.
+  let finalResult = ''
   let tokensIn = 0
   let tokensOut = 0
   let cacheReadTokens = 0
@@ -35,36 +38,54 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
   let totalCostUsd = 0
   let numTurns = 0
   let durationMs = 0
-  let subtype = 'error'
+  let finalSubtype = 'error'
   let sessionId: string | null = null
 
+  const turns = [task.prompt, ...(task.followUps ?? [])]
+  const baseOptions = {
+    model: opts.model,
+    settingSources: ['user', 'project'] as ('user' | 'project')[], // LOAD infra under test — opposite of difficulty.ts
+    allowedTools: ['Read', 'Grep', 'Glob'], // read-only — live repo cannot mutate
+    permissionMode: 'bypassPermissions' as const, // headless: never hang on a prompt
+    cwd: opts.repoRoot,
+    env: subscriptionEnv(),
+    abortController: controller,
+  }
+
   try {
-    const q = query({
-      prompt: task.prompt,
-      options: {
-        model: opts.model,
-        settingSources: ['user', 'project'], // LOAD infra under test — opposite of difficulty.ts
-        allowedTools: ['Read', 'Grep', 'Glob'], // read-only — live repo cannot mutate
-        permissionMode: 'bypassPermissions', // headless: never hang on a prompt
-        cwd: opts.repoRoot,
-        env: subscriptionEnv(),
-        abortController: controller,
-      },
-    })
-    for await (const message of q) {
-      if (message.type === 'result') {
-        subtype = message.subtype
-        numTurns = message.num_turns
-        durationMs = message.duration_ms
-        sessionId = message.session_id
-        if (message.subtype === 'success') {
-          resultText = message.result
-          totalCostUsd = message.total_cost_usd
-          tokensIn = message.usage.input_tokens ?? 0
-          tokensOut = message.usage.output_tokens ?? 0
-          cacheReadTokens = message.usage.cache_read_input_tokens ?? 0
-          cacheCreationTokens = message.usage.cache_creation_input_tokens ?? 0
+    for (let i = 0; i < turns.length; i++) {
+      // First turn opens a fresh session; subsequent turns RESUME it via the
+      // session_id captured from the previous turn's result, so cache-control
+      // breakpoints are shared and the prefix becomes a cache_read hit.
+      const q = query({
+        prompt: turns[i],
+        options: sessionId == null ? baseOptions : { ...baseOptions, resume: sessionId },
+      })
+      let turnSubtype = 'error'
+      let turnSucceeded = false
+      for await (const message of q) {
+        if (message.type === 'result') {
+          turnSubtype = message.subtype
+          finalSubtype = message.subtype
+          numTurns += message.num_turns
+          durationMs += message.duration_ms
+          sessionId = message.session_id
+          if (message.subtype === 'success') {
+            turnSucceeded = true
+            finalResult = message.result
+            totalCostUsd += message.total_cost_usd
+            tokensIn += message.usage.input_tokens ?? 0
+            tokensOut += message.usage.output_tokens ?? 0
+            cacheReadTokens += message.usage.cache_read_input_tokens ?? 0
+            cacheCreationTokens += message.usage.cache_creation_input_tokens ?? 0
+          }
         }
+      }
+      // Stop the scenario on the first failed turn — no point measuring the
+      // tail; gate will classify on the final state.
+      if (!turnSucceeded) {
+        finalSubtype = turnSubtype
+        break
       }
     }
   } catch {
@@ -73,7 +94,10 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
     clearTimeout(timer)
   }
 
-  const gate = checkRun({ subtype, resultText, aborted: controller.signal.aborted }, task.assert)
+  const gate = checkRun(
+    { subtype: finalSubtype, resultText: finalResult, aborted: controller.signal.aborted },
+    task.assert,
+  )
   return {
     taskId: task.id,
     model: opts.model,
