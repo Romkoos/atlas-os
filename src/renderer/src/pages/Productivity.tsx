@@ -27,12 +27,13 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
-type Tab = 'overview' | 'sessions' | 'ecosystem'
+type Tab = 'overview' | 'sessions' | 'ecosystem' | 'benchmark'
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: 'overview', label: './overview' },
   { id: 'sessions', label: './sessions' },
   { id: 'ecosystem', label: './ecosystem' },
+  { id: 'benchmark', label: './benchmark' },
 ]
 
 const RANGES: ReadonlyArray<{ days: number; label: string }> = [
@@ -1520,6 +1521,107 @@ function EcosystemTab({ days }: { days: number }) {
   )
 }
 
+function BenchmarkTab() {
+  const utils = trpc.useUtils()
+  const tasks = trpc.benchmark.tasks.useQuery()
+  const results = trpc.benchmark.results.useQuery()
+  const [batchId, setBatchId] = useState<string | null>(null)
+  const [k, setK] = useState(5)
+  const [model, setModel] = useState('claude-sonnet-4-6')
+
+  const progress = trpc.benchmark.progress.useQuery(
+    { batchId: batchId ?? '' },
+    {
+      enabled: batchId != null,
+      refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+    },
+  )
+
+  const run = trpc.benchmark.run.useMutation({
+    onSuccess: (r) => {
+      setBatchId(r.batchId)
+      toast.success(`Benchmark started: ${r.total} runs`)
+    },
+  })
+
+  useEffect(() => {
+    if (progress.data && !progress.data.running) void utils.benchmark.results.invalidate()
+  }, [progress.data, utils])
+
+  const taskCount = tasks.data?.length ?? 0
+  const estimated = taskCount * k
+  const running = progress.data?.running ?? false
+
+  return (
+    <div className="benchmark">
+      <div className="bench-controls">
+        <label>
+          model <input value={model} onChange={(e) => setModel(e.target.value)} />
+        </label>
+        <label>
+          reps (k){' '}
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={k}
+            onChange={(e) => setK(Number(e.target.value) || 1)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={running || run.isPending}
+          onClick={() => {
+            if (
+              window.confirm(
+                `Run ${estimated} real claude runs (${taskCount} tasks × ${k})? This spends tokens.`,
+              )
+            ) {
+              run.mutate({ k, model })
+            }
+          }}
+        >
+          {running ? 'running…' : `run benchmark (${estimated})`}
+        </button>
+        {progress.data ? (
+          <span className="bench-progress">
+            {progress.data.done}/{progress.data.total} done · {progress.data.failed} failed
+          </span>
+        ) : null}
+        {progress.data?.error ? (
+          <span className="bench-error">error: {progress.data.error}</span>
+        ) : null}
+      </div>
+      <table className="bench-results">
+        <thead>
+          <tr>
+            <th>task</th>
+            <th>infra</th>
+            <th>model</th>
+            <th>n</th>
+            <th>median tokens</th>
+            <th>spread</th>
+            <th>median cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(results.data ?? []).map((r) => (
+            <tr key={`${r.taskId}-${r.infraHash}-${r.model}`}>
+              <td>{r.taskId}</td>
+              <td>{r.infraHash}</td>
+              <td>{r.model}</td>
+              <td>{r.n}</td>
+              <td>{r.n === 0 ? '—' : Math.round(r.medianTokens)}</td>
+              <td>{r.n === 0 ? '—' : Math.round(r.spreadTokens)}</td>
+              <td>{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function Productivity() {
   const utils = trpc.useUtils()
   const refresh = trpc.productivity.refresh.useMutation()
@@ -1606,6 +1708,7 @@ export function Productivity() {
         {tab === 'overview' ? <OverviewTab days={days} projectPath={projectPath} /> : null}
         {tab === 'sessions' ? <SessionsTab days={days} projectPath={projectPath} /> : null}
         {tab === 'ecosystem' ? <EcosystemTab days={days} /> : null}
+        {tab === 'benchmark' ? <BenchmarkTab /> : null}
       </div>
     </>
   )

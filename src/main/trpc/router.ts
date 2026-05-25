@@ -1,4 +1,5 @@
 import { agentRouter } from '@main/trpc/routers/agent'
+import { benchmarkRouter } from '@main/trpc/routers/benchmark'
 import { healthRouter } from '@main/trpc/routers/health'
 import { productivityRouter } from '@main/trpc/routers/productivity'
 import { settingsRouter } from '@main/trpc/routers/settings'
@@ -13,6 +14,7 @@ export const appRouter = router({
   stats: statsRouter,
   skills: skillsRouter,
   productivity: productivityRouter,
+  benchmark: benchmarkRouter,
 })
 
 export type AppRouter = typeof appRouter
