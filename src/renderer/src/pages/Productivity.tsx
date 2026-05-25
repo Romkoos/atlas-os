@@ -1566,28 +1566,21 @@ function BenchmarkTab() {
   const taskCount = tasks.data?.length ?? 0
   const estimated = taskCount * k
 
-  // Group results per task and order each task's infra variants by time, so the
-  // earliest is the baseline and later infra versions show a Δ% against it.
+  // Per task, order infra variants by time and compare each to the PREVIOUS one,
+  // so each row is the step from the prior infra state (matches "infra change →
+  // step shift"). First variant of a task has no prior → no delta.
   const resultRows = useMemo(() => {
-    const data = results.data ?? []
-    const baseline = new Map<string, { firstTs: number; medianTokens: number }>()
-    for (const r of data) {
-      const b = baseline.get(r.taskId)
-      if (!b || r.firstTs < b.firstTs) {
-        baseline.set(r.taskId, { firstTs: r.firstTs, medianTokens: r.medianTokens })
-      }
-    }
-    return [...data]
-      .sort((a, b) => a.taskId.localeCompare(b.taskId) || a.firstTs - b.firstTs)
-      .map((r) => {
-        const base = baseline.get(r.taskId)
-        const isBase = base != null && r.firstTs === base.firstTs
-        const deltaPct =
-          base && base.medianTokens > 0 && !isBase && r.n > 0
-            ? ((r.medianTokens - base.medianTokens) / base.medianTokens) * 100
-            : null
-        return { ...r, isBase, deltaPct }
-      })
+    const sorted = [...(results.data ?? [])].sort(
+      (a, b) => a.taskId.localeCompare(b.taskId) || a.firstTs - b.firstTs,
+    )
+    return sorted.map((r, i) => {
+      const prev = i > 0 && sorted[i - 1].taskId === r.taskId ? sorted[i - 1] : null
+      const deltaPct =
+        prev && prev.medianTokens > 0 && r.n > 0
+          ? ((r.medianTokens - prev.medianTokens) / prev.medianTokens) * 100
+          : null
+      return { ...r, isFirst: prev == null, deltaPct }
+    })
   }, [results.data])
 
   return (
@@ -1697,7 +1690,7 @@ function BenchmarkTab() {
                 <th className="num">n</th>
                 <th className="num">median tokens</th>
                 <th className="num">cached</th>
-                <th className="num">Δ vs base</th>
+                <th className="num">Δ vs prev</th>
                 <th className="num">spread</th>
                 <th className="num">cost</th>
               </tr>
@@ -1716,7 +1709,7 @@ function BenchmarkTab() {
                     <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
                       {new Date(r.firstTs).toLocaleDateString()} · {r.plugins}p {r.mcp}m {r.skills}s
                       · <span style={{ color: 'var(--fg-4)' }}>{r.infraHash.slice(0, 6)}</span>
-                      {r.isBase ? <span style={{ color: 'var(--fg-4)' }}> · base</span> : null}
+                      {r.isFirst ? <span style={{ color: 'var(--fg-4)' }}> · first</span> : null}
                     </td>
                     <td className="num">{r.n}</td>
                     <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
@@ -1735,7 +1728,7 @@ function BenchmarkTab() {
                       }}
                     >
                       {r.deltaPct == null
-                        ? r.isBase
+                        ? r.isFirst
                           ? '—'
                           : '·'
                         : `${r.deltaPct > 0 ? '+' : ''}${r.deltaPct.toFixed(1)}%`}
