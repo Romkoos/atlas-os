@@ -473,6 +473,18 @@
     min-height: 90px;
     line-height: 1.55;
   }
+  .bench-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .bench-field > span {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-4);
+  }
 
   /* ============ PANELS ============ */
   .panel {

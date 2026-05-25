@@ -1553,72 +1553,122 @@ function BenchmarkTab() {
   const running = progress.data?.running ?? false
 
   return (
-    <div className="benchmark">
-      <div className="bench-controls">
-        <label>
-          model <input value={model} onChange={(e) => setModel(e.target.value)} />
-        </label>
-        <label>
-          reps (k){' '}
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={k}
-            onChange={(e) => setK(Number(e.target.value) || 1)}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={running || run.isPending}
-          onClick={() => {
-            if (
-              window.confirm(
-                `Run ${estimated} real claude runs (${taskCount} tasks × ${k})? This spends tokens.`,
-              )
-            ) {
-              run.mutate({ k, model })
-            }
-          }}
-        >
-          {running ? 'running…' : `run benchmark (${estimated})`}
-        </button>
-        {progress.data ? (
-          <span className="bench-progress">
-            {progress.data.done}/{progress.data.total} done · {progress.data.failed} failed
+    <>
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">run benchmark</span>
+          <span className="meta">
+            fixed tasks on real claude headless under current infra · spends tokens
           </span>
-        ) : null}
-        {progress.data?.error ? (
-          <span className="bench-error">error: {progress.data.error}</span>
-        ) : null}
+        </div>
+        <div className="panel-body">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+            <label className="bench-field">
+              <span>model</span>
+              <input
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="input"
+                style={{ width: 220 }}
+                aria-label="Model"
+              />
+            </label>
+            <label className="bench-field">
+              <span>reps (k)</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={k}
+                onChange={(e) => setK(Number(e.target.value) || 1)}
+                className="input"
+                style={{ width: 80 }}
+                aria-label="Reps per task"
+              />
+            </label>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={running || run.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Run ${estimated} real claude runs (${taskCount} tasks × ${k})? This spends tokens.`,
+                  )
+                ) {
+                  run.mutate({ k, model })
+                }
+              }}
+            >
+              {running ? 'RUNNING…' : `RUN BENCHMARK (${estimated})`}
+            </button>
+            {progress.data ? (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+                {progress.data.done}/{progress.data.total} done · {progress.data.failed} failed
+              </span>
+            ) : null}
+          </div>
+          {progress.data?.error ? (
+            <p
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 11,
+                color: 'var(--warn)',
+                marginTop: 12,
+              }}
+            >
+              <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
+              {progress.data.error}
+            </p>
+          ) : null}
+        </div>
       </div>
-      <table className="bench-results">
-        <thead>
-          <tr>
-            <th>task</th>
-            <th>infra</th>
-            <th>model</th>
-            <th>n</th>
-            <th>median tokens</th>
-            <th>spread</th>
-            <th>median cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(results.data ?? []).map((r) => (
-            <tr key={`${r.taskId}-${r.infraHash}-${r.model}`}>
-              <td>{r.taskId}</td>
-              <td>{r.infraHash}</td>
-              <td>{r.model}</td>
-              <td>{r.n}</td>
-              <td>{r.n === 0 ? '—' : Math.round(r.medianTokens)}</td>
-              <td>{r.n === 0 ? '—' : Math.round(r.spreadTokens)}</td>
-              <td>{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">results</span>
+          <span className="meta">
+            median tokens per task × infra version · k reps · lower = better
+          </span>
+        </div>
+        {results.isLoading ? (
+          <div className="panel-body">
+            <Loading />
+          </div>
+        ) : (results.data ?? []).length === 0 ? (
+          <div className="panel-body">
+            <NoteLine>no benchmark runs yet — run one above.</NoteLine>
+          </div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>task</th>
+                <th>infra</th>
+                <th>model</th>
+                <th className="num">n</th>
+                <th className="num">median tokens</th>
+                <th className="num">spread</th>
+                <th className="num">median cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(results.data ?? []).map((r) => (
+                <tr key={`${r.taskId}-${r.infraHash}-${r.model}`}>
+                  <td>{r.taskId}</td>
+                  <td style={{ color: 'var(--fg-4)' }}>{r.infraHash}</td>
+                  <td style={{ color: 'var(--fg-4)' }}>{r.model}</td>
+                  <td className="num">{r.n}</td>
+                  <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
+                  <td className="num">{r.n === 0 ? '—' : num(Math.round(r.spreadTokens))}</td>
+                  <td className="num">{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   )
 }
 
