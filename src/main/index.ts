@@ -13,8 +13,14 @@ import { app, BrowserWindow } from 'electron'
 // Productivity tracker: pull the latest transcripts + hook buffer into the DB.
 // Fire-and-forget so a slow/large scan never blocks the window.
 function ingestProductivity(): void {
-  const { claudeProjectsDir, analyticsBufferDir } = appPaths()
-  ingestAll(db(), { projectsDir: claudeProjectsDir, bufferDir: analyticsBufferDir })
+  const { claudeProjectsDir, analyticsBufferDir, claudeDir, claudeJson, infraSnapshot } = appPaths()
+  ingestAll(db(), {
+    projectsDir: claudeProjectsDir,
+    bufferDir: analyticsBufferDir,
+    claudeDir,
+    claudeJson,
+    infraSnapshotPath: infraSnapshot,
+  })
     .then((res) => logger.info('Productivity ingest complete', res))
     .catch((error) => logger.error('Productivity ingest failed', error))
 }

@@ -1244,6 +1244,7 @@ function EcosystemTab({ days }: { days: number }) {
   const ecosystem = trpc.productivity.ecosystem.useQuery({ days })
   const impact = trpc.productivity.ecosystemImpact.useQuery({})
   const addNote = trpc.productivity.addNote.useMutation()
+  const deleteNote = trpc.productivity.deleteNote.useMutation()
   const [note, setNote] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
 
@@ -1270,6 +1271,16 @@ function EcosystemTab({ days }: { days: number }) {
       toast.success('Note added')
     } catch {
       toast.error('Failed to add note')
+    }
+  }
+
+  const removeNote = async (id: string) => {
+    try {
+      await deleteNote.mutateAsync({ id })
+      await utils.productivity.invalidate()
+      toast.success('Note deleted')
+    } catch {
+      toast.error('Failed to delete note')
     }
   }
 
@@ -1459,6 +1470,29 @@ function EcosystemTab({ days }: { days: number }) {
                       <span style={{ color: 'var(--fg-4)' }}> — {c.note}</span>
                     ) : null}
                   </span>
+                  {c.source === 'manual' ? (
+                    <button
+                      type="button"
+                      onClick={() => removeNote(c.id)}
+                      disabled={deleteNote.isPending}
+                      title="Delete note"
+                      aria-label="Delete note"
+                      style={{
+                        flexShrink: 0,
+                        alignSelf: 'flex-start',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--fg-4)',
+                        fontFamily: 'var(--mono)',
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: '0 2px',
+                      }}
+                    >
+                      ×
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ol>

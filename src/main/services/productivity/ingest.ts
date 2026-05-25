@@ -5,6 +5,7 @@ import type { NewAgentSessionRow, NewAgentTurnRow } from '@main/db/schema'
 import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { estimateDifficulty } from '@main/services/productivity/difficulty'
 import { turnId } from '@main/services/productivity/ids'
+import { detectInfraChanges } from '@main/services/productivity/infra'
 import {
   type EcosystemChange,
   foldSessionEvents,
@@ -153,6 +154,11 @@ export function buildSessionRows(
 export interface IngestPaths {
   projectsDir: string // ~/.claude/projects
   bufferDir: string // ~/agent-analytics
+  // Infra watcher inputs. Optional so collectIngestRows tests (transcripts +
+  // buffer only) stay valid; detection runs in ingestAll only when all present.
+  claudeDir?: string // ~/.claude
+  claudeJson?: string // ~/.claude.json
+  infraSnapshotPath?: string // userData/infra-snapshot.json
 }
 
 export interface IngestResult {
@@ -316,5 +322,14 @@ export async function ingestAll(database: AppDatabase, paths: IngestPaths): Prom
   const rows = await collectIngestRows(paths)
   const result = writeRows(database, rows)
   await estimateMissingDifficulties(database, rows.firstPromptBySession)
-  return result
+  let infra = 0
+  if (paths.claudeDir && paths.claudeJson && paths.infraSnapshotPath) {
+    infra = await detectInfraChanges(database, {
+      settingsPath: join(paths.claudeDir, 'settings.json'),
+      claudeJsonPath: paths.claudeJson,
+      skillsDir: join(paths.claudeDir, 'skills'),
+      snapshotPath: paths.infraSnapshotPath,
+    })
+  }
+  return { ...result, ecosystem: result.ecosystem + infra }
 }
