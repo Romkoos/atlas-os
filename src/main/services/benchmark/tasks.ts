@@ -44,4 +44,18 @@ export const TASKS: BenchmarkTask[] = [
       'Read src/main/paths.ts. Write a detailed ~400-word explanation of appPaths(): describe every path key it returns, what each is for, and the packaged-vs-dev difference. Be thorough and complete.',
     assert: { type: 'regex', value: 'userData|migrations|claude' },
   },
+  {
+    // Multi-turn scenario: 4 follow-up questions IN THE SAME SESSION via SDK
+    // resume. The prefix (system prompt + skills + first file read) is created
+    // on turn 1 and cached for turns 2-4 → the row's totals show the AMORTIZED
+    // cost of a real session, not the cold-start of one Q&A.
+    id: 'scenario-paths',
+    prompt: 'Read src/main/paths.ts. List the keys appPaths() returns.',
+    followUps: [
+      'What is userData used for?',
+      'What is the packaged-vs-dev difference for the migrations path?',
+      'Why does infraSnapshot live under userData specifically?',
+    ],
+    assert: { type: 'regex', value: 'userData|snapshot|migrations' },
+  },
 ]
