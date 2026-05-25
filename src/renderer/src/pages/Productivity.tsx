@@ -1529,6 +1529,13 @@ function BenchmarkTab() {
   const [k, setK] = useState(5)
   const [model, setModel] = useState('claude-sonnet-4-6')
 
+  // A batch runs in the main process; batchId lives in this component's state and
+  // is lost when the tab unmounts. On (re)mount, re-attach to the most recent batch
+  // so progress survives navigation. Polls while one is still running.
+  const latest = trpc.benchmark.latest.useQuery(undefined, {
+    refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+  })
+
   const progress = trpc.benchmark.progress.useQuery(
     { batchId: batchId ?? '' },
     {
@@ -1537,6 +1544,11 @@ function BenchmarkTab() {
     },
   )
 
+  // Adopt the latest batch when this component isn't already tracking one.
+  useEffect(() => {
+    if (batchId == null && latest.data?.batchId) setBatchId(latest.data.batchId)
+  }, [latest.data, batchId])
+
   const run = trpc.benchmark.run.useMutation({
     onSuccess: (r) => {
       setBatchId(r.batchId)
@@ -1544,13 +1556,15 @@ function BenchmarkTab() {
     },
   })
 
+  // Live progress from either query; refresh the results table when a batch ends.
+  const liveProgress = progress.data ?? latest.data ?? null
+  const running = liveProgress?.running ?? false
   useEffect(() => {
-    if (progress.data && !progress.data.running) void utils.benchmark.results.invalidate()
-  }, [progress.data, utils])
+    if (liveProgress && !liveProgress.running) void utils.benchmark.results.invalidate()
+  }, [liveProgress, utils])
 
   const taskCount = tasks.data?.length ?? 0
   const estimated = taskCount * k
-  const running = progress.data?.running ?? false
 
   return (
     <>
@@ -1602,13 +1616,14 @@ function BenchmarkTab() {
             >
               {running ? 'RUNNING…' : `RUN BENCHMARK (${estimated})`}
             </button>
-            {progress.data ? (
+            {liveProgress ? (
               <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
-                {progress.data.done}/{progress.data.total} done · {progress.data.failed} failed
+                {liveProgress.done}/{liveProgress.total} done · {liveProgress.failed} failed
+                {liveProgress.running ? ' · running…' : ''}
               </span>
             ) : null}
           </div>
-          {progress.data?.error ? (
+          {liveProgress?.error ? (
             <p
               style={{
                 fontFamily: 'var(--mono)',
@@ -1618,7 +1633,7 @@ function BenchmarkTab() {
               }}
             >
               <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
-              {progress.data.error}
+              {liveProgress.error}
             </p>
           ) : null}
         </div>
@@ -1626,10 +1641,20 @@ function BenchmarkTab() {
 
       <div className="panel mt-16">
         <div className="panel-head">
-          <span className="ttl">results</span>
-          <span className="meta">
-            median tokens per task × infra version · k reps · lower = better
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <span className="ttl">results</span>
+            <span className="meta">
+              median tokens per task × infra version · k reps · lower = better
+            </span>
           </span>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 10 }}
+            onClick={() => void utils.benchmark.results.invalidate()}
+          >
+            REFRESH
+          </button>
         </div>
         {results.isLoading ? (
           <div className="panel-body">

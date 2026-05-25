@@ -25,9 +25,17 @@ export interface Progress {
 
 // In-memory progress per batch. Not pruned (manual-trigger v1, few runs); concurrent batches share the same OAuth and are unsupported.
 const batches = new Map<string, Progress>()
+// Most recently started batch, so the UI can re-attach its progress after the
+// tab unmounts/remounts (batchId lives in React state and is lost on navigation).
+// Cleared on app restart (in-memory) — that's fine, finished results live in the DB.
+let latestBatchId: string | null = null
 
 export function getProgress(batchId: string): Progress | null {
   return batches.get(batchId) ?? null
+}
+
+export function getLatest(): Progress | null {
+  return latestBatchId ? (batches.get(latestBatchId) ?? null) : null
 }
 
 export interface StartOptions {
@@ -44,6 +52,7 @@ export function startBatch(opts: StartOptions): { batchId: string; total: number
   const batchId = randomUUID()
   const progress: Progress = { batchId, total, done: 0, failed: 0, running: true, error: null }
   batches.set(batchId, progress)
+  latestBatchId = batchId
   void runLoop(batchId, tasks, k, model, progress)
   return { batchId, total }
 }
