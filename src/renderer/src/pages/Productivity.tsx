@@ -1531,7 +1531,10 @@ function BenchmarkTab() {
 
   const progress = trpc.benchmark.progress.useQuery(
     { batchId: batchId ?? '' },
-    { enabled: batchId != null, refetchInterval: 2000 },
+    {
+      enabled: batchId != null,
+      refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+    },
   )
 
   const run = trpc.benchmark.run.useMutation({
@@ -1562,7 +1565,7 @@ function BenchmarkTab() {
             min={1}
             max={20}
             value={k}
-            onChange={(e) => setK(Number(e.target.value))}
+            onChange={(e) => setK(Number(e.target.value) || 1)}
           />
         </label>
         <button
