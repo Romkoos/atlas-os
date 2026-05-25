@@ -1566,6 +1566,30 @@ function BenchmarkTab() {
   const taskCount = tasks.data?.length ?? 0
   const estimated = taskCount * k
 
+  // Group results per task and order each task's infra variants by time, so the
+  // earliest is the baseline and later infra versions show a Δ% against it.
+  const resultRows = useMemo(() => {
+    const data = results.data ?? []
+    const baseline = new Map<string, { firstTs: number; medianTokens: number }>()
+    for (const r of data) {
+      const b = baseline.get(r.taskId)
+      if (!b || r.firstTs < b.firstTs) {
+        baseline.set(r.taskId, { firstTs: r.firstTs, medianTokens: r.medianTokens })
+      }
+    }
+    return [...data]
+      .sort((a, b) => a.taskId.localeCompare(b.taskId) || a.firstTs - b.firstTs)
+      .map((r) => {
+        const base = baseline.get(r.taskId)
+        const isBase = base != null && r.firstTs === base.firstTs
+        const deltaPct =
+          base && base.medianTokens > 0 && !isBase && r.n > 0
+            ? ((r.medianTokens - base.medianTokens) / base.medianTokens) * 100
+            : null
+        return { ...r, isBase, deltaPct }
+      })
+  }, [results.data])
+
   return (
     <>
       <div className="panel mt-16">
@@ -1670,29 +1694,57 @@ function BenchmarkTab() {
               <tr>
                 <th>task</th>
                 <th>infra</th>
-                <th>model</th>
                 <th className="num">n</th>
                 <th className="num">median tokens</th>
                 <th className="num">cached</th>
+                <th className="num">Δ vs base</th>
                 <th className="num">spread</th>
-                <th className="num">median cost</th>
+                <th className="num">cost</th>
               </tr>
             </thead>
             <tbody>
-              {(results.data ?? []).map((r) => (
-                <tr key={`${r.taskId}-${r.infraHash}-${r.model}`}>
-                  <td>{r.taskId}</td>
-                  <td style={{ color: 'var(--fg-4)' }}>{r.infraHash}</td>
-                  <td style={{ color: 'var(--fg-4)' }}>{r.model}</td>
-                  <td className="num">{r.n}</td>
-                  <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
-                  <td className="num" style={{ color: 'var(--fg-4)' }}>
-                    {r.n === 0 ? '—' : num(Math.round(r.medianCacheTokens))}
-                  </td>
-                  <td className="num">{r.n === 0 ? '—' : num(Math.round(r.spreadTokens))}</td>
-                  <td className="num">{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
-                </tr>
-              ))}
+              {resultRows.map((r, i) => {
+                const firstOfTask = i === 0 || resultRows[i - 1].taskId !== r.taskId
+                return (
+                  <tr
+                    key={`${r.taskId}-${r.infraHash}-${r.model}`}
+                    style={firstOfTask ? { borderTop: '2px solid var(--line)' } : undefined}
+                  >
+                    <td style={firstOfTask ? undefined : { color: 'var(--fg-4)' }}>
+                      {firstOfTask ? r.taskId : ''}
+                    </td>
+                    <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
+                      {new Date(r.firstTs).toLocaleDateString()} · {r.plugins}p {r.mcp}m {r.skills}s
+                      · <span style={{ color: 'var(--fg-4)' }}>{r.infraHash.slice(0, 6)}</span>
+                      {r.isBase ? <span style={{ color: 'var(--fg-4)' }}> · base</span> : null}
+                    </td>
+                    <td className="num">{r.n}</td>
+                    <td className="num">{r.n === 0 ? '—' : num(Math.round(r.medianTokens))}</td>
+                    <td className="num" style={{ color: 'var(--fg-4)' }}>
+                      {r.n === 0 ? '—' : num(Math.round(r.medianCacheTokens))}
+                    </td>
+                    <td
+                      className="num"
+                      style={{
+                        color:
+                          r.deltaPct == null
+                            ? 'var(--fg-4)'
+                            : r.deltaPct < 0
+                              ? 'var(--ok)'
+                              : 'var(--warn)',
+                      }}
+                    >
+                      {r.deltaPct == null
+                        ? r.isBase
+                          ? '—'
+                          : '·'
+                        : `${r.deltaPct > 0 ? '+' : ''}${r.deltaPct.toFixed(1)}%`}
+                    </td>
+                    <td className="num">{r.n === 0 ? '—' : num(Math.round(r.spreadTokens))}</td>
+                    <td className="num">{r.n === 0 ? '—' : `$${r.medianCostUsd.toFixed(4)}`}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

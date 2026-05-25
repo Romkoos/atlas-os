@@ -55,6 +55,11 @@ export const benchmarkRouter = router({
           spreadTokens: z.number(),
           medianCacheTokens: z.number(),
           medianCostUsd: z.number(),
+          // Context to make a bare infra hash legible in the UI.
+          firstTs: z.number(), // earliest run in this group (ms)
+          plugins: z.number(), // enabled plugins at run time
+          mcp: z.number(), // active MCP servers
+          skills: z.number(), // user skills present
         }),
       ),
     )
@@ -67,8 +72,15 @@ export const benchmarkRouter = router({
         arr.push(r)
         groups.set(key, arr)
       }
-      const summaries: (TaskInfraSummary & { model: string })[] = []
+      const summaries: (TaskInfraSummary & {
+        model: string
+        firstTs: number
+        plugins: number
+        mcp: number
+        skills: number
+      })[] = []
       for (const g of groups.values()) {
+        const snap = g[0].infraSnapshot
         summaries.push({
           ...summarize(
             g[0].taskId,
@@ -83,6 +95,10 @@ export const benchmarkRouter = router({
             })),
           ),
           model: g[0].model,
+          firstTs: Math.min(...g.map((r) => r.ts.getTime())),
+          plugins: Object.values(snap.plugins).filter(Boolean).length,
+          mcp: snap.mcpActive.length,
+          skills: Object.keys(snap.skills).length,
         })
       }
       return summaries
