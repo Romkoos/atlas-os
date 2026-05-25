@@ -1,3 +1,5 @@
+import { ChartFrame } from '@renderer/components/charts/ChartFrame'
+import { eventsPerDayMeta } from '@renderer/components/charts/chartMeta'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -105,12 +107,8 @@ export function Stats() {
           </div>
         </div>
 
-        <div className="panel mt-20">
-          <div className="panel-head">
-            <span className="ttl">events per day</span>
-            <span className="meta">bucket 1d</span>
-          </div>
-          <div className="panel-body">
+        <ChartFrame meta={eventsPerDayMeta}>
+          {() => (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -147,8 +145,8 @@ export function Stats() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        </div>
+          )}
+        </ChartFrame>
       </div>
     </>
   )

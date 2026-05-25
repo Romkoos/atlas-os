@@ -89,7 +89,7 @@ describe('sessionKpd', () => {
 })
 
 describe('kpdByDay', () => {
-  it('averages КПД per day, averages rated quality, sorts by date', () => {
+  it('averages Eff per day, averages rated quality, sorts by date', () => {
     const out = kpdByDay([
       { day: '2026-05-02', kpd: 120, score: 8 },
       { day: '2026-05-01', kpd: 100, score: null },

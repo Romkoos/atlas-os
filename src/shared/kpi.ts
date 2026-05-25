@@ -1,18 +1,18 @@
-// КПД = frozen-baseline efficiency coefficient (%). Per session:
-//   КПД = expectedTokens(difficulty, baseline) / actualTokens × 100.
+// Eff = frozen-baseline efficiency coefficient (%). Per session:
+//   Eff = expectedTokens(difficulty, baseline) / actualTokens × 100.
 // expectedTokens comes from a baseline frozen at the project's starting period.
 // Two methods: global-median (day-one fallback) and loglinear (once ≥8
 // difficulty-tagged sessions span ≥2 difficulty levels).
 
-// ── Frozen-baseline КПД model ────────────────────────────────────────────────
-// КПД = expectedTokens(difficulty) / actualTokens × 100. expectedTokens comes
+// ── Frozen-baseline Eff model ────────────────────────────────────────────────
+// Eff = expectedTokens(difficulty) / actualTokens × 100. expectedTokens comes
 // from a baseline frozen at the project's starting period. Two methods:
 //   - global-median: expected = median baseline tokens (difficulty ignored).
-//     Used until enough difficulty-tagged data exists. Makes КПД work day one.
+//     Used until enough difficulty-tagged data exists. Makes Eff work day one.
 //   - loglinear: expected = exp(a + b·difficulty), fit on baseline medians.
 //     Used only once difficulty coverage is high (absolute ≥8 AND ≥50% of the
 //     baseline); always carries a median fallback so untagged sessions still
-//     get a КПД instead of being dropped from the line.
+//     get a Eff instead of being dropped from the line.
 
 export type BaselineMethod = 'loglinear' | 'global-median'
 export interface BaselineParams {
@@ -32,7 +32,7 @@ export interface BaselineSample {
 // loglinear needs enough difficulty-tagged samples in absolute terms AND as a
 // fraction of the baseline. The fraction gate is critical: a handful of manually
 // rated sessions (e.g. 9 of 400) must NOT force a noisy loglinear fit that then
-// drops every untagged session from the КПД line.
+// drops every untagged session from the Eff line.
 const MIN_DIFFICULTY_COVERAGE = 8
 const MIN_DIFFICULTY_FRACTION = 0.5
 
@@ -84,7 +84,7 @@ export function fitBaseline(samples: BaselineSample[]): BaselineModel | null {
 
 // Expected token cost for a task of the given difficulty under the frozen model.
 // Loglinear sessions without a difficulty fall back to the stored median so they
-// still get a КПД (otherwise the line collapses to only the rated sessions).
+// still get a Eff (otherwise the line collapses to only the rated sessions).
 export function expectedTokens(model: BaselineModel, difficulty: number | null): number | null {
   if (model.method === 'global-median') return model.params.median ?? null
   if (difficulty == null) return model.params.median ?? null
@@ -93,13 +93,13 @@ export function expectedTokens(model: BaselineModel, difficulty: number | null):
   return Math.exp(a + b * difficulty)
 }
 
-// Per-session КПД (%). >100 = leaner than baseline. Null on unusable inputs.
+// Per-session Eff (%). >100 = leaner than baseline. Null on unusable inputs.
 export function sessionKpd(expected: number | null, actualTokens: number): number | null {
   if (expected == null || expected <= 0 || actualTokens <= 0) return null
   return (expected / actualTokens) * 100
 }
 
-/** A session's КПД (%) for a local calendar day, plus optional quality score. */
+/** A session's Eff (%) for a local calendar day, plus optional quality score. */
 export interface KpdDaySession {
   day: string
   kpd: number
@@ -108,12 +108,12 @@ export interface KpdDaySession {
 
 export interface KpdDay {
   date: string
-  kpi: number // mean КПД (%)
+  kpi: number // mean Eff (%)
   quality: number | null // mean of rated scores that day, or null
   sessions: number
 }
 
-// Group by day; mean КПД and mean rated quality per day; sort by date.
+// Group by day; mean Eff and mean rated quality per day; sort by date.
 export function kpdByDay(sessions: KpdDaySession[]): KpdDay[] {
   const byDay = new Map<string, { kpds: number[]; scores: number[] }>()
   for (const s of sessions) {

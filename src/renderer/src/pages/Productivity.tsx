@@ -1,7 +1,10 @@
+import { ChartFrame } from '@renderer/components/charts/ChartFrame'
+import { kpiMeta, todayByHourMeta, tokensPerDayMeta } from '@renderer/components/charts/chartMeta'
+import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/HoverSyncContext'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -33,6 +36,11 @@ const RANGES: ReadonlyArray<{ days: number; label: string }> = [
 ]
 
 const ALL_PROJECTS = 'all'
+
+// Stable empty fallback for overview.data?.tokensByDay. A fresh `[]` per render
+// would change the chartData useMemo dep on every render during loading,
+// defeating memoization. Typed to match the overview router output.
+const NO_TOKENS_BY_DAY: { date: string; tokensIn: number; tokensOut: number }[] = []
 
 // Scope shared by every tab: time window + optional project filter.
 interface Scope {
@@ -122,7 +130,7 @@ function TokensTooltip(props: {
   )
 }
 
-// KPI-per-day tooltip: КПД value + quality guardrail + session count + ecosystem change.
+// KPI-per-day tooltip: Eff value + quality guardrail + session count + ecosystem change.
 function KpiTooltip(props: {
   active?: boolean
   label?: string | number
@@ -136,7 +144,7 @@ function KpiTooltip(props: {
     <div style={tooltipStyle} className="px-2.5 py-2 text-xs">
       <div className="mb-1 font-medium">{props.label}</div>
       <div className="flex justify-between gap-6">
-        <span className="text-muted-foreground">КПД</span>
+        <span className="text-muted-foreground">Efficiency</span>
         <span className="tabular-nums">{row.kpi == null ? '—' : `${row.kpi.toFixed(0)}%`}</span>
       </div>
       <div className="flex justify-between gap-6">
@@ -234,6 +242,221 @@ function EcoMarkers({ events }: { events: { date: string; count: number; label: 
   )
 }
 
+// The two date-axis charts (tokens-per-day + efficiency). Rendered inside a
+// HoverSyncProvider so a crosshair on one chart drives the readout on both:
+// each chart publishes its hovered category via onMouseMove, and ChartFrame's
+// readout (fed the same data) renders the matching day's values.
+function DailyCharts({
+  chartData,
+  kpiChartData,
+  eventDays,
+  tokensEmpty,
+  kpiLoading,
+  kpiEmpty,
+  rebaseline,
+  days,
+  projectPath,
+}: {
+  chartData: Array<{ date: string; tokensIn: number; tokensOut: number; event: string | null }>
+  kpiChartData: Array<{
+    date: string
+    kpi: number | null
+    quality: number | null
+    sessions: number
+    event: string | null
+  }>
+  eventDays: { date: string; count: number; label: string }[]
+  tokensEmpty: boolean
+  kpiLoading: boolean
+  kpiEmpty: boolean
+  rebaseline: ReturnType<typeof trpc.productivity.rebaseline.useMutation>
+  days: number
+  projectPath?: string
+}) {
+  const { setActiveDate } = useHoverSync()
+  const onMove = (s: { activeLabel?: string | number }) =>
+    setActiveDate(s?.activeLabel != null ? String(s.activeLabel) : null)
+  const onLeave = () => setActiveDate(null)
+  const tokenFmt = (_k: string, v: number) => num(v)
+  const kpiFmt = (k: string, v: number) => (k === 'kpi' ? `${v.toFixed(0)}%` : v.toFixed(1))
+
+  return (
+    <>
+      {/* TOKENS PER DAY */}
+      <ChartFrame meta={tokensPerDayMeta} rows={chartData} format={tokenFmt}>
+        {(hidden) =>
+          tokensEmpty ? (
+            <NoteLine>no token activity yet.</NoteLine>
+          ) : (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  syncId={tokensPerDayMeta.syncGroup}
+                  onMouseMove={onMove}
+                  onMouseLeave={onLeave}
+                  margin={{ top: 8, right: 8, bottom: 8, left: -16 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value: string) => value.slice(5)}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    interval="preserveStartEnd"
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    width={44}
+                    tickFormatter={(value: number) => num(value)}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
+                    content={<TokensTooltip />}
+                  />
+                  {!hidden.has('tokensIn') ? (
+                    <Bar
+                      dataKey="tokensIn"
+                      stackId="t"
+                      fill="var(--color-chart-1)"
+                      radius={[0, 0, 0, 0]}
+                    />
+                  ) : null}
+                  {!hidden.has('tokensOut') ? (
+                    <Bar
+                      dataKey="tokensOut"
+                      stackId="t"
+                      fill="var(--color-chart-2)"
+                      radius={[0, 0, 0, 0]}
+                    />
+                  ) : null}
+                  <EcoMarkers events={eventDays} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )
+        }
+      </ChartFrame>
+
+      {/* TOKEN EFFICIENCY */}
+      <ChartFrame
+        meta={kpiMeta}
+        rows={kpiChartData}
+        format={kpiFmt}
+        action={
+          <button
+            type="button"
+            className="btn"
+            disabled={rebaseline.isPending}
+            onClick={() =>
+              rebaseline.mutate({
+                projectPath,
+                start: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
+                end: new Date(),
+              })
+            }
+          >
+            ↻ RE-BASELINE ({days}d)
+          </button>
+        }
+      >
+        {(hidden) =>
+          kpiLoading ? (
+            <Loading />
+          ) : kpiEmpty ? (
+            <NoteLine>no efficiency data yet.</NoteLine>
+          ) : (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={kpiChartData}
+                  syncId={kpiMeta.syncGroup}
+                  onMouseMove={onMove}
+                  onMouseLeave={onLeave}
+                  margin={{ top: 8, right: 8, bottom: 8, left: -16 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(value: string) => value.slice(5)}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    interval="preserveStartEnd"
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    yAxisId="kpi"
+                    domain={[0, 'auto']}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    width={44}
+                    tickFormatter={(value: number) => `${value}%`}
+                  />
+                  <YAxis
+                    yAxisId="quality"
+                    orientation="right"
+                    domain={[0, 10]}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    stroke="var(--color-border)"
+                    width={32}
+                  />
+                  <ReferenceLine
+                    yAxisId="kpi"
+                    y={100}
+                    stroke="var(--color-muted-foreground)"
+                    strokeDasharray="4 4"
+                  />
+                  <Tooltip
+                    cursor={{ stroke: 'var(--color-muted)', strokeWidth: 1 }}
+                    content={<KpiTooltip />}
+                  />
+                  {!hidden.has('kpi') ? (
+                    <Line
+                      yAxisId="kpi"
+                      type="monotone"
+                      dataKey="kpi"
+                      stroke="var(--color-chart-1)"
+                      strokeWidth={2}
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  {!hidden.has('quality') ? (
+                    <Line
+                      yAxisId="quality"
+                      type="monotone"
+                      dataKey="quality"
+                      stroke="var(--color-chart-2)"
+                      strokeWidth={2}
+                      strokeDasharray="5 3"
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  ) : null}
+                  <EcoMarkers events={eventDays} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )
+        }
+      </ChartFrame>
+    </>
+  )
+}
+
 function OverviewTab({ days, projectPath }: Scope) {
   const utils = trpc.useUtils()
   const overview = trpc.productivity.overview.useQuery({ days, projectPath })
@@ -251,6 +474,39 @@ function OverviewTab({ days, projectPath }: Scope) {
     onError: () => toast.error('Re-baseline failed'),
   })
 
+  const tokensByDay = overview.data?.tokensByDay ?? NO_TOKENS_BY_DAY
+
+  // Ecosystem events are global; the daily bars are scoped (project/tracked
+  // filter). So an event day may have no bar in scope. Union both date sets and
+  // zero-fill tokens, so the category always exists and a marker can be drawn.
+  // Hooks must run unconditionally, so these memos precede the early returns below.
+  const chartData = useMemo(() => {
+    const ecoMap = new Map((ecoDays.data ?? []).map((e) => [e.date, e] as const))
+    const tokMap = new Map(tokensByDay.map((d) => [d.date, d] as const))
+    const allDates = [...new Set([...tokMap.keys(), ...ecoMap.keys()])].sort()
+    return allDates.map((date) => ({
+      date,
+      tokensIn: tokMap.get(date)?.tokensIn ?? 0,
+      tokensOut: tokMap.get(date)?.tokensOut ?? 0,
+      event: ecoMap.get(date)?.label ?? null,
+    }))
+  }, [ecoDays.data, tokensByDay])
+
+  // KPI per day, unioned with ecosystem-event days (null-filled) so a marker can
+  // be drawn even on a day with no in-scope sessions. connectNulls bridges gaps.
+  const kpiChartData = useMemo(() => {
+    const ecoMap = new Map((ecoDays.data ?? []).map((e) => [e.date, e] as const))
+    const kpiByDate = new Map((kpi.data?.byDay ?? []).map((d) => [d.date, d] as const))
+    const kpiDates = [...new Set([...kpiByDate.keys(), ...ecoMap.keys()])].sort()
+    return kpiDates.map((date) => ({
+      date,
+      kpi: kpiByDate.get(date)?.kpi ?? null,
+      quality: kpiByDate.get(date)?.quality ?? null,
+      sessions: kpiByDate.get(date)?.sessions ?? 0,
+      event: ecoMap.get(date)?.label ?? null,
+    }))
+  }, [ecoDays.data, kpi.data])
+
   if (overview.isLoading) return <Loading />
   if (overview.isError)
     return (
@@ -261,7 +517,6 @@ function OverviewTab({ days, projectPath }: Scope) {
       </p>
     )
 
-  const tokensByDay = overview.data?.tokensByDay ?? []
   const byProject = overview.data?.byProject ?? []
   const totals = overview.data?.totals
 
@@ -270,31 +525,7 @@ function OverviewTab({ days, projectPath }: Scope) {
   const tools = usage.data?.tools ?? []
   const skills = usage.data?.skills ?? []
 
-  // Ecosystem events are global; the daily bars are scoped (project/tracked
-  // filter). So an event day may have no bar in scope. Union both date sets and
-  // zero-fill tokens, so the category always exists and a marker can be drawn.
-  const ecoMap = new Map((ecoDays.data ?? []).map((e) => [e.date, e] as const))
-  const tokMap = new Map(tokensByDay.map((d) => [d.date, d] as const))
-  const allDates = [...new Set([...tokMap.keys(), ...ecoMap.keys()])].sort()
-  const chartData = allDates.map((date) => ({
-    date,
-    tokensIn: tokMap.get(date)?.tokensIn ?? 0,
-    tokensOut: tokMap.get(date)?.tokensOut ?? 0,
-    event: ecoMap.get(date)?.label ?? null,
-  }))
   const eventDays = ecoDays.data ?? []
-
-  // KPI per day, unioned with ecosystem-event days (null-filled) so a marker can
-  // be drawn even on a day with no in-scope sessions. connectNulls bridges gaps.
-  const kpiByDate = new Map((kpi.data?.byDay ?? []).map((d) => [d.date, d] as const))
-  const kpiDates = [...new Set([...kpiByDate.keys(), ...ecoMap.keys()])].sort()
-  const kpiChartData = kpiDates.map((date) => ({
-    date,
-    kpi: kpiByDate.get(date)?.kpi ?? null,
-    quality: kpiByDate.get(date)?.quality ?? null,
-    sessions: kpiByDate.get(date)?.sessions ?? 0,
-    event: ecoMap.get(date)?.label ?? null,
-  }))
 
   return (
     <>
@@ -333,7 +564,7 @@ function OverviewTab({ days, projectPath }: Scope) {
         </div>
         <div className="kpi">
           <div className="label">
-            <span className="id">[05]</span>КПД · EFFICIENCY
+            <span className="id">[05]</span>TOKEN EFFICIENCY
           </div>
           <div className="val amber">{pct(kpi.data?.overall ?? null)}</div>
           <div className="delta">vs baseline</div>
@@ -341,13 +572,9 @@ function OverviewTab({ days, projectPath }: Scope) {
       </div>
 
       {/* TODAY BY HOUR */}
-      <div className="panel mt-16">
-        <div className="panel-head">
-          <span className="ttl">today by hour</span>
-          <span className="meta">current local day · ignores range above</span>
-        </div>
-        <div className="panel-body">
-          {today.isLoading ? (
+      <ChartFrame meta={todayByHourMeta}>
+        {(hidden) =>
+          today.isLoading ? (
             <Loading />
           ) : !today.data || today.data.totals.turns === 0 ? (
             <NoteLine>no activity yet today.</NoteLine>
@@ -424,181 +651,39 @@ function OverviewTab({ days, projectPath }: Scope) {
                         name === 'tokensIn' ? 'Tokens in' : 'Tokens out',
                       ]}
                     />
-                    <Bar dataKey="tokensIn" stackId="t" fill="var(--color-chart-1)" />
-                    <Bar
-                      dataKey="tokensOut"
-                      stackId="t"
-                      fill="var(--color-chart-2)"
-                      radius={[0, 0, 0, 0]}
-                    />
+                    {!hidden.has('tokensIn') ? (
+                      <Bar dataKey="tokensIn" stackId="t" fill="var(--color-chart-1)" />
+                    ) : null}
+                    {!hidden.has('tokensOut') ? (
+                      <Bar
+                        dataKey="tokensOut"
+                        stackId="t"
+                        fill="var(--color-chart-2)"
+                        radius={[0, 0, 0, 0]}
+                      />
+                    ) : null}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </>
-          )}
-        </div>
-      </div>
+          )
+        }
+      </ChartFrame>
 
-      {/* TOKENS PER DAY */}
-      <div className="panel mt-16">
-        <div className="panel-head">
-          <span className="ttl">tokens per day</span>
-          <span className="meta">
-            {(ecoDays.data?.length ?? 0) > 0
-              ? 'dashed lines mark ecosystem changes · hover bar for details'
-              : 'input + output per day'}
-          </span>
-        </div>
-        <div className="panel-body">
-          {tokensByDay.length === 0 ? (
-            <NoteLine>no token activity yet.</NoteLine>
-          ) : (
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-border)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(value: string) => value.slice(5)}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    stroke="var(--color-border)"
-                    interval="preserveStartEnd"
-                    minTickGap={16}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    stroke="var(--color-border)"
-                    width={44}
-                    tickFormatter={(value: number) => num(value)}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
-                    content={<TokensTooltip />}
-                  />
-                  <Bar
-                    dataKey="tokensIn"
-                    stackId="t"
-                    fill="var(--color-chart-1)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="tokensOut"
-                    stackId="t"
-                    fill="var(--color-chart-2)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <EcoMarkers events={eventDays} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* КПД (EFFICIENCY) */}
-      <div className="panel mt-16">
-        <div className="panel-head">
-          <span className="ttl">КПД · efficiency</span>
-          <span className="meta">
-            КПД vs frozen baseline · 100% = baseline · dashed = avg quality (0–10, right)
-            {(ecoDays.data?.length ?? 0) > 0 ? ' · ⚑ ecosystem changes' : ''}
-          </span>
-          <button
-            type="button"
-            className="btn"
-            disabled={rebaseline.isPending}
-            onClick={() =>
-              rebaseline.mutate({
-                projectPath,
-                start: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
-                end: new Date(),
-              })
-            }
-          >
-            ↻ RE-BASELINE ({days}d)
-          </button>
-        </div>
-        <div className="panel-body">
-          {kpi.isLoading ? (
-            <Loading />
-          ) : (kpi.data?.byDay.length ?? 0) === 0 ? (
-            <NoteLine>no КПД data yet.</NoteLine>
-          ) : (
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={kpiChartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-border)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(value: string) => value.slice(5)}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    stroke="var(--color-border)"
-                    interval="preserveStartEnd"
-                    minTickGap={16}
-                  />
-                  <YAxis
-                    yAxisId="kpi"
-                    domain={[0, 'auto']}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    stroke="var(--color-border)"
-                    width={44}
-                    tickFormatter={(value: number) => `${value}%`}
-                  />
-                  <YAxis
-                    yAxisId="quality"
-                    orientation="right"
-                    domain={[0, 10]}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                    stroke="var(--color-border)"
-                    width={32}
-                  />
-                  <ReferenceLine
-                    yAxisId="kpi"
-                    y={100}
-                    stroke="var(--color-muted-foreground)"
-                    strokeDasharray="4 4"
-                  />
-                  <Tooltip
-                    cursor={{ stroke: 'var(--color-muted)', strokeWidth: 1 }}
-                    content={<KpiTooltip />}
-                  />
-                  <Line
-                    yAxisId="kpi"
-                    type="monotone"
-                    dataKey="kpi"
-                    stroke="var(--color-chart-1)"
-                    strokeWidth={2}
-                    dot={false}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    yAxisId="quality"
-                    type="monotone"
-                    dataKey="quality"
-                    stroke="var(--color-chart-2)"
-                    strokeWidth={2}
-                    strokeDasharray="5 3"
-                    dot={false}
-                    connectNulls
-                    isAnimationActive={false}
-                  />
-                  <EcoMarkers events={eventDays} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* TOKENS PER DAY + efficiency — synced crosshair + readout */}
+      <HoverSyncProvider>
+        <DailyCharts
+          chartData={chartData}
+          kpiChartData={kpiChartData}
+          eventDays={eventDays}
+          tokensEmpty={tokensByDay.length === 0}
+          kpiLoading={kpi.isLoading}
+          kpiEmpty={(kpi.data?.byDay.length ?? 0) === 0}
+          rebaseline={rebaseline}
+          days={days}
+          projectPath={projectPath}
+        />
+      </HoverSyncProvider>
 
       {/* PROJECTS */}
       <div className="panel mt-16">
@@ -772,7 +857,7 @@ function SessionsTab({ days, projectPath }: Scope) {
             <th className="num">turns</th>
             <th className="num">tokens</th>
             <th className="num">complexity</th>
-            <th className="num">КПД</th>
+            <th className="num">Eff</th>
             <th>difficulty</th>
             <th>rating</th>
             <th>summary</th>
@@ -797,7 +882,7 @@ function SessionsTab({ days, projectPath }: Scope) {
               </td>
               <td
                 className="num"
-                title="КПД vs frozen baseline — 100% = baseline efficiency, higher is leaner"
+                title="Token Efficiency vs frozen baseline — 100% = baseline efficiency, higher is leaner"
               >
                 {pct(s.kpi)}
               </td>
@@ -952,7 +1037,7 @@ function EcoBadge({ type }: { type: string }) {
 }
 
 // Delta colouring. goodDirection='down' (default) = lower is better (tokens/turn);
-// 'up' = higher is better (КПД). The "good" direction is green, the other red.
+// 'up' = higher is better (Eff). The "good" direction is green, the other red.
 function ImpactDelta({
   pct,
   goodDirection = 'down',
@@ -1052,7 +1137,7 @@ function EcosystemTab({ days }: { days: number }) {
         <div className="panel-head">
           <span className="ttl">change impact</span>
           <span className="meta">
-            7d before vs after · global · tok/turn lower = better · КПД higher = better
+            7d before vs after · global · tok/turn lower = better · Eff higher = better
           </span>
         </div>
         {impact.isLoading ? (
@@ -1073,9 +1158,9 @@ function EcosystemTab({ days }: { days: number }) {
                   <th className="num">tok/turn before</th>
                   <th className="num">after</th>
                   <th className="num">Δ tok</th>
-                  <th className="num">КПД before</th>
+                  <th className="num">Eff before</th>
                   <th className="num">after</th>
-                  <th className="num">Δ КПД</th>
+                  <th className="num">Δ Eff</th>
                   <th className="num">Δ quality</th>
                 </tr>
               </thead>
