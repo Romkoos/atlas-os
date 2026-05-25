@@ -23,6 +23,14 @@ describe('summarize', () => {
     expect(s.n).toBe(2)
     expect(s.medianTokens).toBe(300) // totals 200 and 400 -> 300
   })
+  it('returns n=0 and NaN tokens when all reps fail', () => {
+    const s = summarize('t1', 'abc', [
+      { tokensIn: 0, tokensOut: 0, totalCostUsd: 0, success: false },
+      { tokensIn: 0, tokensOut: 0, totalCostUsd: 0, success: false },
+    ])
+    expect(s.n).toBe(0)
+    expect(Number.isNaN(s.medianTokens)).toBe(true)
+  })
 })
 
 describe('compare', () => {

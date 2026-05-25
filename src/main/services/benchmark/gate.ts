@@ -3,7 +3,11 @@ import type { Assertion, FailReason } from '@main/services/benchmark/types'
 
 export function matchesAssertion(text: string, assert: Assertion): boolean {
   if (assert.type === 'includes') return text.includes(assert.value)
-  return new RegExp(assert.value, 'i').test(text)
+  try {
+    return new RegExp(assert.value, 'i').test(text)
+  } catch {
+    return false // invalid regex pattern → treat as no match
+  }
 }
 
 export interface GateInput {

@@ -17,6 +17,9 @@ describe('matchesAssertion', () => {
       false,
     )
   })
+  it('invalid regex pattern returns false instead of throwing', () => {
+    expect(matchesAssertion('anything', { type: 'regex', value: '(unclosed' })).toBe(false)
+  })
 })
 
 describe('checkRun', () => {
