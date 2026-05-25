@@ -10,22 +10,44 @@ import {
 import { complexityFromPercentiles, percentileRanks } from '@main/services/productivity/complexity'
 import { ecosystemId } from '@main/services/productivity/ids'
 import { ingestAll } from '@main/services/productivity/ingest'
+import { type TimeWindow, windowBounds } from '@main/services/productivity/window'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { expectedTokens, kpdByDay, sessionKpd } from '@shared/kpi'
-import { and, avg, count, countDistinct, desc, eq, gte, inArray, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  avg,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lt,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
 const cutoffDate = (days: number): Date => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 const toNum = (v: string | number | null): number | null => (v == null ? null : Number(v))
 
-// Shared input: a time window (in days) and an optional project filter.
+// agent_turns.ts condition for a computed window. hi == null leaves the top
+// open (matches the legacy single lower-bound filter when offset = 0).
+const turnTimeCond = (w: TimeWindow): SQL =>
+  w.hi == null
+    ? gte(agentTurns.ts, new Date(w.lo))
+    : (and(gte(agentTurns.ts, new Date(w.lo)), lt(agentTurns.ts, new Date(w.hi))) as SQL)
+
+// Shared input: a time window (in days), an optional project filter, and an
+// optional offset that shifts the window back N days (for compare-previous).
 const rangeInput = z
   .object({
     days: z.number().int().positive().default(30),
     projectPath: z.string().optional(),
+    offset: z.number().int().min(0).default(0),
   })
-  .default({ days: 30 })
+  .default({ days: 30, offset: 0 })
 
 const trackedProjects = (): string[] => getSettings().trackedProjects ?? []
 
@@ -95,6 +117,7 @@ function sessionComplexityMap(): Map<string, SessionComplexity> {
 
 interface KpdRow extends ScopedSession {
   day: string
+  expected: number | null // expected tokens under the frozen baseline
   kpd: number | null
 }
 
@@ -149,8 +172,9 @@ function scopedKpdRows(projectPath?: string): KpdRow[] {
   const model = ensureBaseline(rows, projectPath)
   return rows.map((r) => {
     const agg = aggById.get(r.id)
-    const kpd = model ? sessionKpd(expectedTokens(model, r.difficulty), r.tokens) : null
-    return { ...r, day: agg?.day ?? '', kpd }
+    const expected = model ? expectedTokens(model, r.difficulty) : null
+    const kpd = sessionKpd(expected, r.tokens)
+    return { ...r, day: agg?.day ?? '', expected, kpd }
   })
 }
 
@@ -239,8 +263,8 @@ export const productivityRouter = router({
       }),
     )
     .query(({ input }) => {
-      const cutoff = cutoffDate(input.days)
-      const scoped = turnFilter(cutoff, input.projectPath)
+      const win = windowBounds(input.days, input.offset)
+      const scoped = and(turnTimeCond(win), projectCondition(input.projectPath))
 
       const day = sql<string>`date(${agentTurns.ts} / 1000, 'unixepoch', 'localtime')`
       const tokensByDay = db()
@@ -288,7 +312,7 @@ export const productivityRouter = router({
           sessions: countDistinct(agentTurns.sessionId),
         })
         .from(agentTurns)
-        .where(and(gte(agentTurns.ts, cutoff), trackedCondition()))
+        .where(and(turnTimeCond(win), trackedCondition()))
         .groupBy(agentTurns.projectPath)
         .all()
 
@@ -369,19 +393,30 @@ export const productivityRouter = router({
       }),
     )
     .query(({ input }) => {
-      const cutoff = cutoffDate(input.days).getTime()
+      const win = windowBounds(input.days, input.offset)
       const rows = scopedKpdRows(input.projectPath).filter(
-        (r) => r.lastTs >= cutoff && r.kpd != null,
+        (r) => r.lastTs >= win.lo && (win.hi == null || r.lastTs < win.hi) && r.kpd != null,
       )
       if (rows.length === 0) return { byDay: [], overall: null }
 
-      const days = kpdByDay(rows.map((r) => ({ day: r.day, kpd: r.kpd as number, score: r.score })))
+      const days = kpdByDay(
+        rows.map((r) => ({
+          day: r.day,
+          expected: r.expected as number,
+          actual: r.tokens,
+          score: r.score,
+        })),
+      )
 
       const tokByDay = new Map<string, number>()
       for (const r of rows) tokByDay.set(r.day, (tokByDay.get(r.day) ?? 0) + r.tokens)
       const byDay = days.map((d) => ({ ...d, tokens: tokByDay.get(d.date) ?? 0 }))
 
-      const overall = mean(rows.map((r) => r.kpd as number))
+      // Overall Eff is token-weighted too, so it matches the daily line and a
+      // few tiny-token sessions can't drag the headline number up.
+      const sumExpected = rows.reduce((s, r) => s + (r.expected as number), 0)
+      const sumActual = rows.reduce((s, r) => s + r.tokens, 0)
+      const overall = sumActual > 0 ? (sumExpected / sumActual) * 100 : null
       return { byDay, overall }
     }),
 
