@@ -1,3 +1,5 @@
+import { ChartFrame } from '@renderer/components/charts/ChartFrame'
+import { todayByHourMeta } from '@renderer/components/charts/chartMeta'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
@@ -341,13 +343,9 @@ function OverviewTab({ days, projectPath }: Scope) {
       </div>
 
       {/* TODAY BY HOUR */}
-      <div className="panel mt-16">
-        <div className="panel-head">
-          <span className="ttl">today by hour</span>
-          <span className="meta">current local day · ignores range above</span>
-        </div>
-        <div className="panel-body">
-          {today.isLoading ? (
+      <ChartFrame meta={todayByHourMeta}>
+        {(hidden) =>
+          today.isLoading ? (
             <Loading />
           ) : !today.data || today.data.totals.turns === 0 ? (
             <NoteLine>no activity yet today.</NoteLine>
@@ -424,20 +422,24 @@ function OverviewTab({ days, projectPath }: Scope) {
                         name === 'tokensIn' ? 'Tokens in' : 'Tokens out',
                       ]}
                     />
-                    <Bar dataKey="tokensIn" stackId="t" fill="var(--color-chart-1)" />
-                    <Bar
-                      dataKey="tokensOut"
-                      stackId="t"
-                      fill="var(--color-chart-2)"
-                      radius={[0, 0, 0, 0]}
-                    />
+                    {!hidden.has('tokensIn') ? (
+                      <Bar dataKey="tokensIn" stackId="t" fill="var(--color-chart-1)" />
+                    ) : null}
+                    {!hidden.has('tokensOut') ? (
+                      <Bar
+                        dataKey="tokensOut"
+                        stackId="t"
+                        fill="var(--color-chart-2)"
+                        radius={[0, 0, 0, 0]}
+                      />
+                    ) : null}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </>
-          )}
-        </div>
-      </div>
+          )
+        }
+      </ChartFrame>
 
       {/* TOKENS PER DAY */}
       <div className="panel mt-16">
