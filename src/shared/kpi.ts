@@ -93,9 +93,20 @@ export function expectedTokens(model: BaselineModel, difficulty: number | null):
   return Math.exp(a + b * difficulty)
 }
 
-// Per-session Eff (%). >100 = leaner than baseline. Null on unusable inputs.
+// A session must have spent at least this fraction of its expected tokens to
+// earn an Eff. Below it the ratio is dominated by a near-empty session and
+// explodes: a 17k-token session against a ~210k baseline reads as 1200%
+// "efficiency", which is noise, not productivity — and on a low-session day or a
+// single-project scope token-weighting can't damp it (n=1 collapses to that one
+// ratio). The floor is fractional, not absolute, so it adapts to scope and
+// difficulty via `expected`; it also bounds Eff at 1/MIN_WORK_FRACTION × 100%.
+export const MIN_WORK_FRACTION = 1 / 3
+
+// Per-session Eff (%). >100 = leaner than baseline. Null on unusable inputs or
+// when the session did too little work to compare (see MIN_WORK_FRACTION).
 export function sessionKpd(expected: number | null, actualTokens: number): number | null {
   if (expected == null || expected <= 0 || actualTokens <= 0) return null
+  if (actualTokens < expected * MIN_WORK_FRACTION) return null
   return (expected / actualTokens) * 100
 }
 

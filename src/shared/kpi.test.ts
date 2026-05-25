@@ -78,13 +78,20 @@ describe('expectedTokens loglinear null-difficulty fallback', () => {
 
 describe('sessionKpd', () => {
   it('is expected/actual × 100', () => {
-    expect(sessionKpd(500, 250)).toBe(200)
-    expect(sessionKpd(500, 500)).toBe(100)
+    expect(sessionKpd(600, 600)).toBe(100)
+    expect(sessionKpd(600, 300)).toBe(200) // 300 = exactly the floor (600/3=200, 300≥200)
   })
   it('returns null on bad inputs', () => {
     expect(sessionKpd(null, 100)).toBeNull()
     expect(sessionKpd(0, 100)).toBeNull()
     expect(sessionKpd(500, 0)).toBeNull()
+  })
+  it('floors out near-empty sessions (actual < expected/3) so Eff cannot blow up', () => {
+    // a 17k-token session vs a 210k baseline used to read as ~1200%
+    expect(sessionKpd(210000, 17000)).toBeNull()
+    // max possible Eff for a kept session is exactly 300%
+    expect(sessionKpd(300, 100)).toBe(300) // 100 = 300/3, the boundary (kept)
+    expect(sessionKpd(300, 99)).toBeNull() // just under the floor → dropped
   })
 })
 
