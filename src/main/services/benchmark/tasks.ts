@@ -35,4 +35,13 @@ export const TASKS: BenchmarkTask[] = [
       'Read src/main/paths.ts. What does appPaths() return? List a few of the path keys it provides.',
     assert: { type: 'regex', value: 'userData|claudeDir|migrations' },
   },
+  {
+    // Long-output task: bounded input (one small file) but an explicitly verbose
+    // answer, so OUTPUT tokens dominate. This is where response-style infra (e.g.
+    // caveman terseness) is measurable — watch the `output` column, not total.
+    id: 'verbose-paths',
+    prompt:
+      'Read src/main/paths.ts. Write a detailed ~400-word explanation of appPaths(): describe every path key it returns, what each is for, and the packaged-vs-dev difference. Be thorough and complete.',
+    assert: { type: 'regex', value: 'userData|migrations|claude' },
+  },
 ]

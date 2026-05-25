@@ -41,6 +41,9 @@ export interface TaskInfraSummary {
   // Just the cached portion (cache_read + cache_creation), so the infra-prefix
   // size is visible on its own — it's what shifts when infra changes.
   medianCacheTokens: number
+  // Output tokens only — what the model actually wrote. This is where response
+  // style (e.g. caveman terseness) shows up, separate from the input prefix.
+  medianOutputTokens: number
   medianCostUsd: number
 }
 
@@ -50,6 +53,7 @@ export function summarize(taskId: string, infraHash: string, reps: RepMetric[]):
     (r) => r.tokensIn + r.tokensOut + r.cacheReadTokens + r.cacheCreationTokens,
   )
   const cache = valid.map((r) => r.cacheReadTokens + r.cacheCreationTokens)
+  const out = valid.map((r) => r.tokensOut)
   const costs = valid.map((r) => r.totalCostUsd)
   return {
     taskId,
@@ -58,6 +62,7 @@ export function summarize(taskId: string, infraHash: string, reps: RepMetric[]):
     medianTokens: median(tokens),
     spreadTokens: spread(tokens),
     medianCacheTokens: median(cache),
+    medianOutputTokens: median(out),
     medianCostUsd: median(costs),
   }
 }

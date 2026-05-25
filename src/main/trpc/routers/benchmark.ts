@@ -54,6 +54,7 @@ export const benchmarkRouter = router({
           medianTokens: z.number(),
           spreadTokens: z.number(),
           medianCacheTokens: z.number(),
+          medianOutputTokens: z.number(),
           medianCostUsd: z.number(),
           // Context to make a bare infra hash legible in the UI.
           firstTs: z.number(), // earliest run in this group (ms)
