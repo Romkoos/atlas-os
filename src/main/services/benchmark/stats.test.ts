@@ -14,22 +14,36 @@ describe('spread', () => {
 })
 
 describe('summarize', () => {
-  it('excludes invalid reps and medians the token totals', () => {
+  const rep = (
+    tokensIn: number,
+    tokensOut: number,
+    cacheRead: number,
+    cost: number,
+    ok: boolean,
+  ) => ({
+    tokensIn,
+    tokensOut,
+    cacheReadTokens: cacheRead,
+    cacheCreationTokens: 0,
+    totalCostUsd: cost,
+    success: ok,
+  })
+
+  it('counts cache tokens in the total and reports cached separately', () => {
     const s = summarize('t1', 'abc', [
-      { tokensIn: 100, tokensOut: 100, totalCostUsd: 0.1, success: true },
-      { tokensIn: 300, tokensOut: 100, totalCostUsd: 0.3, success: true },
-      { tokensIn: 0, tokensOut: 0, totalCostUsd: 0, success: false },
+      rep(100, 100, 1000, 0.1, true),
+      rep(300, 100, 1000, 0.3, true),
+      rep(0, 0, 0, 0, false),
     ])
     expect(s.n).toBe(2)
-    expect(s.medianTokens).toBe(300) // totals 200 and 400 -> 300
+    expect(s.medianTokens).toBe(1300) // totals incl cache: 1200 and 1400 -> 1300
+    expect(s.medianCacheTokens).toBe(1000) // cache 1000 and 1000 -> 1000
   })
   it('returns n=0 and NaN tokens when all reps fail', () => {
-    const s = summarize('t1', 'abc', [
-      { tokensIn: 0, tokensOut: 0, totalCostUsd: 0, success: false },
-      { tokensIn: 0, tokensOut: 0, totalCostUsd: 0, success: false },
-    ])
+    const s = summarize('t1', 'abc', [rep(0, 0, 0, 0, false), rep(0, 0, 0, 0, false)])
     expect(s.n).toBe(0)
     expect(Number.isNaN(s.medianTokens)).toBe(true)
+    expect(Number.isNaN(s.medianCacheTokens)).toBe(true)
   })
 })
 
