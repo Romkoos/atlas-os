@@ -1,8 +1,18 @@
 import { ChartFrame } from '@renderer/components/charts/ChartFrame'
 import { eventsPerDayMeta } from '@renderer/components/charts/chartMeta'
+import { brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  Brush,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 function Spark({ values, w = 70, h = 22 }: { values: number[]; w?: number; h?: number }) {
   if (values.length < 2) return null
@@ -142,6 +152,7 @@ export function Stats() {
                     }}
                   />
                   <Bar dataKey="count" fill="var(--color-chart-1)" radius={[0, 0, 0, 0]} />
+                  <Brush {...brushProps} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
