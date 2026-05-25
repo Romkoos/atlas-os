@@ -1,14 +1,18 @@
 import { ChartFrame } from '@renderer/components/charts/ChartFrame'
 import { kpiMeta, todayByHourMeta, tokensPerDayMeta } from '@renderer/components/charts/chartMeta'
+import { dailyDateAxis, overlayPrevious } from '@renderer/components/charts/compareSeries'
 import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/HoverSyncContext'
+import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
+  Brush,
   CartesianGrid,
+  ComposedChart,
   Line,
   LineChart,
   ReferenceLine,
@@ -106,7 +110,14 @@ function NoteLine({ children }: { children: ReactNode }) {
 function TokensTooltip(props: {
   active?: boolean
   label?: string | number
-  payload?: { payload: { tokensIn: number; tokensOut: number; event: string | null } }[]
+  payload?: {
+    payload: {
+      tokensIn: number
+      tokensOut: number
+      event: string | null
+      prevTokens?: number | null
+    }
+  }[]
 }) {
   const row = props.payload?.[0]?.payload
   if (!props.active || !row) return null
@@ -121,6 +132,12 @@ function TokensTooltip(props: {
         <span className="text-muted-foreground">Tokens out</span>
         <span className="tabular-nums">{num(row.tokensOut)}</span>
       </div>
+      {row.prevTokens != null ? (
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">prev total</span>
+          <span className="tabular-nums">{num(row.prevTokens)}</span>
+        </div>
+      ) : null}
       {row.event ? (
         <div className="mt-1.5 max-w-56 border-t pt-1.5 text-[var(--color-chart-3)]">
           ⚑ {row.event}
@@ -135,7 +152,13 @@ function KpiTooltip(props: {
   active?: boolean
   label?: string | number
   payload?: {
-    payload: { kpi: number | null; quality: number | null; sessions: number; event: string | null }
+    payload: {
+      kpi: number | null
+      quality: number | null
+      sessions: number
+      event: string | null
+      prevKpi?: number | null
+    }
   }[]
 }) {
   const row = props.payload?.[0]?.payload
@@ -155,6 +178,12 @@ function KpiTooltip(props: {
         <span className="text-muted-foreground">Sessions</span>
         <span className="tabular-nums">{row.sessions}</span>
       </div>
+      {row.prevKpi != null ? (
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">prev Eff</span>
+          <span className="tabular-nums">{`${row.prevKpi.toFixed(0)}%`}</span>
+        </div>
+      ) : null}
       {row.event ? (
         <div className="mt-1.5 max-w-56 border-t pt-1.5 text-[var(--color-chart-3)]">
           ⚑ {row.event}
@@ -256,14 +285,26 @@ function DailyCharts({
   rebaseline,
   days,
   projectPath,
+  compare,
+  onToggleCompare,
+  comparePending,
+  brushRange,
+  onBrushChange,
 }: {
-  chartData: Array<{ date: string; tokensIn: number; tokensOut: number; event: string | null }>
+  chartData: Array<{
+    date: string
+    tokensIn: number
+    tokensOut: number
+    event: string | null
+    prevTokens: number | null
+  }>
   kpiChartData: Array<{
     date: string
     kpi: number | null
     quality: number | null
     sessions: number
     event: string | null
+    prevKpi: number | null
   }>
   eventDays: { date: string; count: number; label: string }[]
   tokensEmpty: boolean
@@ -272,25 +313,47 @@ function DailyCharts({
   rebaseline: ReturnType<typeof trpc.productivity.rebaseline.useMutation>
   days: number
   projectPath?: string
+  compare: boolean
+  onToggleCompare: () => void
+  comparePending: boolean
+  brushRange: BrushRange
+  onBrushChange: (r: BrushRange) => void
 }) {
   const { setActiveDate } = useHoverSync()
   const onMove = (s: { activeLabel?: string | number }) =>
     setActiveDate(s?.activeLabel != null ? String(s.activeLabel) : null)
   const onLeave = () => setActiveDate(null)
+  const onBrush = (r: { startIndex?: number; endIndex?: number }) =>
+    onBrushChange({ startIndex: r.startIndex, endIndex: r.endIndex })
   const tokenFmt = (_k: string, v: number) => num(v)
   const kpiFmt = (k: string, v: number) => (k === 'kpi' ? `${v.toFixed(0)}%` : v.toFixed(1))
 
   return (
     <>
       {/* TOKENS PER DAY */}
-      <ChartFrame meta={tokensPerDayMeta} rows={chartData} format={tokenFmt}>
+      <ChartFrame
+        meta={tokensPerDayMeta}
+        rows={chartData}
+        format={tokenFmt}
+        action={
+          <button
+            type="button"
+            className={cn('btn', compare && 'primary')}
+            onClick={onToggleCompare}
+            disabled={comparePending}
+            aria-pressed={compare}
+          >
+            ◧ COMPARE −{days}d
+          </button>
+        }
+      >
         {(hidden) =>
           tokensEmpty ? (
             <NoteLine>no token activity yet.</NoteLine>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
+                <ComposedChart
                   data={chartData}
                   syncId={tokensPerDayMeta.syncGroup}
                   onMouseMove={onMove}
@@ -337,8 +400,26 @@ function DailyCharts({
                       radius={[0, 0, 0, 0]}
                     />
                   ) : null}
+                  {compare ? (
+                    <Line
+                      type="monotone"
+                      dataKey="prevTokens"
+                      stroke="var(--color-muted-foreground)"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  ) : null}
                   <EcoMarkers events={eventDays} />
-                </BarChart>
+                  <Brush
+                    {...brushProps}
+                    startIndex={brushRange.startIndex}
+                    endIndex={brushRange.endIndex}
+                    onChange={onBrush}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )
@@ -446,7 +527,26 @@ function DailyCharts({
                       isAnimationActive={false}
                     />
                   ) : null}
+                  {compare ? (
+                    <Line
+                      yAxisId="kpi"
+                      type="monotone"
+                      dataKey="prevKpi"
+                      stroke="var(--color-muted-foreground)"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      dot={false}
+                      connectNulls
+                      isAnimationActive={false}
+                    />
+                  ) : null}
                   <EcoMarkers events={eventDays} />
+                  <Brush
+                    {...brushProps}
+                    startIndex={brushRange.startIndex}
+                    endIndex={brushRange.endIndex}
+                    onChange={onBrush}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -466,6 +566,20 @@ function OverviewTab({ days, projectPath }: Scope) {
   const today = trpc.productivity.today.useQuery({ projectPath })
   const kpi = trpc.productivity.kpi.useQuery({ days, projectPath })
 
+  const [compare, setCompare] = useState(false)
+  const [brushRange, setBrushRange] = useState<BrushRange>({})
+
+  // Previous period = same window shifted back by `days`. Only fetched while
+  // compare is on, so the toggle is the on/off switch for both ghost lines.
+  const overviewPrev = trpc.productivity.overview.useQuery(
+    { days, projectPath, offset: days },
+    { enabled: compare },
+  )
+  const kpiPrev = trpc.productivity.kpi.useQuery(
+    { days, projectPath, offset: days },
+    { enabled: compare },
+  )
+
   const rebaseline = trpc.productivity.rebaseline.useMutation({
     onSuccess: async (r) => {
       toast.success(r.ok ? `Re-baselined (${r.method})` : 'Not enough data to baseline')
@@ -480,32 +594,54 @@ function OverviewTab({ days, projectPath }: Scope) {
   // filter). So an event day may have no bar in scope. Union both date sets and
   // zero-fill tokens, so the category always exists and a marker can be drawn.
   // Hooks must run unconditionally, so these memos precede the early returns below.
+  // One ordered date axis shared by both daily charts so the lifted brush index
+  // maps to the same day on each. Union of token days, kpi days, and eco days.
+  const dailyDates = useMemo(
+    () => dailyDateAxis(tokensByDay, kpi.data?.byDay ?? [], ecoDays.data ?? []),
+    [tokensByDay, kpi.data, ecoDays.data],
+  )
+
+  // Tokens per day over the shared axis. When compare is on, overlay the
+  // previous period's total tokens (in+out) positionally as `prevTokens`.
   const chartData = useMemo(() => {
     const ecoMap = new Map((ecoDays.data ?? []).map((e) => [e.date, e] as const))
     const tokMap = new Map(tokensByDay.map((d) => [d.date, d] as const))
-    const allDates = [...new Set([...tokMap.keys(), ...ecoMap.keys()])].sort()
-    return allDates.map((date) => ({
+    const base = dailyDates.map((date) => ({
       date,
       tokensIn: tokMap.get(date)?.tokensIn ?? 0,
       tokensOut: tokMap.get(date)?.tokensOut ?? 0,
       event: ecoMap.get(date)?.label ?? null,
+      prevTokens: null as number | null,
     }))
-  }, [ecoDays.data, tokensByDay])
+    if (!compare) return base
+    const prevTotals = (overviewPrev.data?.tokensByDay ?? []).map((d) => d.tokensIn + d.tokensOut)
+    return overlayPrevious(base, 'prevTokens', prevTotals)
+  }, [dailyDates, ecoDays.data, tokensByDay, compare, overviewPrev.data])
 
-  // KPI per day, unioned with ecosystem-event days (null-filled) so a marker can
-  // be drawn even on a day with no in-scope sessions. connectNulls bridges gaps.
+  // Eff per day over the shared axis. When compare is on, overlay the previous
+  // period's Eff positionally as `prevKpi`. connectNulls bridges gap days.
   const kpiChartData = useMemo(() => {
     const ecoMap = new Map((ecoDays.data ?? []).map((e) => [e.date, e] as const))
     const kpiByDate = new Map((kpi.data?.byDay ?? []).map((d) => [d.date, d] as const))
-    const kpiDates = [...new Set([...kpiByDate.keys(), ...ecoMap.keys()])].sort()
-    return kpiDates.map((date) => ({
+    const base = dailyDates.map((date) => ({
       date,
       kpi: kpiByDate.get(date)?.kpi ?? null,
       quality: kpiByDate.get(date)?.quality ?? null,
       sessions: kpiByDate.get(date)?.sessions ?? 0,
       event: ecoMap.get(date)?.label ?? null,
+      prevKpi: null as number | null,
     }))
-  }, [ecoDays.data, kpi.data])
+    if (!compare) return base
+    const prevKpis = (kpiPrev.data?.byDay ?? []).map((d) => d.kpi)
+    return overlayPrevious(base, 'prevKpi', prevKpis)
+  }, [dailyDates, ecoDays.data, kpi.data, compare, kpiPrev.data])
+
+  // Reset the brush when the axis length changes (range toggle / project switch)
+  // so stale indices can't point past the new data.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on length only
+  useEffect(() => {
+    setBrushRange({})
+  }, [dailyDates.length])
 
   if (overview.isLoading) return <Loading />
   if (overview.isError)
@@ -682,6 +818,11 @@ function OverviewTab({ days, projectPath }: Scope) {
           rebaseline={rebaseline}
           days={days}
           projectPath={projectPath}
+          compare={compare}
+          onToggleCompare={() => setCompare((v) => !v)}
+          comparePending={compare && (overviewPrev.isFetching || kpiPrev.isFetching)}
+          brushRange={brushRange}
+          onBrushChange={setBrushRange}
         />
       </HoverSyncProvider>
 
