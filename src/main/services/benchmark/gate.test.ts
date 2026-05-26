@@ -56,4 +56,16 @@ describe('checkRun', () => {
       failReason: 'assertion_failed',
     })
   })
+  it('rate_limited when the response is a session-limit message', () => {
+    expect(
+      checkRun(
+        {
+          subtype: 'success',
+          resultText: "You've hit your session limit · resets 6:20pm (Asia/Jerusalem)",
+          aborted: false,
+        },
+        assert,
+      ),
+    ).toEqual({ valid: false, failReason: 'rate_limited' })
+  })
 })
