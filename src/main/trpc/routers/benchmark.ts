@@ -20,8 +20,24 @@ const progressShape = z
 
 export const benchmarkRouter = router({
   tasks: publicProcedure
-    .output(z.array(z.object({ id: z.string(), prompt: z.string() })))
-    .query(() => TASKS.map((t) => ({ id: t.id, prompt: t.prompt }))),
+    .output(
+      z.array(
+        z.object({
+          id: z.string(),
+          prompt: z.string(),
+          name: z.string().nullable(),
+          description: z.string().nullable(),
+        }),
+      ),
+    )
+    .query(() =>
+      TASKS.map((t) => ({
+        id: t.id,
+        prompt: t.prompt,
+        name: t.name ?? null,
+        description: t.description ?? null,
+      })),
+    ),
 
   run: publicProcedure
     .input(
@@ -56,6 +72,10 @@ export const benchmarkRouter = router({
           medianCacheTokens: z.number(),
           medianOutputTokens: z.number(),
           medianCostUsd: z.number(),
+          // Human label + description for the task row (denormalized from the
+          // TASKS fixture so the UI doesn't need a separate join).
+          name: z.string().nullable(),
+          description: z.string().nullable(),
           // Context to make a bare infra hash legible in the UI.
           firstTs: z.number(), // earliest run in this group (ms)
           plugins: z.number(), // enabled plugins at run time
@@ -79,9 +99,13 @@ export const benchmarkRouter = router({
         plugins: number
         mcp: number
         skills: number
+        name: string | null
+        description: string | null
       })[] = []
+      const taskMeta = new Map(TASKS.map((t) => [t.id, t]))
       for (const g of groups.values()) {
         const snap = g[0].infraSnapshot
+        const meta = taskMeta.get(g[0].taskId)
         summaries.push({
           ...summarize(
             g[0].taskId,
@@ -100,6 +124,8 @@ export const benchmarkRouter = router({
           plugins: Object.values(snap.plugins).filter(Boolean).length,
           mcp: snap.mcpActive.length,
           skills: Object.keys(snap.skills).length,
+          name: meta?.name ?? null,
+          description: meta?.description ?? null,
         })
       }
       return summaries

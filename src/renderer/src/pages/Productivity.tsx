@@ -1705,7 +1705,27 @@ function BenchmarkTab() {
                     style={firstOfTask ? { borderTop: '2px solid var(--line)' } : undefined}
                   >
                     <td style={firstOfTask ? undefined : { color: 'var(--fg-4)' }}>
-                      {firstOfTask ? r.taskId : ''}
+                      {firstOfTask ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {r.name ?? r.taskId}
+                          {r.description ? (
+                            <abbr
+                              title={r.description}
+                              style={{
+                                color: 'var(--fg-4)',
+                                cursor: 'help',
+                                textDecoration: 'none',
+                                fontSize: 11,
+                              }}
+                              aria-label={`About ${r.name ?? r.taskId}`}
+                            >
+                              ⓘ
+                            </abbr>
+                          ) : null}
+                        </span>
+                      ) : (
+                        ''
+                      )}
                     </td>
                     <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
                       {new Date(r.firstTs).toLocaleDateString()} · {r.plugins}p {r.mcp}m {r.skills}s
