@@ -485,6 +485,45 @@
     text-transform: uppercase;
     color: var(--fg-4);
   }
+  /* CSS-driven hover tooltip — native `title=` is unreliable in Electron. */
+  .info-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    color: var(--fg-4);
+    cursor: help;
+    font-size: 11px;
+    user-select: none;
+  }
+  .info-tip:hover {
+    color: var(--amber);
+  }
+  .info-tip-bubble {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 50;
+    display: none;
+    width: max-content;
+    max-width: 360px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.4);
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    pointer-events: none;
+  }
+  .info-tip:hover .info-tip-bubble,
+  .info-tip:focus .info-tip-bubble,
+  .info-tip:focus-within .info-tip-bubble {
+    display: block;
+  }
 
   /* ============ PANELS ============ */
   .panel {
