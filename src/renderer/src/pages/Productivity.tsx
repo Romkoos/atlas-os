@@ -1709,18 +1709,9 @@ function BenchmarkTab() {
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {r.name ?? r.taskId}
                           {r.description ? (
-                            <abbr
-                              title={r.description}
-                              style={{
-                                color: 'var(--fg-4)',
-                                cursor: 'help',
-                                textDecoration: 'none',
-                                fontSize: 11,
-                              }}
-                              aria-label={`About ${r.name ?? r.taskId}`}
-                            >
-                              ⓘ
-                            </abbr>
+                            <span className="info-tip">
+                              ⓘ<span className="info-tip-bubble">{r.description}</span>
+                            </span>
                           ) : null}
                         </span>
                       ) : (
