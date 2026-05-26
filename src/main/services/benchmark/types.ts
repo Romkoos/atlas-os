@@ -16,7 +16,7 @@ export interface BenchmarkTask {
   assert: Assertion
 }
 
-export type FailReason = 'sdk_error' | 'assertion_failed' | 'timeout'
+export type FailReason = 'sdk_error' | 'assertion_failed' | 'timeout' | 'rate_limited'
 
 export interface RunResult {
   taskId: string
