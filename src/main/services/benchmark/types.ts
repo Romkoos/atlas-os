@@ -7,6 +7,12 @@ export interface Assertion {
 
 export interface BenchmarkTask {
   id: string
+  // Human-friendly label shown in the UI (falls back to `id` if absent). `id`
+  // stays the stable machine key — DB rows reference it forever.
+  name?: string
+  // One-paragraph plain-language explanation of what the task probes — shown on
+  // hover via the info icon next to the name in the results table.
+  description?: string
   prompt: string
   // Additional user turns sent IN THE SAME SESSION (via SDK `resume`), so the
   // prefix is created once and read across turns — models a real coding session
