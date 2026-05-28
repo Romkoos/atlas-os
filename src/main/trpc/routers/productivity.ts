@@ -1,12 +1,14 @@
 import { basename } from 'node:path'
 import { db } from '@main/db/client'
-import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
+import { agentSessions, agentTurns, ecosystemChanges, kpiBaseline } from '@main/db/schema'
 import { appPaths } from '@main/paths'
 import {
   ensureBaseline,
   getScopedSessions,
   rebaseline as refitBaseline,
   type ScopedSession,
+  scopeKey,
+  selectBaselineSamples,
 } from '@main/services/productivity/baseline'
 import { complexityFromPercentiles, percentileRanks } from '@main/services/productivity/complexity'
 import { ecosystemId } from '@main/services/productivity/ids'
@@ -14,7 +16,7 @@ import { ingestAll } from '@main/services/productivity/ingest'
 import { type TimeWindow, windowBounds } from '@main/services/productivity/window'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import { expectedTokens, kpdByDay, sessionKpd } from '@shared/kpi'
+import { expectedTokens, kpdByDay, medianAbsResidualPct, r2LogScale, sessionKpd } from '@shared/kpi'
 import {
   and,
   avg,
@@ -381,6 +383,154 @@ export const productivityRouter = router({
       const sumActual = rows.reduce((s, r) => s + r.tokens, 0)
       const overall = sumActual > 0 ? (sumExpected / sumActual) * 100 : null
       return { byDay, overall }
+    }),
+
+  kpiDiagnostics: publicProcedure
+    .input(z.object({ projectPath: z.string().optional() }).optional().default({}))
+    .output(
+      z.object({
+        baseline: z
+          .object({
+            scope: z.string(),
+            method: z.enum(['scope', 'global-median']),
+            params: z.object({
+              a: z.number().optional(),
+              bFiles: z.number().optional(),
+              bDirs: z.number().optional(),
+              median: z.number().optional(),
+            }),
+            periodStart: z.number().nullable(),
+            periodEnd: z.number().nullable(),
+            sessionCount: z.number(),
+            createdAt: z.number(),
+          })
+          .nullable(),
+        fit: z.object({
+          r2LogScale: z.number().nullable(),
+          samplesUsed: z.number(),
+          medianAbsResidualPct: z.number().nullable(),
+          samplesPreview: z.array(
+            z.object({
+              files: z.number(),
+              dirs: z.number(),
+              actualTokens: z.number(),
+              expectedTokens: z.number(),
+            }),
+          ),
+        }),
+        dataInventory: z.object({
+          sessionsTotal: z.number(),
+          sessionsWithScope: z.number(),
+          sessionsWithScore: z.number(),
+          sessionsWithDifficulty: z.number(),
+          turnsTotal: z.number(),
+          tokensInTotal: z.number(),
+          tokensOutTotal: z.number(),
+          ecosystemChangesTotal: z.number(),
+          earliestSessionTs: z.number().nullable(),
+          latestSessionTs: z.number().nullable(),
+        }),
+      }),
+    )
+    .query(({ input }) => {
+      const projectPath = input?.projectPath
+      const sessions = getScopedSessions(projectPath)
+      const model = ensureBaseline(sessions, projectPath)
+      const used = selectBaselineSamples(sessions)
+      const usedSamples = used.map((s) => ({ files: s.files, dirs: s.dirs, tokens: s.tokens }))
+
+      let baselineOut: {
+        scope: string
+        method: 'scope' | 'global-median'
+        params: { a?: number; bFiles?: number; bDirs?: number; median?: number }
+        periodStart: number | null
+        periodEnd: number | null
+        sessionCount: number
+        createdAt: number
+      } | null = null
+      if (model) {
+        const row = db()
+          .select()
+          .from(kpiBaseline)
+          .where(eq(kpiBaseline.scope, scopeKey(projectPath)))
+          .orderBy(desc(kpiBaseline.createdAt))
+          .limit(1)
+          .get()
+        if (row) {
+          baselineOut = {
+            scope: row.scope,
+            method: row.method as 'scope' | 'global-median',
+            params: row.params,
+            periodStart: row.periodStart ? row.periodStart.getTime() : null,
+            periodEnd: row.periodEnd ? row.periodEnd.getTime() : null,
+            sessionCount: row.sessionCount,
+            createdAt: row.createdAt.getTime(),
+          }
+        }
+      }
+
+      const fit = {
+        r2LogScale: model ? r2LogScale(usedSamples, model) : null,
+        samplesUsed: used.length,
+        medianAbsResidualPct: model ? medianAbsResidualPct(usedSamples, model) : null,
+        samplesPreview: used.slice(0, 50).map((s) => {
+          const exp = model ? expectedTokens(model, { files: s.files, dirs: s.dirs }) : null
+          return {
+            files: s.files,
+            dirs: s.dirs,
+            actualTokens: s.tokens,
+            expectedTokens: exp ?? 0,
+          }
+        }),
+      }
+
+      // Data inventory — counted over the same scope filter (or all tracked).
+      const tracked = (getSettings().trackedProjects ?? []) as string[]
+      const scopeWhere = projectPath
+        ? eq(agentSessions.projectPath, projectPath)
+        : tracked.length
+          ? inArray(agentSessions.projectPath, tracked)
+          : undefined
+
+      const inv = db()
+        .select({
+          sessionsTotal: count(agentSessions.sessionId),
+          sessionsWithScope: sql<number>`sum(case when ${agentSessions.distinctFiles} > 0 or ${agentSessions.distinctDirs} > 0 then 1 else 0 end)`,
+          sessionsWithScore: sql<number>`sum(case when ${agentSessions.score} is not null then 1 else 0 end)`,
+          sessionsWithDifficulty: sql<number>`sum(case when ${agentSessions.difficulty} is not null then 1 else 0 end)`,
+          turnsTotal: sql<number>`sum(${agentSessions.turnCount})`,
+          tokensInTotal: sql<number>`sum(${agentSessions.totalTokensIn})`,
+          tokensOutTotal: sql<number>`sum(${agentSessions.totalTokensOut})`,
+        })
+        .from(agentSessions)
+        .where(scopeWhere)
+        .get()
+
+      const earliestSessionTs = sessions.length ? sessions[0].lastTs : null
+      const latestSessionTs = sessions.length ? sessions[sessions.length - 1].lastTs : null
+
+      const ecoTotal =
+        db()
+          .select({ n: count(ecosystemChanges.id) })
+          .from(ecosystemChanges)
+          .get()?.n ?? 0
+
+      return {
+        baseline: baselineOut,
+        fit,
+        dataInventory: {
+          sessionsTotal: Number(inv?.sessionsTotal ?? 0),
+          sessionsWithScope: Number(inv?.sessionsWithScope ?? 0),
+          sessionsWithScore: Number(inv?.sessionsWithScore ?? 0),
+          sessionsWithDifficulty: Number(inv?.sessionsWithDifficulty ?? 0),
+          turnsTotal: Number(inv?.turnsTotal ?? 0),
+          tokensInTotal: Number(inv?.tokensInTotal ?? 0),
+          tokensOutTotal: Number(inv?.tokensOutTotal ?? 0),
+          ecosystemChangesTotal: Number(ecoTotal),
+          earliestSessionTs,
+          latestSessionTs,
+        },
+      }
     }),
 
   // Current local calendar day broken down by hour (0–23). Always "today",
