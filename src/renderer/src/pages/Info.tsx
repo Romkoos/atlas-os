@@ -1,7 +1,10 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { Baseline } from '@renderer/pages/info/sections/baseline'
 import { Caveats } from '@renderer/pages/info/sections/caveats'
+import { CodeRefs } from '@renderer/pages/info/sections/code-refs'
+import { ComingSoon } from '@renderer/pages/info/sections/coming-soon'
 import { Daily } from '@renderer/pages/info/sections/daily'
+import { DataInventory } from '@renderer/pages/info/sections/data-inventory'
 import { DataSources } from '@renderer/pages/info/sections/data-sources'
 import { Intro } from '@renderer/pages/info/sections/intro'
 import { OutOfScope } from '@renderer/pages/info/sections/out-of-scope'
@@ -24,6 +27,9 @@ const ANCHORS: NavAnchor[] = [
   { id: 'reliability', label: '7. Надёжность' },
   { id: 'out-of-scope', label: '8. Что мы НЕ измеряем' },
   { id: 'caveats', label: '9. Известные ограничения' },
+  { id: 'data-inventory', label: '10. Инвентаризация' },
+  { id: 'code-refs', label: '11. Код' },
+  { id: 'coming-soon', label: '12. В разработке' },
 ]
 
 export function Info() {
@@ -54,6 +60,9 @@ export function Info() {
           <Reliability />
           <OutOfScope />
           <Caveats />
+          <DataInventory />
+          <CodeRefs />
+          <ComingSoon />
         </div>
       </div>
     </div>
