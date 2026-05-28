@@ -140,12 +140,21 @@ describe('kpdByDay', () => {
 })
 
 describe('r2LogScale', () => {
-  it('returns null when fewer than 3 samples', () => {
+  it('returns null when fewer valid samples than MIN_SCOPE_SAMPLES', () => {
+    // r2LogScale's threshold mirrors fitBaseline's so we never report a
+    // degrees-of-freedom-collapsed R². 7 samples is the largest input the
+    // function should refuse for a 3-parameter scope model.
     const m = fitBaseline(
       Array.from({ length: 10 }, (_, i) => sample(i + 1, 1, 5000 * (i + 1))),
     ) as BaselineModel
     expect(r2LogScale([], m)).toBeNull()
     expect(r2LogScale([sample(1, 1, 100), sample(2, 1, 200)], m)).toBeNull()
+    expect(
+      r2LogScale(
+        Array.from({ length: 7 }, (_, i) => sample(i + 1, 1, 5000 * (i + 1))),
+        m,
+      ),
+    ).toBeNull()
   })
 
   it('returns null for global-median method (no log-scale predictor)', () => {

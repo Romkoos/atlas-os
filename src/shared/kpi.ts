@@ -146,7 +146,9 @@ export function rollingMedian(xs: number[], window: number): number[] {
 
 // In-sample R² on log(actual tokens) for the scope model. Returns null when:
 // - method is global-median (no log-scale linear predictor exists);
-// - fewer than 3 valid samples;
+// - fewer than MIN_SCOPE_SAMPLES valid samples: a 3-parameter model on ≤3
+//   points trivially fits with R²=1; we mirror fitBaseline's own minimum
+//   to refuse degrees-of-freedom-collapsed results.
 // - the model is missing scope params.
 // Formula: 1 − Σ(yᵢ − ŷᵢ)² / Σ(yᵢ − ȳ)²
 // where yᵢ = log(tokensᵢ) and ŷᵢ = a + bFiles·log1p(filesᵢ) + bDirs·log1p(dirsᵢ).
@@ -155,7 +157,7 @@ export function r2LogScale(samples: BaselineSample[], model: BaselineModel): num
   const { a, bFiles, bDirs } = model.params
   if (a == null || bFiles == null || bDirs == null) return null
   const valid = samples.filter((s) => s.tokens > 0)
-  if (valid.length < 3) return null
+  if (valid.length < MIN_SCOPE_SAMPLES) return null
   const ys = valid.map((s) => Math.log(s.tokens))
   const yBar = ys.reduce((acc, y) => acc + y, 0) / ys.length
   let ssRes = 0
