@@ -34,37 +34,39 @@ const ANCHORS: NavAnchor[] = [
 
 export function Info() {
   return (
-    <div className="page info-page">
+    <>
       <PageHeader
         num="04"
         title="info"
         description="Token Efficiency — методика, данные, формулы"
       />
-      <div className="info-grid">
-        <nav className="info-nav">
-          <ul>
-            {ANCHORS.map((a) => (
-              <li key={a.id}>
-                <a href={`#${a.id}`}>{a.label}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="info-content">
-          <Intro />
-          <DataSources />
-          <Storage />
-          <Baseline />
-          <PerSession />
-          <Daily />
-          <Reliability />
-          <OutOfScope />
-          <Caveats />
-          <DataInventory />
-          <CodeRefs />
-          <ComingSoon />
+      <div className="scroll">
+        <div className="info-grid">
+          <nav className="info-nav">
+            <ul>
+              {ANCHORS.map((a) => (
+                <li key={a.id}>
+                  <a href={`#${a.id}`}>{a.label}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="info-content">
+            <Intro />
+            <DataSources />
+            <Storage />
+            <Baseline />
+            <PerSession />
+            <Daily />
+            <Reliability />
+            <OutOfScope />
+            <Caveats />
+            <DataInventory />
+            <CodeRefs />
+            <ComingSoon />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
