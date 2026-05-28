@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Section = 'dashboard' | 'stats' | 'productivity' | 'skills' | 'settings'
+export type Section = 'dashboard' | 'stats' | 'productivity' | 'info' | 'skills' | 'settings'
 
 interface UiState {
   section: Section
