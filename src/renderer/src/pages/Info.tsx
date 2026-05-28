@@ -1,4 +1,5 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { Baseline } from '@renderer/pages/info/sections/baseline'
 import { DataSources } from '@renderer/pages/info/sections/data-sources'
 import { Intro } from '@renderer/pages/info/sections/intro'
 import { Storage } from '@renderer/pages/info/sections/storage'
@@ -12,6 +13,7 @@ const ANCHORS: NavAnchor[] = [
   { id: 'intro', label: '1. Зачем эта метрика' },
   { id: 'data-sources', label: '2. Источники данных' },
   { id: 'storage', label: '3. Что мы храним' },
+  { id: 'baseline', label: '4. Бейзлайн' },
   // remaining anchors appended in later tasks
 ]
 
@@ -37,6 +39,7 @@ export function Info() {
           <Intro />
           <DataSources />
           <Storage />
+          <Baseline />
         </div>
       </div>
     </div>
