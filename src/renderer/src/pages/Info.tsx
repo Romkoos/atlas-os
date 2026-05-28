@@ -1,8 +1,10 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { Baseline } from '@renderer/pages/info/sections/baseline'
+import { Caveats } from '@renderer/pages/info/sections/caveats'
 import { Daily } from '@renderer/pages/info/sections/daily'
 import { DataSources } from '@renderer/pages/info/sections/data-sources'
 import { Intro } from '@renderer/pages/info/sections/intro'
+import { OutOfScope } from '@renderer/pages/info/sections/out-of-scope'
 import { PerSession } from '@renderer/pages/info/sections/per-session'
 import { Reliability } from '@renderer/pages/info/sections/reliability'
 import { Storage } from '@renderer/pages/info/sections/storage'
@@ -20,6 +22,8 @@ const ANCHORS: NavAnchor[] = [
   { id: 'per-session', label: '5. Per-session Eff' },
   { id: 'daily', label: '6. Дневной Eff' },
   { id: 'reliability', label: '7. Надёжность' },
+  { id: 'out-of-scope', label: '8. Что мы НЕ измеряем' },
+  { id: 'caveats', label: '9. Известные ограничения' },
 ]
 
 export function Info() {
@@ -48,6 +52,8 @@ export function Info() {
           <PerSession />
           <Daily />
           <Reliability />
+          <OutOfScope />
+          <Caveats />
         </div>
       </div>
     </div>
