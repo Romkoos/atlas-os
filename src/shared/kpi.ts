@@ -144,6 +144,32 @@ export function rollingMedian(xs: number[], window: number): number[] {
   return xs.map((_, i) => medianOf(xs.slice(Math.max(0, i - window + 1), i + 1)))
 }
 
+// In-sample R² on log(actual tokens) for the scope model. Returns null when:
+// - method is global-median (no log-scale linear predictor exists);
+// - fewer than 3 valid samples;
+// - the model is missing scope params.
+// Formula: 1 − Σ(yᵢ − ŷᵢ)² / Σ(yᵢ − ȳ)²
+// where yᵢ = log(tokensᵢ) and ŷᵢ = a + bFiles·log1p(filesᵢ) + bDirs·log1p(dirsᵢ).
+export function r2LogScale(samples: BaselineSample[], model: BaselineModel): number | null {
+  if (model.method !== 'scope') return null
+  const { a, bFiles, bDirs } = model.params
+  if (a == null || bFiles == null || bDirs == null) return null
+  const valid = samples.filter((s) => s.tokens > 0)
+  if (valid.length < 3) return null
+  const ys = valid.map((s) => Math.log(s.tokens))
+  const yBar = ys.reduce((acc, y) => acc + y, 0) / ys.length
+  let ssRes = 0
+  let ssTot = 0
+  for (let i = 0; i < valid.length; i++) {
+    const s = valid[i]
+    const yHat = a + bFiles * log1p(s.files) + bDirs * log1p(s.dirs)
+    ssRes += (ys[i] - yHat) ** 2
+    ssTot += (ys[i] - yBar) ** 2
+  }
+  if (ssTot === 0) return null
+  return 1 - ssRes / ssTot
+}
+
 /** A session's token counts for a local calendar day, plus optional quality. */
 export interface KpdDaySession {
   day: string

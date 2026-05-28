@@ -4,6 +4,7 @@ import {
   expectedTokens,
   fitBaseline,
   kpdByDay,
+  r2LogScale,
   rollingMedian,
   sessionKpd,
 } from '@shared/kpi'
@@ -135,5 +136,48 @@ describe('kpdByDay', () => {
   })
   it('returns [] for empty input', () => {
     expect(kpdByDay([])).toEqual([])
+  })
+})
+
+describe('r2LogScale', () => {
+  it('returns null when fewer than 3 samples', () => {
+    const m = fitBaseline(
+      Array.from({ length: 10 }, (_, i) => sample(i + 1, 1, 5000 * (i + 1))),
+    ) as BaselineModel
+    expect(r2LogScale([], m)).toBeNull()
+    expect(r2LogScale([sample(1, 1, 100), sample(2, 1, 200)], m)).toBeNull()
+  })
+
+  it('returns null for global-median method (no log-scale predictor)', () => {
+    const m: BaselineModel = { method: 'global-median', params: { median: 1000 } }
+    const samples = Array.from({ length: 10 }, () => sample(2, 1, 1000))
+    expect(r2LogScale(samples, m)).toBeNull()
+  })
+
+  it('approaches 1 for tokens generated from the same scope model', () => {
+    // Generate samples that perfectly fit a chosen (a, bFiles, bDirs).
+    const a = 5
+    const bF = 1.2
+    const bD = 0.4
+    const samples: BaselineSample[] = []
+    for (let i = 1; i <= 12; i++) {
+      const files = i
+      const dirs = 1 + (i % 4)
+      const tokens = Math.exp(a + bF * Math.log1p(files) + bD * Math.log1p(dirs))
+      samples.push({ files, dirs, tokens })
+    }
+    const m = fitBaseline(samples) as BaselineModel
+    expect(m.method).toBe('scope')
+    const r2 = r2LogScale(samples, m) as number
+    expect(r2).toBeGreaterThan(0.999)
+  })
+
+  it('reports null R² when the model falls back to global-median (no scope predictor)', () => {
+    // Same scope for every sample → fitBaseline produces global-median; r2LogScale must return null.
+    const tokens = [100, 5000, 200, 800, 3000, 50, 7000, 120, 4500, 230]
+    const samples = tokens.map((t) => sample(2, 1, t))
+    const m = fitBaseline(samples)
+    expect(m?.method).toBe('global-median')
+    expect(r2LogScale(samples, m as BaselineModel)).toBeNull()
   })
 })
