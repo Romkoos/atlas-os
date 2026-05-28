@@ -4,6 +4,7 @@ import { Daily } from '@renderer/pages/info/sections/daily'
 import { DataSources } from '@renderer/pages/info/sections/data-sources'
 import { Intro } from '@renderer/pages/info/sections/intro'
 import { PerSession } from '@renderer/pages/info/sections/per-session'
+import { Reliability } from '@renderer/pages/info/sections/reliability'
 import { Storage } from '@renderer/pages/info/sections/storage'
 
 interface NavAnchor {
@@ -18,6 +19,7 @@ const ANCHORS: NavAnchor[] = [
   { id: 'baseline', label: '4. Бейзлайн' },
   { id: 'per-session', label: '5. Per-session Eff' },
   { id: 'daily', label: '6. Дневной Eff' },
+  { id: 'reliability', label: '7. Надёжность' },
 ]
 
 export function Info() {
@@ -45,6 +47,7 @@ export function Info() {
           <Baseline />
           <PerSession />
           <Daily />
+          <Reliability />
         </div>
       </div>
     </div>
