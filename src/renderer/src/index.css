@@ -1097,3 +1097,58 @@
   animation: blink 1s steps(1) infinite;
   margin-left: 2px;
 }
+
+/* INFO page layout (src/renderer/src/pages/Info.tsx) */
+.info-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 32px;
+  align-items: start;
+  margin-top: 16px;
+}
+.info-nav {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+}
+.info-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.info-nav a {
+  display: block;
+  padding: 4px 8px;
+  color: var(--color-muted-fg);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  font-size: 13px;
+}
+.info-nav a:hover {
+  color: var(--color-fg);
+  border-left-color: var(--color-chart-1);
+}
+.info-content {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  line-height: 1.55;
+}
+.info-h {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.info-section p { margin: 8px 0; }
+.info-section code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  background: var(--color-border);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
