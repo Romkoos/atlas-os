@@ -1,4 +1,5 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { Formula } from '@renderer/pages/info/Formula'
 
 export function Info() {
   return (
@@ -10,7 +11,10 @@ export function Info() {
       />
       <div className="panel mt-16">
         <div className="panel-body">
-          <p style={{ color: 'var(--color-muted-fg)' }}>Страница в сборке.</p>
+          <Formula
+            display
+            tex="\\text{Eff} = \\frac{\\text{expected}}{\\text{actual}} \\times 100\\%"
+          />
         </div>
       </div>
     </div>
