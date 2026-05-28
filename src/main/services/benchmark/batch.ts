@@ -77,7 +77,21 @@ async function runLoop(
 
     for (const task of tasks) {
       for (let rep = 0; rep < k; rep++) {
-        const result = await runBenchmarkTask(task, { model, repoRoot })
+        // One free retry on TRANSIENT SDK failures (controller-aborted mid-
+        // session, networking blip, internal SDK error). assertion_failed and
+        // rate_limited are NOT retried — they're real signals about the run.
+        // This trades a small token spend for stability: a single SDK hiccup
+        // shouldn't poison the batch row.
+        let result = await runBenchmarkTask(task, { model, repoRoot })
+        if (
+          !result.success &&
+          (result.failReason === 'sdk_error' || result.failReason === 'timeout')
+        ) {
+          console.warn(
+            `[benchmark] ${task.id} rep=${rep} transient ${result.failReason} — retrying once`,
+          )
+          result = await runBenchmarkTask(task, { model, repoRoot })
+        }
         db()
           .insert(benchmarkRuns)
           .values({

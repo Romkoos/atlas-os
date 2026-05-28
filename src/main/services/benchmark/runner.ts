@@ -45,7 +45,9 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
   const baseOptions = {
     model: opts.model,
     settingSources: ['user', 'project'] as ('user' | 'project')[], // LOAD infra under test — opposite of difficulty.ts
-    allowedTools: ['Read', 'Grep', 'Glob'], // read-only — live repo cannot mutate
+    // Default: read-only tools so the live repo cannot mutate. A task can widen
+    // this set (e.g. add 'Bash' for read-only git inspection) via allowedTools.
+    allowedTools: task.allowedTools ?? ['Read', 'Grep', 'Glob'],
     permissionMode: 'bypassPermissions' as const, // headless: never hang on a prompt
     cwd: opts.repoRoot,
     env: subscriptionEnv(),
@@ -95,7 +97,14 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
   }
 
   const gate = checkRun(
-    { subtype: finalSubtype, resultText: finalResult, aborted: controller.signal.aborted },
+    {
+      subtype: finalSubtype,
+      resultText: finalResult,
+      aborted: controller.signal.aborted,
+      // Zero turns AND zero duration ⇒ the SDK never emitted a result message,
+      // so the 5-min wall-clock timer cannot have fired. Treat as sdk_error.
+      noProgress: numTurns === 0 && durationMs === 0,
+    },
     task.assert,
   )
   return {
@@ -111,6 +120,7 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
     success: gate.valid,
     failReason: gate.failReason,
     sessionId,
+    resultText: finalResult,
   }
 }
 
