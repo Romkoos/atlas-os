@@ -4,6 +4,7 @@ import {
   expectedTokens,
   fitBaseline,
   kpdByDay,
+  medianAbsResidualPct,
   r2LogScale,
   rollingMedian,
   sessionKpd,
@@ -188,5 +189,46 @@ describe('r2LogScale', () => {
     const m = fitBaseline(samples)
     expect(m?.method).toBe('global-median')
     expect(r2LogScale(samples, m as BaselineModel)).toBeNull()
+  })
+})
+
+describe('medianAbsResidualPct', () => {
+  it('returns null when no valid samples or expected is non-positive', () => {
+    const m = fitBaseline(
+      Array.from({ length: 10 }, (_, i) => sample(i + 1, 1, 5000 * (i + 1))),
+    ) as BaselineModel
+    expect(medianAbsResidualPct([], m)).toBeNull()
+    expect(medianAbsResidualPct([sample(1, 1, 0)], m)).toBeNull()
+  })
+
+  it('returns ~0 when actual ≈ expected for every sample (perfect fit)', () => {
+    const a = 5
+    const bF = 1.2
+    const bD = 0.4
+    const samples: BaselineSample[] = []
+    for (let i = 1; i <= 12; i++) {
+      const files = i
+      const dirs = 1 + (i % 4)
+      const tokens = Math.exp(a + bF * Math.log1p(files) + bD * Math.log1p(dirs))
+      samples.push({ files, dirs, tokens })
+    }
+    const m = fitBaseline(samples) as BaselineModel
+    const med = medianAbsResidualPct(samples, m) as number
+    expect(med).toBeLessThan(0.01)
+  })
+
+  it('reports the median of |actual − expected| / expected × 100', () => {
+    // expected for every sample = stored median (global-median model).
+    const m: BaselineModel = { method: 'global-median', params: { median: 1000 } }
+    const samples = [
+      sample(0, 0, 800), // 20%
+      sample(0, 0, 1500), // 50%
+      sample(0, 0, 900), // 10%
+      sample(0, 0, 1200), // 20%
+      sample(0, 0, 1100), // 10%
+    ]
+    const med = medianAbsResidualPct(samples, m) as number
+    // sorted absolute residual %: [10, 10, 20, 20, 50] → median = 20
+    expect(med).toBeCloseTo(20, 6)
   })
 })

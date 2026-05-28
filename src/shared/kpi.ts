@@ -172,6 +172,26 @@ export function r2LogScale(samples: BaselineSample[], model: BaselineModel): num
   return 1 - ssRes / ssTot
 }
 
+// Median absolute residual as a percentage of expected:
+//   median( |actual − expected| / expected × 100 ).
+// "Typical fit error" in linear token space — easier to interpret than R² on
+// logs. Works for both scope and global-median models (uses expectedTokens).
+// Returns null on empty input or when no sample yields a positive expected.
+export function medianAbsResidualPct(
+  samples: BaselineSample[],
+  model: BaselineModel,
+): number | null {
+  const pcts: number[] = []
+  for (const s of samples) {
+    if (!(s.tokens > 0)) continue
+    const expected = expectedTokens(model, { files: s.files, dirs: s.dirs })
+    if (expected == null || expected <= 0) continue
+    pcts.push((Math.abs(s.tokens - expected) / expected) * 100)
+  }
+  if (pcts.length === 0) return null
+  return medianOf(pcts)
+}
+
 /** A session's token counts for a local calendar day, plus optional quality. */
 export interface KpdDaySession {
   day: string
