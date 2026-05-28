@@ -32,12 +32,20 @@ describe('checkRun', () => {
       failReason: null,
     })
   })
-  it('timeout when aborted', () => {
+  it('timeout when aborted after some progress (5-min wall-clock)', () => {
     expect(
       checkRun({ subtype: 'success', resultText: 'see infra.ts', aborted: true }, assert),
     ).toEqual({
       valid: false,
       failReason: 'timeout',
+    })
+  })
+  it('sdk_error when aborted with zero progress (SDK gave up before first turn)', () => {
+    expect(
+      checkRun({ subtype: 'error', resultText: '', aborted: true, noProgress: true }, assert),
+    ).toEqual({
+      valid: false,
+      failReason: 'sdk_error',
     })
   })
   it('sdk_error when subtype is not success', () => {
@@ -56,7 +64,7 @@ describe('checkRun', () => {
       failReason: 'assertion_failed',
     })
   })
-  it('rate_limited when the response is a session-limit message', () => {
+  it('rate_limited when the response is a short canonical session-limit message', () => {
     expect(
       checkRun(
         {
@@ -67,5 +75,22 @@ describe('checkRun', () => {
         assert,
       ),
     ).toEqual({ valid: false, failReason: 'rate_limited' })
+  })
+  it('NOT rate_limited when limit phrase is cited in long task output', () => {
+    // Length guard prevents false positives when tasks like git-recent-touch
+    // surface gate.test.ts or commit messages that include the canonical
+    // limit phrase as documentation.
+    const longResponse =
+      'Recent commit summaries for the benchmark module:\n\n' +
+      "1. gate.ts: added detection for `You've hit your session limit · resets 6:20pm` style server messages so the runner classifies subscription cooldowns honestly instead of treating them as assertion failures.\n" +
+      '2. runner.ts: aggregates token + cache + duration metrics across all turns of a session via the agent SDK resume mechanism.\n' +
+      '3. types.ts: declared the FailReason union including rate_limited / sdk_error / timeout / assertion_failed.\n\n' +
+      'These changes implement the infra.ts watcher updates required for benchmark stability across infra changes. The full text of the canonical server message is documented in the source comments. infra.ts is the central watcher file in this codebase and is referenced throughout the benchmark module.'
+    expect(
+      checkRun(
+        { subtype: 'success', resultText: longResponse, aborted: false },
+        { type: 'includes', value: 'infra.ts' },
+      ),
+    ).toEqual({ valid: true, failReason: null })
   })
 })
