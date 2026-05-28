@@ -1,7 +1,9 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { Baseline } from '@renderer/pages/info/sections/baseline'
+import { Daily } from '@renderer/pages/info/sections/daily'
 import { DataSources } from '@renderer/pages/info/sections/data-sources'
 import { Intro } from '@renderer/pages/info/sections/intro'
+import { PerSession } from '@renderer/pages/info/sections/per-session'
 import { Storage } from '@renderer/pages/info/sections/storage'
 
 interface NavAnchor {
@@ -14,7 +16,8 @@ const ANCHORS: NavAnchor[] = [
   { id: 'data-sources', label: '2. Источники данных' },
   { id: 'storage', label: '3. Что мы храним' },
   { id: 'baseline', label: '4. Бейзлайн' },
-  // remaining anchors appended in later tasks
+  { id: 'per-session', label: '5. Per-session Eff' },
+  { id: 'daily', label: '6. Дневной Eff' },
 ]
 
 export function Info() {
@@ -40,6 +43,8 @@ export function Info() {
           <DataSources />
           <Storage />
           <Baseline />
+          <PerSession />
+          <Daily />
         </div>
       </div>
     </div>
