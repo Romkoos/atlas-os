@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { db } from '@main/db/client'
-import { kpiBaseline } from '@main/db/schema'
+import { agentSessions, agentTurns, kpiBaseline } from '@main/db/schema'
+import { getSettings } from '@main/store'
 import { type BaselineModel, fitBaseline } from '@shared/kpi'
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, inArray, sql } from 'drizzle-orm'
 
 const BASELINE_MIN_SESSIONS = 15
 const BASELINE_FRACTION = 0.25
@@ -88,4 +89,64 @@ export function rebaseline(used: ScopedSession[], projectPath?: string): Baselin
   if (!model) return null
   saveBaseline(scopeKey(projectPath), model, used)
   return model
+}
+
+// Tracked-projects filter — mirrors the helper in the productivity router.
+function trackedProjects(): string[] {
+  return getSettings().trackedProjects ?? []
+}
+
+// All scope-filtered agent sessions with derived `lastTs` from agent_turns and
+// `tokens = totalTokensIn + totalTokensOut`. Sorted ASCENDING by lastTs (the
+// order baseline freezing and rolling-window logic depend on).
+// Sessions with no recorded turns are excluded.
+export function getScopedSessions(projectPath?: string): ScopedSession[] {
+  const tracked = trackedProjects()
+  const scopeFilter = projectPath
+    ? eq(agentSessions.projectPath, projectPath)
+    : tracked.length
+      ? inArray(agentSessions.projectPath, tracked)
+      : undefined
+
+  const turnAgg = db()
+    .select({
+      id: agentTurns.sessionId,
+      lastTs: sql<number>`max(${agentTurns.ts})`,
+    })
+    .from(agentTurns)
+    .groupBy(agentTurns.sessionId)
+    .all()
+  const aggById = new Map(turnAgg.map((r) => [r.id, r]))
+
+  const sessRows = db()
+    .select({
+      id: agentSessions.sessionId,
+      difficulty: agentSessions.difficulty,
+      files: agentSessions.distinctFiles,
+      dirs: agentSessions.distinctDirs,
+      score: agentSessions.score,
+      tin: agentSessions.totalTokensIn,
+      tout: agentSessions.totalTokensOut,
+    })
+    .from(agentSessions)
+    .where(scopeFilter)
+    .all()
+
+  const rows: ScopedSession[] = sessRows.flatMap((r) => {
+    const agg = aggById.get(r.id)
+    if (!agg) return []
+    return [
+      {
+        id: r.id,
+        difficulty: r.difficulty,
+        files: r.files,
+        dirs: r.dirs,
+        tokens: r.tin + r.tout,
+        score: r.score,
+        lastTs: Number(agg.lastTs),
+      },
+    ]
+  })
+  rows.sort((a, b) => a.lastTs - b.lastTs)
+  return rows
 }

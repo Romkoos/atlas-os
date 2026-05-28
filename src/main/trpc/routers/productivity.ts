@@ -4,6 +4,7 @@ import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { appPaths } from '@main/paths'
 import {
   ensureBaseline,
+  getScopedSessions,
   rebaseline as refitBaseline,
   type ScopedSession,
 } from '@main/services/productivity/baseline'
@@ -124,61 +125,14 @@ interface KpdRow extends ScopedSession {
 // Every scoped session with its last-turn day/ts, plus Eff against the frozen
 // baseline. Ascending by lastTs. Shared by kpi / ecosystemImpact / rebaseline.
 function scopedKpdRows(projectPath?: string): KpdRow[] {
-  const tracked = trackedProjects()
-  const scopeFilter = projectPath
-    ? eq(agentSessions.projectPath, projectPath)
-    : tracked.length
-      ? inArray(agentSessions.projectPath, tracked)
-      : undefined
-
-  const turnAgg = db()
-    .select({
-      id: agentTurns.sessionId,
-      lastTs: sql<number>`max(${agentTurns.ts})`,
-      day: sql<string>`date(max(${agentTurns.ts}) / 1000, 'unixepoch', 'localtime')`,
-    })
-    .from(agentTurns)
-    .groupBy(agentTurns.sessionId)
-    .all()
-  const aggById = new Map(turnAgg.map((r) => [r.id, r]))
-
-  const sessRows = db()
-    .select({
-      id: agentSessions.sessionId,
-      difficulty: agentSessions.difficulty,
-      files: agentSessions.distinctFiles,
-      dirs: agentSessions.distinctDirs,
-      score: agentSessions.score,
-      tin: agentSessions.totalTokensIn,
-      tout: agentSessions.totalTokensOut,
-    })
-    .from(agentSessions)
-    .where(scopeFilter)
-    .all()
-
-  const rows: ScopedSession[] = sessRows.flatMap((r) => {
-    const agg = aggById.get(r.id)
-    if (!agg) return []
-    return [
-      {
-        id: r.id,
-        difficulty: r.difficulty,
-        files: r.files,
-        dirs: r.dirs,
-        tokens: r.tin + r.tout,
-        score: r.score,
-        lastTs: Number(agg.lastTs),
-      },
-    ]
-  })
-  rows.sort((a, b) => a.lastTs - b.lastTs)
-
+  const rows = getScopedSessions(projectPath)
   const model = ensureBaseline(rows, projectPath)
   return rows.map((r) => {
-    const agg = aggById.get(r.id)
+    // Local YYYY-MM-DD; 'sv-SE' produces ISO-like format in any locale.
+    const day = new Date(r.lastTs).toLocaleDateString('sv-SE')
     const expected = model ? expectedTokens(model, { files: r.files, dirs: r.dirs }) : null
     const kpd = sessionKpd(expected, r.tokens)
-    return { ...r, day: agg?.day ?? '', expected, kpd }
+    return { ...r, day, expected, kpd }
   })
 }
 
