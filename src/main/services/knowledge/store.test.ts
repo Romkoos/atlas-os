@@ -51,3 +51,73 @@ describe('assertInside', () => {
     expect(() => assertInside('/root', '/etc/passwd')).toThrow(/escapes/)
   })
 })
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, beforeAll } from 'vitest'
+import { listArticles, listDaily, listProjects, readArticle, readIndex } from './store'
+
+let root: string
+
+beforeAll(() => {
+  root = mkdtempSync(join(tmpdir(), 'kb-'))
+  mkdirSync(join(root, '_engine'), { recursive: true })
+  writeFileSync(join(root, '_engine', 'projects.json'), JSON.stringify({ proj: '/abs/proj' }))
+  const k = join(root, 'proj', 'knowledge')
+  mkdirSync(join(k, 'concepts'), { recursive: true })
+  mkdirSync(join(k, 'connections'), { recursive: true })
+  writeFileSync(join(k, 'index.md'), '# Index\n| link | summary |')
+  writeFileSync(
+    join(k, 'concepts', 'alpha.md'),
+    '---\ntitle: Alpha\ntags: [x]\naliases: [a]\nupdated: 2026-05-01\n---\n# Alpha\nlinks [[connections/beta]]',
+  )
+  writeFileSync(
+    join(k, 'connections', 'beta.md'),
+    '---\ntitle: Beta\nupdated: 2026-05-02\n---\n# Beta\nbody',
+  )
+  mkdirSync(join(root, 'proj', 'daily'), { recursive: true })
+  writeFileSync(join(root, 'proj', 'daily', '2026-05-30.md'), '# Daily')
+})
+
+afterAll(() => rmSync(root, { recursive: true, force: true }))
+
+describe('listProjects', () => {
+  it('lists tracked projects, skips _engine, counts articles + daily', () => {
+    const projects = listProjects(root, new Set(['/abs/proj']))
+    expect(projects.map((p) => p.name)).toEqual(['proj'])
+    expect(projects[0].articleCount).toBe(2)
+    expect(projects[0].dailyCount).toBe(1)
+  })
+  it('hides untracked projects', () => {
+    expect(listProjects(root, new Set(['/abs/other']))).toEqual([])
+  })
+})
+
+describe('listArticles', () => {
+  it('returns metadata with kind, tags, aliases, and inbound counts', () => {
+    const arts = listArticles(root, 'proj')
+    const beta = arts.find((a) => a.relPath === 'connections/beta.md')
+    expect(beta?.kind).toBe('connection')
+    expect(beta?.title).toBe('Beta')
+    expect(beta?.inboundLinks).toBe(1)
+    const alpha = arts.find((a) => a.relPath === 'concepts/alpha.md')
+    expect(alpha?.tags).toEqual(['x'])
+    expect(alpha?.aliases).toEqual(['a'])
+  })
+})
+
+describe('readArticle / readIndex / listDaily', () => {
+  it('reads an article doc', () => {
+    expect(readArticle(root, 'proj', 'concepts/alpha.md').frontmatter.title).toBe('Alpha')
+  })
+  it('reads the raw index', () => {
+    expect(readIndex(root, 'proj')).toContain('# Index')
+  })
+  it('lists daily entries newest-first', () => {
+    expect(listDaily(root, 'proj')).toEqual([{ date: '2026-05-30', relPath: '2026-05-30.md' }])
+  })
+  it('rejects traversal in readArticle', () => {
+    expect(() => readArticle(root, 'proj', '../../_engine/projects.json')).toThrow(/escapes/)
+  })
+})
