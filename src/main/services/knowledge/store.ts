@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
+import { promisify } from 'node:util'
 import {
   type ArticleDoc,
   type ArticleKind,
@@ -169,4 +171,32 @@ export function listDaily(root: string, project: string): DailyEntry[] {
 export function readDaily(root: string, project: string, relPath: string): string {
   const abs = assertInside(join(root, project, 'daily'), relPath)
   return existsSync(abs) ? readFileSync(abs, 'utf8') : ''
+}
+
+const execFileAsync = promisify(execFile)
+
+// Shell out to the engine's query.py (read-only: NO --file-back). Spends API
+// tokens — callers must gate this behind an explicit user action. ATLAS_KB_ROOT
+// points at the per-project root; the engine resolves knowledge/ from there.
+export async function runQuery(root: string, project: string, q: string): Promise<string> {
+  const engine = join(root, RESERVED)
+  const projectRoot = assertInside(root, project)
+  try {
+    const { stdout } = await execFileAsync(
+      'uv',
+      ['run', '--directory', engine, 'python', 'scripts/query.py', q],
+      {
+        env: { ...process.env, ATLAS_KB_ROOT: projectRoot },
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    )
+    return stdout.trim()
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException & { stderr?: string }
+    if (e.code === 'ENOENT') {
+      throw new Error('`uv` not found on PATH — install uv to use knowledge search.')
+    }
+    throw new Error(e.stderr?.trim() || e.message || 'query.py failed')
+  }
 }
