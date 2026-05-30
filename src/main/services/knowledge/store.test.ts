@@ -52,7 +52,7 @@ describe('assertInside', () => {
   })
 })
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll } from 'vitest'
@@ -91,6 +91,11 @@ describe('listProjects', () => {
   })
   it('hides untracked projects', () => {
     expect(listProjects(root, new Set(['/abs/other']))).toEqual([])
+  })
+  it('skips a broken symlink in the store root without throwing', () => {
+    symlinkSync(join(root, 'nonexistent-target'), join(root, 'broken'))
+    const projects = listProjects(root, new Set())
+    expect(projects.map((p) => p.name)).not.toContain('broken')
   })
 })
 

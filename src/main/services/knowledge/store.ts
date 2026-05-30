@@ -66,7 +66,9 @@ function loadProjectsJson(root: string): Record<string, string> {
   if (!existsSync(f)) return {}
   try {
     const parsed = JSON.parse(readFileSync(f, 'utf8'))
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {}
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, string>)
+      : {}
   } catch {
     return {}
   }
@@ -121,7 +123,13 @@ export function listProjects(root: string, tracked: ReadonlySet<string>): Knowle
   for (const name of readdirSync(root)) {
     if (name === RESERVED) continue
     const dir = join(root, name)
-    if (!statSync(dir).isDirectory()) continue
+    let st: ReturnType<typeof statSync> | null = null
+    try {
+      st = statSync(dir)
+    } catch {
+      continue
+    }
+    if (!st.isDirectory()) continue
     if (!existsSync(join(dir, 'knowledge'))) continue
     if (!isTracked(name, projects, tracked)) continue
     const articles = listArticles(root, name)
