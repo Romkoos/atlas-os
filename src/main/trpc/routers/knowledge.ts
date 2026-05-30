@@ -19,7 +19,9 @@ import {
 import { z } from 'zod'
 
 const tracked = (): Set<string> => new Set(getSettings().trackedProjects ?? [])
-const projectInput = z.object({ project: z.string() })
+const projectInput = z.object({
+  project: z.string().regex(/^[^/\\.][^/\\]*$/, 'invalid project'),
+})
 
 export const knowledgeRouter = router({
   projects: publicProcedure

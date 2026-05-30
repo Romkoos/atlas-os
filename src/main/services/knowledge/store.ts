@@ -28,7 +28,9 @@ export function parseFrontmatter(raw: string): ArticleDoc {
   let frontmatter: Record<string, unknown> = {}
   try {
     const parsed = parseYaml(m[1])
-    if (parsed && typeof parsed === 'object') frontmatter = parsed as Record<string, unknown>
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      frontmatter = parsed as Record<string, unknown>
+    }
   } catch {
     frontmatter = {}
   }
@@ -55,6 +57,21 @@ export function assertInside(root: string, relPath: string): string {
     throw new Error(`path escapes root: ${relPath}`)
   }
   return target
+}
+
+// Validate `project` is a single safe dir segment and return its guarded abs
+// path. Rejects separators and `.`/`..` so a crafted project can't escape root.
+export function projectRoot(root: string, project: string): string {
+  if (
+    !project ||
+    project === '.' ||
+    project === '..' ||
+    project.includes('/') ||
+    project.includes('\\')
+  ) {
+    throw new Error(`invalid project: ${project}`)
+  }
+  return assertInside(root, project)
 }
 
 const KINDS: ReadonlyArray<{ dir: string; kind: ArticleKind }> = [
@@ -88,7 +105,7 @@ function readAllArticles(
   root: string,
   project: string,
 ): Array<{ relPath: string; kind: ArticleKind; doc: ArticleDoc }> {
-  const kdir = assertInside(join(root, project), 'knowledge')
+  const kdir = assertInside(projectRoot(root, project), 'knowledge')
   const out: Array<{ relPath: string; kind: ArticleKind; doc: ArticleDoc }> = []
   for (const { dir, kind } of KINDS) {
     const abs = join(kdir, dir)
@@ -149,18 +166,18 @@ export function listProjects(root: string, tracked: ReadonlySet<string>): Knowle
 }
 
 export function readArticle(root: string, project: string, relPath: string): ArticleDoc {
-  const abs = assertInside(join(root, project, 'knowledge'), relPath)
+  const abs = assertInside(join(projectRoot(root, project), 'knowledge'), relPath)
   if (!existsSync(abs)) return { frontmatter: {}, body: '' }
   return parseFrontmatter(readFileSync(abs, 'utf8'))
 }
 
 export function readIndex(root: string, project: string): string {
-  const abs = assertInside(join(root, project, 'knowledge'), 'index.md')
+  const abs = assertInside(join(projectRoot(root, project), 'knowledge'), 'index.md')
   return existsSync(abs) ? readFileSync(abs, 'utf8') : ''
 }
 
 export function listDaily(root: string, project: string): DailyEntry[] {
-  const abs = assertInside(join(root, project), 'daily')
+  const abs = assertInside(projectRoot(root, project), 'daily')
   if (!existsSync(abs)) return []
   return readdirSync(abs)
     .filter((f) => f.endsWith('.md'))
@@ -169,7 +186,7 @@ export function listDaily(root: string, project: string): DailyEntry[] {
 }
 
 export function readDaily(root: string, project: string, relPath: string): string {
-  const abs = assertInside(join(root, project, 'daily'), relPath)
+  const abs = assertInside(join(projectRoot(root, project), 'daily'), relPath)
   return existsSync(abs) ? readFileSync(abs, 'utf8') : ''
 }
 
@@ -180,13 +197,13 @@ const execFileAsync = promisify(execFile)
 // points at the per-project root; the engine resolves knowledge/ from there.
 export async function runQuery(root: string, project: string, q: string): Promise<string> {
   const engine = join(root, RESERVED)
-  const projectRoot = assertInside(root, project)
+  const projRoot = projectRoot(root, project)
   try {
     const { stdout } = await execFileAsync(
       'uv',
       ['run', '--directory', engine, 'python', 'scripts/query.py', q],
       {
-        env: { ...process.env, ATLAS_KB_ROOT: projectRoot },
+        env: { ...process.env, ATLAS_KB_ROOT: projRoot },
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
       },

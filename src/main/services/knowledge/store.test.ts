@@ -19,6 +19,11 @@ describe('parseFrontmatter', () => {
     expect(doc.frontmatter).toEqual({})
     expect(doc.body).toBe('body')
   })
+  it('degrades array frontmatter to empty object', () => {
+    const doc = parseFrontmatter('---\n- a\n- b\n---\nbody')
+    expect(doc.frontmatter).toEqual({})
+    expect(doc.body).toBe('body')
+  })
 })
 
 describe('isTracked', () => {
@@ -124,5 +129,11 @@ describe('readArticle / readIndex / listDaily', () => {
   })
   it('rejects traversal in readArticle', () => {
     expect(() => readArticle(root, 'proj', '../../_engine/projects.json')).toThrow(/escapes/)
+  })
+  it('rejects project traversal in readArticle', () => {
+    expect(() => readArticle(root, '../../etc', 'passwd.md')).toThrow(/invalid project|escapes/)
+  })
+  it('rejects project traversal in listArticles', () => {
+    expect(() => listArticles(root, '../../etc')).toThrow(/invalid project|escapes/)
   })
 })
