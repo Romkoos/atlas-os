@@ -71,7 +71,7 @@ export function Knowledge() {
                 <button
                   key={t.id}
                   type="button"
-                  className={tab === t.id ? 'tab tab-active' : 'tab'}
+                  className={tab === t.id ? 'on' : ''}
                   onClick={() => setTab(t.id)}
                 >
                   {t.label}
