@@ -112,6 +112,15 @@ A hook fires with a working context. Resolve the project folder name as follows:
 
 ## How ROOT flows through the pipeline
 
+> **Mechanism refinement (post-brainstorm, locked in the plan):** ROOT is
+> carried through the process chain via an **`ATLAS_KB_ROOT` environment
+> variable**, not by threading a `resolve(root)` argument through every
+> function. The hook resolves the project from stdin `cwd`, sets
+> `ATLAS_KB_ROOT` on spawned subprocesses, and `config.py` reads it at import.
+> This keeps `utils.py` and the four scripts in their existing
+> module-constant style with minimal edits. `config.py` remains the single
+> chokepoint — it just resolves from the env instead of from `__file__`.
+
 mako derives `ROOT` from `__file__` (script location). That breaks once engine
 and data are separate folders. New scheme:
 
