@@ -1,6 +1,6 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import type { SkillMeta } from '@shared/skills'
+import { groupByPrefix, type SkillMeta } from '@shared/skills'
 import { skipToken } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
@@ -21,26 +21,6 @@ function formatSkillMarkdown(md: string): string {
       /^[ \t]*<([a-zA-Z][\w-]*)(?:\s[^>]*)?>[ \t]*$/gm,
       (_match, tag: string) => `\n### ${titleCase(tag)}\n`,
     )
-}
-
-// Group skills by the segment before the first dash in their id (all `gsd-*`
-// collapse into one "gsd" group). Single-skill prefixes come first, then
-// multi-skill (collapsible) groups; both alphabetical by prefix. Members keep
-// the backend's name order.
-function groupByPrefix(items: SkillMeta[]): Array<[string, SkillMeta[]]> {
-  const groups = new Map<string, SkillMeta[]>()
-  for (const skill of items) {
-    const dash = skill.id.indexOf('-')
-    const prefix = dash > 0 ? skill.id.slice(0, dash) : skill.id
-    const arr = groups.get(prefix)
-    if (arr) arr.push(skill)
-    else groups.set(prefix, [skill])
-  }
-  return [...groups.entries()].sort((a, b) => {
-    const aMulti = a[1].length > 1 ? 1 : 0
-    const bMulti = b[1].length > 1 ? 1 : 0
-    return aMulti - bMulti || a[0].localeCompare(b[0])
-  })
 }
 
 const hintStyle = {
@@ -142,7 +122,7 @@ export function Skills() {
                   onSelect={() => setSelectedId(group[0].id)}
                 />
               ) : (
-                <details key={prefix} className="group" open>
+                <details key={prefix} className="group">
                   <summary
                     style={{
                       display: 'flex',

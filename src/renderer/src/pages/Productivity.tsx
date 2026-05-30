@@ -8,6 +8,8 @@ import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBr
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@renderer/lib/utils'
+import { groupByPrefix } from '@shared/skills'
+import { ChevronRight } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bar,
@@ -1521,6 +1523,434 @@ function EcosystemTab({ days }: { days: number }) {
   )
 }
 
+// ── Infra compare ─────────────────────────────────────────────────────────
+//
+// Three-column visualisation showing which plugins / MCP servers / skills were
+// active during the LAST benchmark run, the run before that (PREV), and the
+// LIVE on-disk state — so the user can see at a glance what changed since the
+// last cost measurement. The "live" column is only rendered when it actually
+// differs from "last" (no diff → just a "infra unchanged since last run" hint).
+//
+// Diff coloring is computed PER COLUMN relative to the column to its left:
+//   added (in this col, missing in left) → green `+`
+//   kept  (present in both)              → dim   `·`
+//   removed (in left, missing in this col) → red `−` (strikethrough)
+//
+// The Clear button records a "baseline cleared at" timestamp on disk; runs
+// older than it are filtered out of this panel (results table unaffected). The
+// Wipe button is gated behind a confirm — it DELETEs all benchmark_runs.
+
+const compareCellStyle = {
+  display: 'block',
+  fontFamily: 'var(--mono)',
+  fontSize: 11,
+  lineHeight: 1.55,
+  padding: '1px 6px',
+} as const
+
+const sectionTitleStyle = {
+  display: 'block',
+  fontFamily: 'var(--mono)',
+  fontSize: 10,
+  color: 'var(--fg-4)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  padding: '10px 6px 4px',
+  borderBottom: '1px solid var(--line-dim)',
+  marginBottom: 4,
+} as const
+
+type DiffStatus = 'added' | 'kept' | 'removed'
+
+function statusFor(name: string, currSet: Set<string>, leftSet: Set<string> | null): DiffStatus {
+  if (leftSet === null) return 'kept' // no left neighbour ⇒ neutral
+  const inCurr = currSet.has(name)
+  const inLeft = leftSet.has(name)
+  if (inCurr && !inLeft) return 'added'
+  if (!inCurr && inLeft) return 'removed'
+  return 'kept'
+}
+
+const STATUS_STYLE: Record<DiffStatus, { mark: string; color: string; strike: boolean }> = {
+  added: { mark: '+', color: 'var(--ok)', strike: false },
+  removed: { mark: '−', color: 'var(--warn)', strike: true },
+  kept: { mark: '·', color: 'var(--fg-3)', strike: false },
+}
+
+function DiffItem({ name, status }: { name: string; status: DiffStatus }) {
+  const sty = STATUS_STYLE[status]
+  return (
+    <span style={{ ...compareCellStyle, color: sty.color }}>
+      <span style={{ display: 'inline-block', width: 12, color: sty.color }}>{sty.mark}</span>
+      <span style={{ textDecoration: sty.strike ? 'line-through' : 'none' }}>{name}</span>
+    </span>
+  )
+}
+
+// Render skills as collapsible <details> groups by prefix, matching the Skills
+// page. The union (curr ∪ left) is grouped; each member item carries its diff
+// status. Group header shows the count "kept+added" / total in the union.
+function SkillsColumn({ currSet, leftSet }: { currSet: Set<string>; leftSet: Set<string> | null }) {
+  const union = new Set<string>([...currSet, ...(leftSet ?? [])])
+  if (union.size === 0) {
+    return <span style={{ ...compareCellStyle, color: 'var(--fg-4)' }}>{'// no skills'}</span>
+  }
+  const items = [...union].sort().map((id) => ({ id }))
+  const groups = groupByPrefix(items)
+  return (
+    <>
+      {groups.map(([prefix, group]) => {
+        if (group.length === 1) {
+          return (
+            <DiffItem
+              key={prefix}
+              name={group[0].id}
+              status={statusFor(group[0].id, currSet, leftSet)}
+            />
+          )
+        }
+        const presentInCurr = group.filter((g) => currSet.has(g.id)).length
+        return (
+          <details key={prefix}>
+            <summary
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '4px 6px',
+                fontFamily: 'var(--mono)',
+                fontSize: 10,
+                color: 'var(--fg-4)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                listStyle: 'none',
+                userSelect: 'none',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <ChevronRight style={{ width: 10, height: 10 }} />
+                {prefix}
+              </span>
+              <span>
+                {presentInCurr}/{group.length}
+              </span>
+            </summary>
+            {group.map((g) => (
+              <DiffItem key={g.id} name={g.id} status={statusFor(g.id, currSet, leftSet)} />
+            ))}
+          </details>
+        )
+      })}
+    </>
+  )
+}
+
+// One column of the compare grid: header + sections. `state === null` renders
+// a placeholder (used for the "prev" column when only one run exists, or after
+// Clear when no run has happened yet).
+function CompareColumn({
+  title,
+  subtitle,
+  state,
+  leftState,
+}: {
+  title: string
+  subtitle: string
+  state: {
+    plugins: Record<string, boolean>
+    mcpActive: string[]
+    mcpDisabled: string[]
+    skills: Record<string, number>
+  } | null
+  leftState: {
+    plugins: Record<string, boolean>
+    mcpActive: string[]
+    mcpDisabled: string[]
+    skills: Record<string, number>
+  } | null
+}) {
+  const pluginsCurr = state
+    ? new Set(
+        Object.entries(state.plugins)
+          .filter(([, v]) => v)
+          .map(([k]) => k),
+      )
+    : new Set<string>()
+  const pluginsLeft = leftState
+    ? new Set(
+        Object.entries(leftState.plugins)
+          .filter(([, v]) => v)
+          .map(([k]) => k),
+      )
+    : null
+  const mcpCurr = state ? new Set(state.mcpActive) : new Set<string>()
+  const mcpLeft = leftState ? new Set(leftState.mcpActive) : null
+  const mcpDisabledCurr = state ? new Set(state.mcpDisabled) : new Set<string>()
+  const mcpDisabledLeft = leftState ? new Set(leftState.mcpDisabled) : null
+  const skillsCurr = state ? new Set(Object.keys(state.skills)) : new Set<string>()
+  const skillsLeft = leftState ? new Set(Object.keys(leftState.skills)) : null
+
+  // Union of curr+left so removed items show as strikethrough in THIS column.
+  const renderSet = (currSet: Set<string>, leftSet: Set<string> | null): ReactNode[] => {
+    const union = new Set<string>([...currSet, ...(leftSet ?? [])])
+    if (union.size === 0) {
+      return [
+        <span key="empty" style={{ ...compareCellStyle, color: 'var(--fg-4)' }}>
+          {'// empty'}
+        </span>,
+      ]
+    }
+    return [...union]
+      .sort()
+      .map((name) => <DiffItem key={name} name={name} status={statusFor(name, currSet, leftSet)} />)
+  }
+
+  return (
+    <div
+      style={{
+        borderLeft: '1px solid var(--line-dim)',
+        padding: '0 0 12px',
+        minWidth: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '10px 12px 8px',
+          borderBottom: '1px solid var(--line-dim)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 11,
+            color: 'var(--fg-2)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+          {subtitle}
+        </div>
+      </div>
+      {state === null ? (
+        <span style={{ ...compareCellStyle, color: 'var(--fg-4)', padding: '12px' }}>
+          {'// no snapshot — run benchmark to populate'}
+        </span>
+      ) : (
+        <>
+          <span style={sectionTitleStyle}>plugins</span>
+          {renderSet(pluginsCurr, pluginsLeft)}
+          <span style={sectionTitleStyle}>mcp · active</span>
+          {renderSet(mcpCurr, mcpLeft)}
+          {(mcpDisabledCurr.size > 0 || (mcpDisabledLeft && mcpDisabledLeft.size > 0)) && (
+            <>
+              <span style={sectionTitleStyle}>mcp · disabled</span>
+              {renderSet(mcpDisabledCurr, mcpDisabledLeft)}
+            </>
+          )}
+          <span style={sectionTitleStyle}>skills</span>
+          <SkillsColumn currSet={skillsCurr} leftSet={skillsLeft} />
+        </>
+      )}
+    </div>
+  )
+}
+
+function infraNamesEqual(
+  a: {
+    plugins: Record<string, boolean>
+    mcpActive: string[]
+    mcpDisabled: string[]
+    skills: Record<string, number>
+  },
+  b: {
+    plugins: Record<string, boolean>
+    mcpActive: string[]
+    mcpDisabled: string[]
+    skills: Record<string, number>
+  },
+): boolean {
+  // Compare PRESENCE of names only (mtime drift on skills doesn't trigger the
+  // live column — Skills page surfaces edits via the productivity tracker).
+  const enabled = (p: Record<string, boolean>): string =>
+    JSON.stringify(
+      Object.entries(p)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+        .sort(),
+    )
+  if (enabled(a.plugins) !== enabled(b.plugins)) return false
+  if (JSON.stringify([...a.mcpActive].sort()) !== JSON.stringify([...b.mcpActive].sort()))
+    return false
+  if (JSON.stringify([...a.mcpDisabled].sort()) !== JSON.stringify([...b.mcpDisabled].sort()))
+    return false
+  if (JSON.stringify(Object.keys(a.skills).sort()) !== JSON.stringify(Object.keys(b.skills).sort()))
+    return false
+  return true
+}
+
+function fmtTs(ms: number): string {
+  const d = new Date(ms)
+  return d.toLocaleString(undefined, {
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function InfraComparePanel() {
+  const utils = trpc.useUtils()
+  const cmp = trpc.benchmark.infraCompare.useQuery()
+  const clearMut = trpc.benchmark.clearCompareBaseline.useMutation({
+    onSuccess: () => {
+      void utils.benchmark.infraCompare.invalidate()
+      toast.success('Compare baseline cleared — next run becomes the new baseline')
+    },
+  })
+  const wipeMut = trpc.benchmark.wipeRuns.useMutation({
+    onSuccess: ({ deleted }) => {
+      void utils.benchmark.infraCompare.invalidate()
+      void utils.benchmark.results.invalidate()
+      toast.success(`Wiped ${deleted} benchmark runs`)
+    },
+  })
+
+  if (cmp.isLoading) {
+    return (
+      <div className="panel mt-16">
+        <div className="panel-head">
+          <span className="ttl">infra compare</span>
+        </div>
+        <div className="panel-body">
+          <Loading />
+        </div>
+      </div>
+    )
+  }
+
+  const data = cmp.data
+  if (!data) {
+    return null
+  }
+
+  const liveDiffers = data.last === null || !infraNamesEqual(data.last.state, data.live)
+  const showLive = liveDiffers
+
+  return (
+    <div className="panel mt-16">
+      <div className="panel-head">
+        <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <span className="ttl">infra compare</span>
+          <span className="meta">
+            plugins · mcp · skills active at each run · live = on-disk state right now
+          </span>
+        </span>
+        <span style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 10 }}
+            disabled={clearMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  'Clear the compare baseline? Existing runs stay in the results table, but the panel resets and the next run becomes the new baseline.',
+                )
+              ) {
+                clearMut.mutate()
+              }
+            }}
+          >
+            CLEAR BASELINE
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 10, color: 'var(--warn)' }}
+            disabled={wipeMut.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  'DELETE all benchmark runs from the database? This wipes the results table AND the compare baseline. Cannot be undone.',
+                )
+              ) {
+                wipeMut.mutate()
+              }
+            }}
+          >
+            WIPE ALL RUNS
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 10 }}
+            onClick={() => void cmp.refetch()}
+          >
+            REFRESH LIVE
+          </button>
+        </span>
+      </div>
+      <div className="panel-body" style={{ padding: 0 }}>
+        {data.baselineClearedAt !== null && data.prev === null && data.last === null ? (
+          <div style={{ padding: 16 }}>
+            <NoteLine>
+              baseline cleared at {fmtTs(data.baselineClearedAt)} — run benchmark to populate the
+              first baseline.
+            </NoteLine>
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: showLive ? '1fr 1fr 1fr' : '1fr 1fr',
+            borderTop: '1px solid var(--line-dim)',
+          }}
+        >
+          <CompareColumn
+            title="prev run"
+            subtitle={data.prev ? fmtTs(data.prev.ts) : '— no prior run —'}
+            state={data.prev?.state ?? null}
+            leftState={null}
+          />
+          <CompareColumn
+            title="last run"
+            subtitle={data.last ? fmtTs(data.last.ts) : '— no run yet —'}
+            state={data.last?.state ?? null}
+            leftState={data.prev?.state ?? null}
+          />
+          {showLive ? (
+            <CompareColumn
+              title="live (now)"
+              subtitle="on-disk state · click RUN to measure"
+              state={data.live}
+              leftState={data.last?.state ?? null}
+            />
+          ) : null}
+        </div>
+        {!showLive && data.last !== null ? (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderTop: '1px solid var(--line-dim)',
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              color: 'var(--fg-3)',
+            }}
+          >
+            {'// infra unchanged since last run — no live diff to show'}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function BenchmarkTab() {
   const utils = trpc.useUtils()
   const tasks = trpc.benchmark.tasks.useQuery()
@@ -1560,7 +1990,10 @@ function BenchmarkTab() {
   const liveProgress = progress.data ?? latest.data ?? null
   const running = liveProgress?.running ?? false
   useEffect(() => {
-    if (liveProgress && !liveProgress.running) void utils.benchmark.results.invalidate()
+    if (liveProgress && !liveProgress.running) {
+      void utils.benchmark.results.invalidate()
+      void utils.benchmark.infraCompare.invalidate()
+    }
   }, [liveProgress, utils])
 
   const taskCount = tasks.data?.length ?? 0
@@ -1656,6 +2089,8 @@ function BenchmarkTab() {
         </div>
       </div>
 
+      <InfraComparePanel />
+
       <div className="panel mt-16">
         <div className="panel-head">
           <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -1686,6 +2121,7 @@ function BenchmarkTab() {
             <thead>
               <tr>
                 <th>task</th>
+                <th>category</th>
                 <th>infra</th>
                 <th className="num">n</th>
                 <th className="num">median tokens</th>
@@ -1717,6 +2153,9 @@ function BenchmarkTab() {
                       ) : (
                         ''
                       )}
+                    </td>
+                    <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
+                      {firstOfTask ? (r.category ?? '—') : ''}
                     </td>
                     <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
                       {new Date(r.firstTs).toLocaleDateString()} · {r.plugins}p {r.mcp}m {r.skills}s

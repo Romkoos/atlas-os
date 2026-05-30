@@ -19,3 +19,24 @@ export const skillDetailSchema = z.object({
 
 export type SkillMeta = z.infer<typeof skillMetaSchema>
 export type SkillDetail = z.infer<typeof skillDetailSchema>
+
+// Group items by the segment of their id before the first dash (e.g. all
+// `gsd-*` collapse into one "gsd" group). Single-id prefixes come first, then
+// multi-id (collapsible) groups; both alphabetical by prefix. Member order is
+// preserved from the input. Used by the Skills page and the benchmark infra
+// compare panel (where skills with the same prefix are visually grouped).
+export function groupByPrefix<T extends { id: string }>(items: T[]): Array<[string, T[]]> {
+  const groups = new Map<string, T[]>()
+  for (const item of items) {
+    const dash = item.id.indexOf('-')
+    const prefix = dash > 0 ? item.id.slice(0, dash) : item.id
+    const arr = groups.get(prefix)
+    if (arr) arr.push(item)
+    else groups.set(prefix, [item])
+  }
+  return [...groups.entries()].sort((a, b) => {
+    const aMulti = a[1].length > 1 ? 1 : 0
+    const bMulti = b[1].length > 1 ? 1 : 0
+    return aMulti - bMulti || a[0].localeCompare(b[0])
+  })
+}
