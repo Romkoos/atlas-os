@@ -5,6 +5,7 @@ import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
+import { Knowledge } from '@renderer/pages/Knowledge'
 import { Productivity } from '@renderer/pages/Productivity'
 import { Settings } from '@renderer/pages/Settings'
 import { Skills } from '@renderer/pages/Skills'
@@ -17,6 +18,7 @@ const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
   stats: Stats,
   productivity: Productivity,
+  knowledge: Knowledge,
   info: Info,
   skills: Skills,
   settings: Settings,
