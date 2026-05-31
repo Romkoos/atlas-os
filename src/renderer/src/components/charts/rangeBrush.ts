@@ -2,6 +2,8 @@
 // in a custom component (it scans children by type), so each chart renders
 // <Brush> inline and spreads these props for a consistent terminal look.
 
+import { formatDayMonth } from '@renderer/lib/utils'
+
 export interface BrushRange {
   startIndex?: number
   endIndex?: number
@@ -15,5 +17,5 @@ export const brushProps = {
   travellerWidth: 8,
   stroke: 'var(--color-chart-1)',
   fill: 'var(--color-muted)',
-  tickFormatter: (v: string | number): string => String(v).slice(5),
+  tickFormatter: (v: string | number): string => formatDayMonth(String(v)),
 }

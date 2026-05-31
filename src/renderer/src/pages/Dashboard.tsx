@@ -1,5 +1,6 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
+import { formatDateTime } from '@renderer/lib/utils'
 import { CLAUDE_MODELS, type ClaudeModelId } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
@@ -44,7 +45,7 @@ export function Dashboard() {
   const [running, setRunning] = useState(false)
   const [requestId, setRequestId] = useState<string | null>(null)
   const [model, setModel] = useState<ClaudeModelId | undefined>(undefined)
-  const [startedAt] = useState(() => new Date().toLocaleString())
+  const [startedAt] = useState(() => formatDateTime(new Date()))
 
   const openFile = trpc.agent.openFile.useMutation()
 

@@ -1,5 +1,6 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
+import { formatDate } from '@renderer/lib/utils'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleKind, ArticleMeta } from '@shared/knowledge'
 import { type ReactNode, useMemo, useState } from 'react'
@@ -176,7 +177,7 @@ function DailyTab({ project }: { project: string }) {
             className={resolvedPath === d.relPath ? 'kb-item kb-item-active' : 'kb-item'}
             onClick={() => setSelected(d.relPath)}
           >
-            <span className="kb-item-title">{d.date}</span>
+            <span className="kb-item-title">{formatDate(d.date)}</span>
           </button>
         ))}
       </nav>
@@ -195,7 +196,7 @@ function SearchTab({ project }: { project: string }) {
     <div className="kb-search">
       <div className="kb-search-warn">
         <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
-        runs the engine and spends API tokens. Fires only on submit.
+        runs the LLM engine via Claude Code (uses your Claude usage). Fires only on submit.
       </div>
       <form
         className="kb-search-bar"

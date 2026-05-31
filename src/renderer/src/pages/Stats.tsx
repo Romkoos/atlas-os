@@ -3,6 +3,7 @@ import { eventsPerDayMeta } from '@renderer/components/charts/chartMeta'
 import { brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
+import { formatDateTime } from '@renderer/lib/utils'
 import {
   Bar,
   BarChart,
@@ -52,7 +53,7 @@ export function Stats() {
   const total = summary.data?.total ?? 0
   const avgDurationMs = summary.data?.avgDurationMs ?? 0
   const avgTokens = summary.data?.avgTokens ?? 0
-  const lastRun = summary.data?.lastRun ? new Date(summary.data.lastRun).toLocaleString() : '—'
+  const lastRun = formatDateTime(summary.data?.lastRun ?? null)
 
   const sparkValues = data.map((d) => d.count)
 

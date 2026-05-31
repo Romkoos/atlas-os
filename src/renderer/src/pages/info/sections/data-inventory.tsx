@@ -1,10 +1,9 @@
 import { trpc } from '@renderer/lib/trpc'
+import { formatDate as fmtDate } from '@renderer/lib/utils'
 import { DataCard } from '@renderer/pages/info/DataCard'
 import { Section } from '@renderer/pages/info/Section'
 
 const fmtInt = (n: number): string => n.toLocaleString('ru-RU')
-const fmtDate = (ts: number | null): string =>
-  ts == null ? '—' : new Date(ts).toISOString().slice(0, 10)
 
 export function DataInventory() {
   const q = trpc.productivity.kpiDiagnostics.useQuery()

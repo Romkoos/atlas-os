@@ -7,7 +7,7 @@ import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/Hov
 import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { cn } from '@renderer/lib/utils'
+import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
 import { groupByPrefix } from '@shared/skills'
 import { ChevronRight } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
@@ -64,8 +64,8 @@ const pct = (v: number | null, digits = 0): string => (v == null ? '—' : `${v.
 const scoreLabel = (avg: number | null, rated: number, total: number): string =>
   rated === 0 ? '—' : `${avg == null ? '—' : avg.toFixed(1)} · ${rated}/${total} rated`
 // Dates cross IPC as real Date objects (structured clone), but tRPC's transformer-less
-// type inference reports them as string — accept both and normalize.
-const fmtDate = (d: Date | string | null): string => (d ? new Date(d).toLocaleString() : '—')
+// type inference reports them as string — formatDateTime accepts both.
+const fmtDate = formatDateTime
 
 const tooltipStyle = {
   background: 'var(--color-popover)',
@@ -1794,14 +1794,7 @@ function infraNamesEqual(
 }
 
 function fmtTs(ms: number): string {
-  const d = new Date(ms)
-  return d.toLocaleString(undefined, {
-    year: '2-digit',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(ms)
 }
 
 function InfraComparePanel() {
@@ -2158,8 +2151,8 @@ function BenchmarkTab() {
                       {firstOfTask ? (r.category ?? '—') : ''}
                     </td>
                     <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
-                      {new Date(r.firstTs).toLocaleDateString()} · {r.plugins}p {r.mcp}m {r.skills}s
-                      · <span style={{ color: 'var(--fg-4)' }}>{r.infraHash.slice(0, 6)}</span>
+                      {formatDate(r.firstTs)} · {r.plugins}p {r.mcp}m {r.skills}s ·{' '}
+                      <span style={{ color: 'var(--fg-4)' }}>{r.infraHash.slice(0, 6)}</span>
                       {r.isFirst ? <span style={{ color: 'var(--fg-4)' }}> · first</span> : null}
                     </td>
                     <td className="num">{r.n}</td>

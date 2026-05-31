@@ -1,3 +1,4 @@
+import { formatDayMonth } from '@renderer/lib/utils'
 import type { ChartMeta } from './chartMeta'
 import { useHoverSync } from './HoverSyncContext'
 
@@ -21,7 +22,7 @@ export function ChartReadout({
   const fmt = format ?? ((_k: string, v: number) => String(v))
   return (
     <span style={{ display: 'inline-flex', gap: 12, fontFamily: 'var(--mono)', fontSize: 11 }}>
-      <span style={{ color: 'var(--amber)' }}>{activeDate.slice(5)}</span>
+      <span style={{ color: 'var(--amber)' }}>{formatDayMonth(activeDate)}</span>
       {meta.series
         .filter((s) => !hidden.has(s.key))
         .map((s) => {

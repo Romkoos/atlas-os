@@ -1,10 +1,9 @@
 import { trpc } from '@renderer/lib/trpc'
+import { formatDate as fmtDate } from '@renderer/lib/utils'
 import { DataCard } from '@renderer/pages/info/DataCard'
 import { Formula } from '@renderer/pages/info/Formula'
 import { Section } from '@renderer/pages/info/Section'
 
-const fmtDate = (ts: number | null): string =>
-  ts == null ? '—' : new Date(ts).toISOString().slice(0, 10)
 const fmtNum = (n: number | undefined, digits = 4): string => (n == null ? '—' : n.toFixed(digits))
 
 export function Baseline() {
