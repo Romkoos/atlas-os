@@ -1521,3 +1521,206 @@
     }
   }
 }
+
+/* ============================================================
+ * INTERACTION ANIMATIONS — power-on, streaks, glints, glow.
+ * Static positioning + focus glow live outside the media query
+ * (instant, reduced-motion-safe); the motion lives inside it.
+ * ============================================================ */
+
+/* Anchors for the pseudo-element effects below. */
+.sb-nav button,
+.tabs button,
+.btn {
+  position: relative;
+}
+.sb-nav button,
+.btn {
+  overflow: hidden;
+}
+
+/* Amber focus glow on text inputs and selects. */
+.input,
+.select {
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.18s ease;
+}
+.input:focus,
+textarea.input:focus,
+.select:focus {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--amber) 28%, transparent),
+    0 0 11px color-mix(in oklch, var(--amber) 16%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Page title boots in with a CRT power-on flicker on every navigation;
+     the description fades up just behind it. */
+  .page-head h2 {
+    animation: atlas-crt-on 0.55s steps(1, end) both;
+  }
+  .page-head .desc {
+    animation: atlas-fade-up 0.45s 0.14s ease both;
+  }
+  @keyframes atlas-crt-on {
+    0% {
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.55;
+    }
+    16% {
+      opacity: 0.15;
+    }
+    32% {
+      opacity: 0.9;
+    }
+    42% {
+      opacity: 0.35;
+    }
+    56% {
+      opacity: 1;
+    }
+    68% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes atlas-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Sidebar nav items stagger in from the left on mount. */
+  .sb-nav button {
+    animation: atlas-nav-in 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .sb-nav button:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .sb-nav button:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  .sb-nav button:nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  .sb-nav button:nth-child(4) {
+    animation-delay: 0.14s;
+  }
+  .sb-nav button:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .sb-nav button:nth-child(n + 6) {
+    animation-delay: 0.22s;
+  }
+  @keyframes atlas-nav-in {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Amber data-streak sweeps across a nav item on hover. */
+  .sb-nav button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--amber) 16%, transparent) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  .sb-nav button:hover::after {
+    animation: atlas-streak 0.55s ease;
+  }
+  @keyframes atlas-streak {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  /* Active tab underline draws in from the left instead of snapping. */
+  .tabs button.on {
+    border-bottom-color: transparent;
+  }
+  .tabs button.on::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--amber);
+    transform-origin: left;
+    animation: atlas-underline 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes atlas-underline {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /* A light glint sweeps across buttons on hover. */
+  .btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 45%;
+    left: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--amber) 22%, transparent),
+      transparent
+    );
+    transform: translateX(-180%);
+    opacity: 0;
+  }
+  .btn:hover:not(:disabled)::after {
+    animation: atlas-glint 0.5s ease;
+  }
+  @keyframes atlas-glint {
+    0% {
+      transform: translateX(-180%);
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(320%);
+      opacity: 0;
+    }
+  }
+}
