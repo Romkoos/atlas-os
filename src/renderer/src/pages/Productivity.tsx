@@ -71,7 +71,7 @@ const tooltipStyle = {
   background: 'var(--color-popover)',
   border: '1px solid var(--color-border)',
   borderRadius: 0,
-  fontSize: 12,
+  fontSize: 13,
   color: 'var(--color-popover-foreground)',
 }
 
@@ -80,7 +80,7 @@ function EmptyHint() {
   return (
     <div className="panel mt-16">
       <div className="panel-body">
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
           <div style={{ color: 'var(--fg-3)', marginBottom: 8 }}>
             <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>no data in this range.
           </div>
@@ -95,7 +95,7 @@ function EmptyHint() {
 
 function Loading() {
   return (
-    <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)', padding: '16px 0' }}>
+    <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)', padding: '16px 0' }}>
       <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>loading…
     </p>
   )
@@ -104,7 +104,7 @@ function Loading() {
 // Mono "// message" line used for per-panel empty states.
 function NoteLine({ children }: { children: ReactNode }) {
   return (
-    <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)', padding: '8px 0' }}>
+    <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)', padding: '8px 0' }}>
       <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
       {children}
     </p>
@@ -380,14 +380,14 @@ function DailyCharts({
                   <XAxis
                     dataKey="date"
                     tickFormatter={(value: string) => value.slice(5)}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     interval="preserveStartEnd"
                     minTickGap={16}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={44}
                     tickFormatter={(value: number) => num(value)}
@@ -484,7 +484,7 @@ function DailyCharts({
                   <XAxis
                     dataKey="date"
                     tickFormatter={(value: string) => value.slice(5)}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     interval="preserveStartEnd"
                     minTickGap={16}
@@ -492,7 +492,7 @@ function DailyCharts({
                   <YAxis
                     yAxisId="kpi"
                     domain={[0, 'auto']}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={44}
                     tickFormatter={(value: number) => `${value}%`}
@@ -501,7 +501,7 @@ function DailyCharts({
                     yAxisId="quality"
                     orientation="right"
                     domain={[0, 10]}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={32}
                   />
@@ -701,7 +701,7 @@ function OverviewTab({ days, projectPath }: Scope) {
   if (overview.isError)
     return (
       <p
-        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+        style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)', padding: '16px 0' }}
       >
         <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load overview.
       </p>
@@ -777,7 +777,7 @@ function OverviewTab({ days, projectPath }: Scope) {
                   gap: '4px 24px',
                   marginBottom: 12,
                   fontFamily: 'var(--mono)',
-                  fontSize: 11,
+                  fontSize: 12,
                   color: 'var(--fg-4)',
                 }}
               >
@@ -820,14 +820,14 @@ function OverviewTab({ days, projectPath }: Scope) {
                     <XAxis
                       dataKey="hour"
                       tickFormatter={(value: string) => `${value}:00`}
-                      tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                      tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                       stroke="var(--color-border)"
                       interval={1}
                       minTickGap={8}
                     />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                      tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                       stroke="var(--color-border)"
                       width={44}
                       tickFormatter={(value: number) => num(value)}
@@ -991,7 +991,7 @@ function OverviewTab({ days, projectPath }: Scope) {
               <div
                 style={{
                   fontFamily: 'var(--mono)',
-                  fontSize: 11,
+                  fontSize: 12,
                   color: 'var(--fg-4)',
                   padding: '12px 0',
                 }}
@@ -1030,7 +1030,7 @@ function SessionsTab({ days, projectPath }: Scope) {
   if (sessions.isError)
     return (
       <p
-        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+        style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)', padding: '16px 0' }}
       >
         <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load sessions.
       </p>
@@ -1117,7 +1117,7 @@ function SessionsTab({ days, projectPath }: Scope) {
             padding: '10px 14px',
             borderTop: '1px solid var(--line-dim)',
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--fg-4)',
           }}
         >
@@ -1226,7 +1226,7 @@ function EcoBadge({ type }: { type: string }) {
         border: '1px solid var(--line)',
         color: 'var(--fg-3)',
         fontFamily: 'var(--mono)',
-        fontSize: 10,
+        fontSize: 11,
         letterSpacing: '0.04em',
         padding: '1px 6px',
         textTransform: 'uppercase',
@@ -1272,7 +1272,7 @@ function EcosystemTab({ days }: { days: number }) {
   if (ecosystem.isError)
     return (
       <p
-        style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', padding: '16px 0' }}
+        style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)', padding: '16px 0' }}
       >
         <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>failed to load ecosystem.
       </p>
@@ -1429,7 +1429,7 @@ function EcosystemTab({ days }: { days: number }) {
               style={{
                 padding: '10px 14px',
                 fontFamily: 'var(--mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--fg-4)',
                 borderTop: '1px solid var(--line-dim)',
               }}
@@ -1468,7 +1468,7 @@ function EcosystemTab({ days }: { days: number }) {
                       width: 150,
                       flexShrink: 0,
                       fontFamily: 'var(--mono)',
-                      fontSize: 10,
+                      fontSize: 11,
                       color: 'var(--fg-4)',
                     }}
                     className="tabular-nums"
@@ -1543,7 +1543,7 @@ function EcosystemTab({ days }: { days: number }) {
 const compareCellStyle = {
   display: 'block',
   fontFamily: 'var(--mono)',
-  fontSize: 11,
+  fontSize: 12,
   lineHeight: 1.55,
   padding: '1px 6px',
 } as const
@@ -1551,7 +1551,7 @@ const compareCellStyle = {
 const sectionTitleStyle = {
   display: 'block',
   fontFamily: 'var(--mono)',
-  fontSize: 10,
+  fontSize: 11,
   color: 'var(--fg-4)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
@@ -1619,7 +1619,7 @@ function SkillsColumn({ currSet, leftSet }: { currSet: Set<string>; leftSet: Set
                 justifyContent: 'space-between',
                 padding: '4px 6px',
                 fontFamily: 'var(--mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--fg-4)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -1724,7 +1724,7 @@ function CompareColumn({
         <div
           style={{
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--fg-2)',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
@@ -1732,7 +1732,7 @@ function CompareColumn({
         >
           {title}
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
           {subtitle}
         </div>
       </div>
@@ -1848,7 +1848,7 @@ function InfraComparePanel() {
           <button
             type="button"
             className="btn"
-            style={{ fontSize: 10 }}
+            style={{ fontSize: 11 }}
             disabled={clearMut.isPending}
             onClick={() => {
               if (
@@ -1865,7 +1865,7 @@ function InfraComparePanel() {
           <button
             type="button"
             className="btn"
-            style={{ fontSize: 10, color: 'var(--warn)' }}
+            style={{ fontSize: 11, color: 'var(--warn)' }}
             disabled={wipeMut.isPending}
             onClick={() => {
               if (
@@ -1882,7 +1882,7 @@ function InfraComparePanel() {
           <button
             type="button"
             className="btn"
-            style={{ fontSize: 10 }}
+            style={{ fontSize: 11 }}
             onClick={() => void cmp.refetch()}
           >
             REFRESH LIVE
@@ -1932,7 +1932,7 @@ function InfraComparePanel() {
               padding: '10px 14px',
               borderTop: '1px solid var(--line-dim)',
               fontFamily: 'var(--mono)',
-              fontSize: 11,
+              fontSize: 12,
               color: 'var(--fg-3)',
             }}
           >
@@ -2060,7 +2060,7 @@ function BenchmarkTab() {
               {running ? 'RUNNING…' : `RUN BENCHMARK (${estimated})`}
             </button>
             {liveProgress ? (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
                 {liveProgress.done}/{liveProgress.total} done · {liveProgress.failed} failed
                 {liveProgress.running ? ' · running…' : ''}
               </span>
@@ -2070,7 +2070,7 @@ function BenchmarkTab() {
             <p
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--warn)',
                 marginTop: 12,
               }}
@@ -2095,7 +2095,7 @@ function BenchmarkTab() {
           <button
             type="button"
             className="btn"
-            style={{ fontSize: 10 }}
+            style={{ fontSize: 11 }}
             onClick={() => void utils.benchmark.results.invalidate()}
           >
             REFRESH
@@ -2147,10 +2147,10 @@ function BenchmarkTab() {
                         ''
                       )}
                     </td>
-                    <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
+                    <td style={{ color: 'var(--fg-3)', fontSize: 11 }}>
                       {firstOfTask ? (r.category ?? '—') : ''}
                     </td>
-                    <td style={{ color: 'var(--fg-3)', fontSize: 10 }}>
+                    <td style={{ color: 'var(--fg-3)', fontSize: 11 }}>
                       {formatDate(r.firstTs)} · {r.plugins}p {r.mcp}m {r.skills}s ·{' '}
                       <span style={{ color: 'var(--fg-4)' }}>{r.infraHash.slice(0, 6)}</span>
                       {r.isFirst ? <span style={{ color: 'var(--fg-4)' }}> · first</span> : null}

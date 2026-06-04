@@ -13,7 +13,7 @@ function HealthBadge() {
 
   if (health.isLoading) {
     return (
-      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
         <span className="dot" /> connecting…
       </span>
     )
@@ -21,14 +21,14 @@ function HealthBadge() {
 
   if (health.isError || !health.data) {
     return (
-      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)' }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)' }}>
         <span className="dot warn" /> backend.offline
       </span>
     )
   }
 
   return (
-    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
       <span className="dot ok" /> {'backend.ok · '}
       <span style={{ color: 'var(--amber)' }}>v{health.data.version}</span>
     </span>
@@ -235,7 +235,7 @@ export function Dashboard() {
                 {running && <span className="caret" />}
               </div>
             ) : (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--fg-4)' }}>
                 <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
                 output will stream here. press RUN AGENT or ⌘+ENTER.
               </div>

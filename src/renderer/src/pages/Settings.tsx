@@ -59,7 +59,7 @@ function TrackedProjectsCard() {
         <div
           style={{
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--fg-3)',
             marginBottom: 12,
           }}
@@ -68,11 +68,11 @@ function TrackedProjectsCard() {
         </div>
 
         {discover.isLoading ? (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
             Loading projects…
           </div>
         ) : projects.length === 0 ? (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
             No projects yet. Run Refresh on the Productivity page first.
           </div>
         ) : (
@@ -231,7 +231,7 @@ export function Settings() {
               alignItems: 'center',
               gap: 12,
               fontFamily: 'var(--mono)',
-              fontSize: 12,
+              fontSize: 13,
               color: 'var(--fg-2)',
             }}
           >
@@ -258,7 +258,7 @@ export function Settings() {
             </div>
             <div className="panel-body">
               {settingsQuery.isLoading ? (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}>
                   Loading settings…
                 </div>
               ) : (
@@ -301,7 +301,7 @@ export function Settings() {
                       <div
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: 10,
+                          fontSize: 11,
                           color: 'var(--warn)',
                         }}
                       >
@@ -311,7 +311,7 @@ export function Settings() {
                       <div
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: 10,
+                          fontSize: 11,
                           color: 'var(--fg-4)',
                         }}
                       >
@@ -364,7 +364,7 @@ export function Settings() {
                     <div
                       style={{
                         fontFamily: 'var(--mono)',
-                        fontSize: 10,
+                        fontSize: 11,
                         color: 'var(--fg-4)',
                       }}
                     >
@@ -414,7 +414,7 @@ export function Settings() {
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '8px 24px',
               fontFamily: 'var(--mono)',
-              fontSize: 11,
+              fontSize: 12,
             }}
           >
             {HOTKEYS.map(([label, key]) => (

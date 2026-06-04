@@ -50,7 +50,7 @@ export function ChartFrame({
       </div>
       <div className="panel-body">
         <div
-          style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)', marginBottom: 8 }}
+          style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)', marginBottom: 8 }}
         >
           <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
           {meta.caption}

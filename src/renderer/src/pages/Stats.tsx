@@ -131,14 +131,14 @@ export function Stats() {
                   <XAxis
                     dataKey="date"
                     tickFormatter={(value: string) => value.slice(5)}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     interval="preserveStartEnd"
                     minTickGap={16}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                     stroke="var(--color-border)"
                     width={32}
                   />
@@ -148,7 +148,7 @@ export function Stats() {
                       background: 'var(--color-popover)',
                       border: '1px solid var(--color-border)',
                       borderRadius: 0,
-                      fontSize: 12,
+                      fontSize: 13,
                       color: 'var(--color-popover-foreground)',
                     }}
                   />

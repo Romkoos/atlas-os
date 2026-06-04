@@ -26,7 +26,7 @@ function formatSkillMarkdown(md: string): string {
 const hintStyle = {
   padding: '20px 14px',
   fontFamily: 'var(--mono)',
-  fontSize: 11,
+  fontSize: 12,
   color: 'var(--fg-4)',
 } as const
 
@@ -130,7 +130,7 @@ export function Skills() {
                       justifyContent: 'space-between',
                       padding: '6px 14px',
                       fontFamily: 'var(--mono)',
-                      fontSize: 10,
+                      fontSize: 11,
                       color: 'var(--fg-4)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
@@ -189,7 +189,7 @@ export function Skills() {
                       padding: '16px 24px 0',
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
                       Tools:
                     </span>
                     {detail.data.meta.allowedTools.map((tool) => (
@@ -197,7 +197,7 @@ export function Skills() {
                         key={tool}
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: 9,
+                          fontSize: 10,
                           color: 'var(--amber)',
                           border: '1px solid var(--amber-dim)',
                           padding: '1px 6px',

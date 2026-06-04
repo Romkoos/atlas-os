@@ -31,7 +31,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
         onClick={() => setOpen((v) => !v)}
         style={{
           fontFamily: 'var(--mono)',
-          fontSize: 10,
+          fontSize: 11,
           lineHeight: '14px',
           width: 16,
           height: 16,
@@ -56,7 +56,7 @@ export function InfoPopover({ label, body }: { label: string; body: string }) {
             border: '1px solid var(--color-border)',
             padding: '8px 10px',
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 12,
             lineHeight: 1.6,
             color: 'var(--color-popover-foreground)',
           }}

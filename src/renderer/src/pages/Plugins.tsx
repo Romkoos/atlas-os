@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 const hintStyle = {
   padding: '20px 14px',
   fontFamily: 'var(--mono)',
-  fontSize: 11,
+  fontSize: 12,
   color: 'var(--fg-4)',
 } as const
 

@@ -94,7 +94,7 @@ export function DayDrawer({
             padding: '10px 14px',
             borderBottom: '1px solid var(--line-dim)',
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--fg-4)',
             display: 'flex',
             flexWrap: 'wrap',
@@ -128,7 +128,7 @@ export function DayDrawer({
               padding: '8px 14px',
               borderBottom: '1px solid var(--line-dim)',
               fontFamily: 'var(--mono)',
-              fontSize: 11,
+              fontSize: 12,
             }}
           >
             {sum.byProject.map((p) => (
@@ -153,7 +153,7 @@ export function DayDrawer({
             <p
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--fg-4)',
                 padding: '12px 14px',
               }}
@@ -164,7 +164,7 @@ export function DayDrawer({
             <p
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: 11,
+                fontSize: 12,
                 color: 'var(--fg-4)',
                 padding: '12px 14px',
               }}
@@ -197,7 +197,7 @@ export function DayDrawer({
                     </span>
                     <span
                       className={cn('tabular-nums')}
-                      style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}
+                      style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)' }}
                     >
                       {num(s.totalTokens)} tok · {pct(s.kpi)} · cx {dash(s.complexity)} ·{' '}
                       {num(s.turnCount)}t
@@ -206,7 +206,7 @@ export function DayDrawer({
                   {s.summary ? (
                     <span
                       className="line-clamp-2"
-                      style={{ fontSize: 12, color: 'var(--fg-3)' }}
+                      style={{ fontSize: 13, color: 'var(--fg-3)' }}
                       title={s.summary}
                     >
                       {s.summary}

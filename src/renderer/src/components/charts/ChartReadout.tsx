@@ -21,7 +21,7 @@ export function ChartReadout({
   if (!row) return null
   const fmt = format ?? ((_k: string, v: number) => String(v))
   return (
-    <span style={{ display: 'inline-flex', gap: 12, fontFamily: 'var(--mono)', fontSize: 11 }}>
+    <span style={{ display: 'inline-flex', gap: 12, fontFamily: 'var(--mono)', fontSize: 12 }}>
       <span style={{ color: 'var(--amber)' }}>{formatDayMonth(activeDate)}</span>
       {meta.series
         .filter((s) => !hidden.has(s.key))

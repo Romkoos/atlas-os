@@ -27,7 +27,7 @@ export function LegendChips({
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--mono)',
-              fontSize: 10,
+              fontSize: 11,
               padding: '1px 6px',
               border: `1px solid ${off ? 'var(--color-border)' : s.color}`,
               color: off ? 'var(--fg-4)' : s.color,
