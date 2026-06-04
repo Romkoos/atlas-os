@@ -780,6 +780,84 @@
     margin-top: 6px;
   }
 
+  /* ============ PLUGINS ============ */
+  .plugin-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-dim);
+  }
+  .plugin-row:hover {
+    background: var(--bg-2);
+  }
+  .plugin-row .meta {
+    flex: 1;
+    min-width: 0;
+  }
+  .plugin-row .meta .nm {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .plugin-row .meta .sub {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-4);
+    margin-top: 3px;
+  }
+  .upd-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  .plugin-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-4);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 5px 9px;
+    cursor: pointer;
+    min-width: 92px;
+    transition:
+      color 0.12s,
+      border-color 0.12s;
+  }
+  .plugin-toggle:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .plugin-toggle .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fg-4);
+  }
+  .plugin-toggle.on {
+    color: var(--ok);
+    border-color: color-mix(in oklch, var(--ok) 45%, transparent);
+  }
+  .plugin-toggle.on .dot {
+    background: var(--ok);
+  }
+  .spin {
+    animation: atlas-spin 0.9s linear infinite;
+  }
+  @keyframes atlas-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   /* ============ TABS ============ */
   .tabs {
     display: flex;

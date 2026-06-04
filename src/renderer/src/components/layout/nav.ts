@@ -15,5 +15,6 @@ export const NAV: ReadonlyArray<NavItem> = [
   { id: 'knowledge', key: '04', label: 'KNOWLEDGE' },
   { id: 'info', key: '05', label: 'INFO' },
   { id: 'skills', key: '06', label: 'SKILLS' },
-  { id: 'settings', key: '07', label: 'SETTINGS' },
+  { id: 'plugins', key: '07', label: 'PLUGINS' },
+  { id: 'settings', key: '08', label: 'SETTINGS' },
 ]

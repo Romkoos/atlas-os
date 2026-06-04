@@ -7,6 +7,7 @@ export type Section =
   | 'knowledge'
   | 'info'
   | 'skills'
+  | 'plugins'
   | 'settings'
 
 interface UiState {
