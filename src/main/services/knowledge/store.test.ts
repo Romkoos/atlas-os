@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertInside, isTracked, parseFrontmatter } from './store'
+import { assertInside, isTracked, parseCompileOutput, parseFrontmatter } from './store'
 
 describe('parseFrontmatter', () => {
   it('splits YAML frontmatter from body', () => {
@@ -23,6 +23,34 @@ describe('parseFrontmatter', () => {
     const doc = parseFrontmatter('---\n- a\n- b\n---\nbody')
     expect(doc.frontmatter).toEqual({})
     expect(doc.body).toBe('body')
+  })
+})
+
+describe('parseCompileOutput', () => {
+  it('classifies an up-to-date run as nothing', () => {
+    const r = parseCompileOutput('Nothing to compile - all daily logs are up to date.')
+    expect(r.status).toBe('nothing')
+    expect(r.summary).toBe('up to date')
+  })
+  it('classifies a completed run as compiled and captures the summary tail', () => {
+    const stdout = [
+      'Files to compile (1):',
+      '  - 2026-05-31.md',
+      '[1/1] Compiling 2026-05-31.md...',
+      '  Cost: $0.4231',
+      '  Done.',
+      'Compilation complete. Total cost: $0.42',
+      'Knowledge base: 7 articles',
+    ].join('\n')
+    const r = parseCompileOutput(stdout)
+    expect(r.status).toBe('compiled')
+    expect(r.summary).toContain('Compilation complete. Total cost: $0.42')
+    expect(r.summary).toContain('Knowledge base: 7 articles')
+  })
+  it('falls back to a generic compiled summary when no tail line is present', () => {
+    const r = parseCompileOutput('some unexpected output')
+    expect(r.status).toBe('compiled')
+    expect(r.summary).toBe('compiled')
   })
 })
 

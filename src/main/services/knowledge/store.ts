@@ -7,6 +7,7 @@ import {
   type ArticleDoc,
   type ArticleKind,
   type ArticleMeta,
+  type CompileResult,
   countInbound,
   type DailyEntry,
   type KnowledgeProject,
@@ -216,4 +217,72 @@ export async function runQuery(root: string, project: string, q: string): Promis
     }
     throw new Error(e.stderr?.trim() || e.message || 'query.py failed')
   }
+}
+
+// Classify compile.py stdout into a UI status + a one-line summary. compile.py
+// prints "Nothing to compile..." when all logs are current, else "Compilation
+// complete. Total cost: $X" on success. Pure so it can be unit-tested directly.
+export function parseCompileOutput(stdout: string): {
+  status: 'compiled' | 'nothing'
+  summary: string
+} {
+  const lines = stdout
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (stdout.includes('Nothing to compile')) {
+    return { status: 'nothing', summary: 'up to date' }
+  }
+  // Prefer the trailing summary lines compile.py prints on completion.
+  const tail = lines.filter((l) => /Compilation complete|Knowledge base:/.test(l)).join(' — ')
+  return { status: 'compiled', summary: tail || 'compiled' }
+}
+
+// Shell out to the engine's compile.py for a single project (incremental: only
+// new/changed daily logs, by hash). Spawns a nested Claude per changed log, so
+// the timeout is generous. Never throws — failures map to an 'error' result so
+// compileAll can isolate one project's failure from the rest.
+export async function compileProject(root: string, project: string): Promise<CompileResult> {
+  const engine = join(root, RESERVED)
+  let projRoot: string
+  try {
+    projRoot = projectRoot(root, project)
+  } catch (err) {
+    return { project, status: 'error', summary: (err as Error).message }
+  }
+  try {
+    const { stdout } = await execFileAsync(
+      'uv',
+      ['run', '--directory', engine, 'python', 'scripts/compile.py'],
+      {
+        env: { ...process.env, ATLAS_KB_ROOT: projRoot },
+        timeout: 15 * 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    )
+    return { project, ...parseCompileOutput(stdout) }
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException & { stderr?: string }
+    const summary =
+      e.code === 'ENOENT'
+        ? '`uv` not found on PATH — install uv to compile.'
+        : e.stderr?.trim() || e.message || 'compile.py failed'
+    return { project, status: 'error', summary }
+  }
+}
+
+// Compile every visible (tracked) project in parallel. One process per project,
+// each scoped by ATLAS_KB_ROOT; allSettled keeps a single failure from sinking
+// the batch (compileProject already swallows its own errors as a guard).
+export async function compileAll(
+  root: string,
+  tracked: ReadonlySet<string>,
+): Promise<CompileResult[]> {
+  const projects = listProjects(root, tracked).map((p) => p.name)
+  const settled = await Promise.allSettled(projects.map((p) => compileProject(root, p)))
+  return settled.map((s, i) =>
+    s.status === 'fulfilled'
+      ? s.value
+      : { project: projects[i], status: 'error', summary: String(s.reason) },
+  )
 }

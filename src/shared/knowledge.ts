@@ -32,6 +32,13 @@ export type ArticleDoc = z.infer<typeof articleDocSchema>
 export const dailyEntrySchema = z.object({ date: z.string(), relPath: z.string() })
 export type DailyEntry = z.infer<typeof dailyEntrySchema>
 
+export const compileResultSchema = z.object({
+  project: z.string(),
+  status: z.enum(['compiled', 'nothing', 'error']),
+  summary: z.string(),
+})
+export type CompileResult = z.infer<typeof compileResultSchema>
+
 // Strip the .md suffix: 'concepts/x.md' -> 'concepts/x'.
 const stripExt = (relPath: string): string => relPath.replace(/\.md$/, '')
 

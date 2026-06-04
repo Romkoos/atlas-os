@@ -23,7 +23,7 @@ function Empty({ children }: { children: ReactNode }) {
   return (
     <div className="panel mt-16">
       <div className="panel-body">
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
           <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
           {children}
         </div>
@@ -33,11 +33,21 @@ function Empty({ children }: { children: ReactNode }) {
 }
 
 export function Knowledge() {
+  const utils = trpc.useUtils()
   const projects = trpc.knowledge.projects.useQuery()
   const [project, setProject] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('browse')
 
+  const compile = trpc.knowledge.compileAll.useMutation({
+    onSuccess: () => {
+      utils.knowledge.projects.invalidate()
+      utils.knowledge.list.invalidate()
+      utils.knowledge.index.invalidate()
+    },
+  })
+
   const active = project ?? projects.data?.[0]?.name ?? null
+  const hasProjects = projects.data && projects.data.length > 0
 
   return (
     <>
@@ -46,21 +56,67 @@ export function Knowledge() {
         title="knowledge"
         description="Per-project knowledge base — read-only."
         action={
-          projects.data && projects.data.length > 0 ? (
-            <select
-              className="select"
-              value={active ?? ''}
-              onChange={(e) => setProject(e.target.value)}
-            >
-              {projects.data.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name} ({p.articleCount})
-                </option>
-              ))}
-            </select>
+          hasProjects ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                className="select"
+                value={active ?? ''}
+                onChange={(e) => setProject(e.target.value)}
+              >
+                {projects.data?.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name} ({p.articleCount})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn"
+                disabled={compile.isPending}
+                onClick={() => compile.mutate()}
+                title="Compile daily logs into wiki articles for all tracked projects"
+              >
+                {compile.isPending ? 'compiling…' : 'compile'}
+              </button>
+            </div>
           ) : null
         }
       />
+
+      {hasProjects && (
+        <div className="kb-search-warn">
+          <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
+          compile runs the LLM engine via Claude Code (uses your Claude usage). All tracked
+          projects, incremental — only new daily logs.
+        </div>
+      )}
+
+      {compile.data && (
+        <div className="panel mt-16">
+          <div className="panel-body">
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.7 }}>
+              {compile.data.map((r) => (
+                <div key={r.project}>
+                  <span
+                    style={{
+                      color:
+                        r.status === 'error'
+                          ? 'var(--red, #e66)'
+                          : r.status === 'compiled'
+                            ? 'var(--green, #6c6)'
+                            : 'var(--fg-3)',
+                    }}
+                  >
+                    {r.status === 'compiled' ? '✓' : r.status === 'nothing' ? '·' : '✗'}
+                  </span>{' '}
+                  <span style={{ color: 'var(--fg-2)' }}>{r.project}</span>{' '}
+                  <span style={{ color: 'var(--fg-3)' }}>— {r.summary}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {projects.isPending ? (
         <Empty>loading…</Empty>

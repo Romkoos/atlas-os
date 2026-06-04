@@ -1,4 +1,5 @@
 import {
+  compileAll,
   listArticles,
   listDaily,
   listProjects,
@@ -13,6 +14,7 @@ import { publicProcedure, router } from '@main/trpc/trpc'
 import {
   articleDocSchema,
   articleMetaSchema,
+  compileResultSchema,
   dailyEntrySchema,
   knowledgeProjectSchema,
 } from '@shared/knowledge'
@@ -59,4 +61,8 @@ export const knowledgeRouter = router({
     .mutation(async ({ input }) => ({
       answer: await runQuery(storeRoot(), input.project, input.q),
     })),
+
+  compileAll: publicProcedure
+    .output(z.array(compileResultSchema))
+    .mutation(() => compileAll(storeRoot(), tracked())),
 })
