@@ -24,8 +24,7 @@ export interface RunOptions {
 
 export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): Promise<RunResult> {
   const { query } = await import('@anthropic-ai/claude-agent-sdk')
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? TIMEOUT_MS)
+  const perTurnTimeoutMs = opts.timeoutMs ?? TIMEOUT_MS
 
   // Aggregate metrics across ALL turns of the session, so the totals reflect the
   // amortized cost of a multi-turn conversation (prefix created on turn 1, read
@@ -40,6 +39,7 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
   let durationMs = 0
   let finalSubtype = 'error'
   let sessionId: string | null = null
+  let aborted = false
 
   const turns = [task.prompt, ...(task.followUps ?? [])]
   const baseOptions = {
@@ -51,20 +51,28 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
     permissionMode: 'bypassPermissions' as const, // headless: never hang on a prompt
     cwd: opts.repoRoot,
     env: subscriptionEnv(),
-    abortController: controller,
   }
 
-  try {
-    for (let i = 0; i < turns.length; i++) {
+  for (let i = 0; i < turns.length; i++) {
+    // Fresh timeout budget PER TURN. The limit is meant to bound a single
+    // request; a multi-turn scenario sharing ONE budget would abort mid-session
+    // once cumulative wall-clock (API time + inter-turn rate-limit cooldowns)
+    // crossed it — falsely flagging a healthy long dialog as `timeout`.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), perTurnTimeoutMs)
+    let turnSubtype = 'error'
+    let turnSucceeded = false
+    try {
       // First turn opens a fresh session; subsequent turns RESUME it via the
       // session_id captured from the previous turn's result, so cache-control
       // breakpoints are shared and the prefix becomes a cache_read hit.
       const q = query({
         prompt: turns[i],
-        options: sessionId == null ? baseOptions : { ...baseOptions, resume: sessionId },
+        options:
+          sessionId == null
+            ? { ...baseOptions, abortController: controller }
+            : { ...baseOptions, resume: sessionId, abortController: controller },
       })
-      let turnSubtype = 'error'
-      let turnSucceeded = false
       for await (const message of q) {
         if (message.type === 'result') {
           turnSubtype = message.subtype
@@ -83,24 +91,25 @@ export async function runBenchmarkTask(task: BenchmarkTask, opts: RunOptions): P
           }
         }
       }
-      // Stop the scenario on the first failed turn — no point measuring the
-      // tail; gate will classify on the final state.
-      if (!turnSucceeded) {
-        finalSubtype = turnSubtype
-        break
-      }
+    } catch {
+      // swallow — gate below classifies via the aborted flag / non-success subtype
+    } finally {
+      clearTimeout(timer)
     }
-  } catch {
-    // swallow — gate below classifies via the aborted flag / non-success subtype
-  } finally {
-    clearTimeout(timer)
+    if (controller.signal.aborted) aborted = true
+    // Stop the scenario on the first failed turn — no point measuring the
+    // tail; gate will classify on the final state.
+    if (!turnSucceeded) {
+      finalSubtype = turnSubtype
+      break
+    }
   }
 
   const gate = checkRun(
     {
       subtype: finalSubtype,
       resultText: finalResult,
-      aborted: controller.signal.aborted,
+      aborted,
       // Zero turns AND zero duration ⇒ the SDK never emitted a result message,
       // so the 5-min wall-clock timer cannot have fired. Treat as sdk_error.
       noProgress: numTurns === 0 && durationMs === 0,
