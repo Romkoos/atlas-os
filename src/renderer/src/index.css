@@ -31,6 +31,13 @@
   --sans: "Inter", system-ui, -apple-system, sans-serif;
   --corner-display: block;
 
+  /* --- ambient FX dials (turn an effect off by zeroing its strength) --- */
+  --crt-scanlines: 0.4; /* phosphor scanline opacity (0 = off) */
+  --crt-sweep: 0.5; /* slow scan-sweep opacity (0 = off) */
+  --grid-strength: 0.5; /* blueprint background grid (0 = off) */
+  --phosphor: 0.55; /* amber text-glow strength (0 = off) */
+  --boot-reveal: 1; /* staggered panel boot-in (0 = off) */
+
   /* --- shadcn tokens remapped onto the terminal palette --- */
   --radius: 0rem;
   --background: var(--bg);
@@ -532,28 +539,46 @@
     border: 1px solid var(--line-dim);
     background: var(--panel);
   }
-  .panel::before,
-  .panel::after {
+  /* Target-lock reticle: four corner ticks painted from a single layer of
+     gradient slivers, so no extra DOM is needed. Brightens + glows on hover. */
+  .panel::before {
     content: "";
     position: absolute;
+    inset: -1px;
     pointer-events: none;
-    width: 8px;
-    height: 8px;
-    border: 1px solid var(--amber-dim);
-    opacity: 0.4;
     display: var(--corner-display);
+    --tick: 9px;
+    --hair: 1px;
+    --reticle: var(--amber-dim);
+    background-image:
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle)),
+      linear-gradient(var(--reticle), var(--reticle));
+    background-repeat: no-repeat;
+    background-size:
+      var(--tick) var(--hair), var(--hair) var(--tick),
+      var(--tick) var(--hair), var(--hair) var(--tick),
+      var(--tick) var(--hair), var(--hair) var(--tick),
+      var(--tick) var(--hair), var(--hair) var(--tick);
+    background-position:
+      0 0, 0 0,
+      100% 0, 100% 0,
+      0 100%, 0 100%,
+      100% 100%, 100% 100%;
+    opacity: 0.45;
+    transition:
+      opacity 0.18s ease,
+      filter 0.18s ease;
   }
-  .panel::before {
-    top: -1px;
-    left: -1px;
-    border-right: 0;
-    border-bottom: 0;
-  }
-  .panel::after {
-    bottom: -1px;
-    right: -1px;
-    border-left: 0;
-    border-top: 0;
+  .panel:hover::before {
+    --reticle: var(--amber);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 3px color-mix(in oklch, var(--amber) 55%, transparent));
   }
   .panel-head {
     display: flex;
@@ -1356,4 +1381,140 @@
 }
 .kb-search-bar .input {
   flex: 1;
+}
+
+/* ============================================================
+ * AMBIENT FX — CRT phosphor / blueprint / target-lock layer.
+ * Cohesive "mission-control terminal" atmosphere. Every effect
+ * is gated by a dial in :root (set to 0 to disable) and honors
+ * prefers-reduced-motion. Overlays are pointer-events:none so
+ * they never intercept input.
+ * ============================================================ */
+
+/* Blueprint grid breathing behind the working area (sidebar bg is
+   opaque so it stays clean; the grid only shows through .main). */
+.win {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--line) calc(var(--grid-strength) * 100%), transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--line) calc(var(--grid-strength) * 100%), transparent) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+  background-position: -1px -1px;
+}
+
+/* Edge vignette — focuses the eye toward center, CRT curvature hint. */
+.win::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 49;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 120% 130% at 50% 50%,
+    transparent 58%,
+    color-mix(in srgb, #000 22%, transparent) 100%
+  );
+}
+
+/* Phosphor scanlines + slow amber scan-sweep. */
+.win::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, #000 calc(var(--crt-scanlines) * 45%), transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--amber) calc(var(--crt-sweep) * 7%), transparent) 50%,
+      transparent 100%
+    );
+  background-repeat: repeat, no-repeat;
+  background-size:
+    auto,
+    100% 26%;
+  background-position:
+    0 0,
+    0 -30%;
+}
+
+/* Amber phosphor bloom on the accent glyphs. */
+.page-head h2 .num,
+.sb-head .brand .ver,
+.sb-nav button.active .k,
+.win-bar .path b {
+  text-shadow: 0 0 calc(var(--phosphor) * 10px)
+    color-mix(in oklch, var(--amber) calc(var(--phosphor) * 55%), transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Refresh sweep crawls down the panel slowly. */
+  .win::after {
+    animation: atlas-scan 7.5s linear infinite;
+  }
+  @keyframes atlas-scan {
+    from {
+      background-position:
+        0 0,
+        0 -30%;
+    }
+    to {
+      background-position:
+        0 0,
+        0 130%;
+    }
+  }
+
+  /* Panels boot in with a brief staggered rise on mount / navigation. */
+  .panel,
+  .kpis {
+    animation: atlas-rise calc(var(--boot-reveal) * 0.45s) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .panel:nth-of-type(2),
+  .kpis + .panel {
+    animation-delay: calc(var(--boot-reveal) * 0.06s);
+  }
+  .panel:nth-of-type(3) {
+    animation-delay: calc(var(--boot-reveal) * 0.12s);
+  }
+  @keyframes atlas-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Breathing telemetry pulse on the live backend indicator. */
+  .win-bar .right .live {
+    animation: atlas-telemetry 2.4s ease-in-out infinite;
+  }
+  @keyframes atlas-telemetry {
+    0%,
+    100% {
+      opacity: 0.72;
+      text-shadow: none;
+    }
+    50% {
+      opacity: 1;
+      text-shadow: 0 0 7px color-mix(in oklch, var(--ok) 70%, transparent);
+    }
+  }
 }
