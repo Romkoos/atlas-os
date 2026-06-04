@@ -6,6 +6,7 @@ import { inDayRange, localDay } from '@renderer/components/charts/daySessions'
 import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/HoverSyncContext'
 import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBrush'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
 import { groupByPrefix } from '@shared/skills'
@@ -45,6 +46,12 @@ const RANGES: ReadonlyArray<{ days: number; label: string }> = [
 ]
 
 const ALL_PROJECTS = 'all'
+// Radix Select forbids empty-string item values, so use a sentinel for "unset".
+const NO_VALUE = '__none__'
+const RATING_OPTIONS = [
+  { value: NO_VALUE, label: '—' },
+  ...Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+]
 
 // Stable empty fallback for overview.data?.tokensByDay. A fresh `[]` per render
 // would change the chartData useMemo dep on every render during loading,
@@ -1160,24 +1167,17 @@ function RatingControl({ sessionId, score }: { sessionId: string; score: number 
     onError: () => toast.error('Failed to save rating'),
   })
   return (
-    <select
+    <TermSelect
       aria-label={`Quality rating for session ${sessionId}`}
-      className="select tabular-nums"
+      className="tabular-nums"
       style={{ width: 72 }}
-      value={score ?? ''}
+      value={score == null ? NO_VALUE : String(score)}
       disabled={setRating.isPending}
-      onChange={(e) => {
-        const v = e.target.value === '' ? null : Number(e.target.value)
-        setRating.mutate({ sessionId, score: v })
+      onValueChange={(v) => {
+        setRating.mutate({ sessionId, score: v === NO_VALUE ? null : Number(v) })
       }}
-    >
-      <option value="">—</option>
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-        <option key={n} value={n}>
-          {n}
-        </option>
-      ))}
-    </select>
+      options={RATING_OPTIONS}
+    />
   )
 }
 
@@ -1196,24 +1196,17 @@ function DifficultyControl({
     onError: () => toast.error('Failed to save difficulty'),
   })
   return (
-    <select
+    <TermSelect
       aria-label={`Task difficulty for session ${sessionId}`}
-      className="select tabular-nums"
+      className="tabular-nums"
       style={{ width: 72 }}
-      value={difficulty ?? ''}
+      value={difficulty == null ? NO_VALUE : String(difficulty)}
       disabled={setDifficulty.isPending}
-      onChange={(e) => {
-        const v = e.target.value === '' ? null : Number(e.target.value)
-        setDifficulty.mutate({ sessionId, difficulty: v })
+      onValueChange={(v) => {
+        setDifficulty.mutate({ sessionId, difficulty: v === NO_VALUE ? null : Number(v) })
       }}
-    >
-      <option value="">—</option>
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-        <option key={n} value={n}>
-          {n}
-        </option>
-      ))}
-    </select>
+      options={RATING_OPTIONS}
+    />
   )
 }
 
@@ -2228,21 +2221,15 @@ export function Productivity() {
         }
         action={
           <>
-            <select
-              className="select"
-              value={projectPath ?? ALL_PROJECTS}
-              onChange={(e) =>
-                setProjectPath(e.target.value === ALL_PROJECTS ? undefined : e.target.value)
-              }
+            <TermSelect
               aria-label="Project filter"
-            >
-              <option value={ALL_PROJECTS}>all projects · {projectList.length}</option>
-              {projectList.map((p) => (
-                <option key={p.projectPath} value={p.projectPath}>
-                  {p.project}
-                </option>
-              ))}
-            </select>
+              value={projectPath ?? ALL_PROJECTS}
+              onValueChange={(v) => setProjectPath(v === ALL_PROJECTS ? undefined : v)}
+              options={[
+                { value: ALL_PROJECTS, label: `all projects · ${projectList.length}` },
+                ...projectList.map((p) => ({ value: p.projectPath, label: p.project })),
+              ]}
+            />
             <div className="seg">
               {RANGES.map((r) => (
                 <button

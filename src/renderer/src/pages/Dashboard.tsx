@@ -1,4 +1,5 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDateTime } from '@renderer/lib/utils'
 import { CLAUDE_MODELS, type ClaudeModelId } from '@shared/models'
@@ -147,20 +148,14 @@ export function Dashboard() {
               </div>
               <div className="label-block">
                 <label htmlFor="dash-model">model</label>
-                <select
+                <TermSelect
                   id="dash-model"
-                  className="select"
                   value={effectiveModel}
-                  onChange={(e) => setModel(e.target.value as ClaudeModelId)}
+                  onValueChange={(v) => setModel(v as ClaudeModelId)}
                   disabled={running}
                   style={{ width: '100%' }}
-                >
-                  {CLAUDE_MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                  options={CLAUDE_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+                />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button

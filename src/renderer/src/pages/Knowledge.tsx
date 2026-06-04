@@ -1,4 +1,5 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDate } from '@renderer/lib/utils'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
@@ -58,17 +59,15 @@ export function Knowledge() {
         action={
           hasProjects ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <select
-                className="select"
+              <TermSelect
+                aria-label="Project"
                 value={active ?? ''}
-                onChange={(e) => setProject(e.target.value)}
-              >
-                {projects.data?.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} ({p.articleCount})
-                  </option>
-                ))}
-              </select>
+                onValueChange={setProject}
+                options={(projects.data ?? []).map((p) => ({
+                  value: p.name,
+                  label: `${p.name} (${p.articleCount})`,
+                }))}
+              />
               <button
                 type="button"
                 className="btn"

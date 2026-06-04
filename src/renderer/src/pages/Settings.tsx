@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { CLAUDE_MODELS } from '@shared/models'
 import { type AppSettings, LOG_LEVELS, settingsSchema, THEMES } from '@shared/settings'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
@@ -268,13 +269,19 @@ export function Settings() {
                 >
                   <div className="label-block">
                     <label htmlFor="settings-model">default model</label>
-                    <select id="settings-model" className="select" {...form.register('model')}>
-                      {CLAUDE_MODELS.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      control={form.control}
+                      name="model"
+                      render={({ field }) => (
+                        <TermSelect
+                          id="settings-model"
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          style={{ width: '100%' }}
+                          options={CLAUDE_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+                        />
+                      )}
+                    />
                   </div>
 
                   <div className="label-block">
@@ -324,27 +331,41 @@ export function Settings() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div className="label-block">
                       <label htmlFor="settings-theme">theme</label>
-                      <select id="settings-theme" className="select" {...form.register('theme')}>
-                        {THEMES.map((theme) => (
-                          <option key={theme} value={theme}>
-                            {capitalize(theme)}
-                          </option>
-                        ))}
-                      </select>
+                      <Controller
+                        control={form.control}
+                        name="theme"
+                        render={({ field }) => (
+                          <TermSelect
+                            id="settings-theme"
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            style={{ width: '100%' }}
+                            options={THEMES.map((theme) => ({
+                              value: theme,
+                              label: capitalize(theme),
+                            }))}
+                          />
+                        )}
+                      />
                     </div>
                     <div className="label-block">
                       <label htmlFor="settings-logLevel">log level</label>
-                      <select
-                        id="settings-logLevel"
-                        className="select"
-                        {...form.register('logLevel')}
-                      >
-                        {LOG_LEVELS.map((level) => (
-                          <option key={level} value={level}>
-                            {capitalize(level)}
-                          </option>
-                        ))}
-                      </select>
+                      <Controller
+                        control={form.control}
+                        name="logLevel"
+                        render={({ field }) => (
+                          <TermSelect
+                            id="settings-logLevel"
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            style={{ width: '100%' }}
+                            options={LOG_LEVELS.map((level) => ({
+                              value: level,
+                              label: capitalize(level),
+                            }))}
+                          />
+                        )}
+                      />
                     </div>
                   </div>
 
