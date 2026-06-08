@@ -1218,6 +1218,47 @@
     color: var(--amber);
   }
 
+  /* Skill-improver overlay: covers the right-pane area while a session runs. */
+  .improver {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .improver-transcript {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .improver-entry {
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+  }
+  .improver-entry.tool {
+    color: var(--fg-4);
+  }
+  .improver-entry.user {
+    color: var(--amber);
+  }
+  .improver-entry.user::before {
+    content: '› ';
+  }
+  .improver-foot {
+    border-top: 1px solid var(--line-dim);
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .improver-foot .input {
+    flex: 1;
+  }
+
   /* ============ KEY/VALUE ROWS ============ */
   .kv {
     display: grid;
