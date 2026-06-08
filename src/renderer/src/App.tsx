@@ -3,6 +3,7 @@ import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { NewsRunHost } from '@renderer/components/NewsRunHost'
+import { SkillImproverHost } from '@renderer/components/SkillImproverHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
@@ -67,6 +68,7 @@ export function App() {
       </div>
       <NewsRunHost />
       <TrendingRunHost />
+      <SkillImproverHost />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )
