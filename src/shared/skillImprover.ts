@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+// Printed by the agent on its own line right after it writes the report JSON, so
+// the main-process run service knows to read + parse it. Lives in shared so the
+// renderer can strip it from the streamed transcript. Keep it unusual so it
+// never collides with normal output.
+export const REPORT_SENTINEL = '<<ATLAS_REPORT_READY>>'
+
 // One eval's result within an iteration. The model fills these from its A/B runs.
 const evalResultSchema = z.object({
   name: z.string(),

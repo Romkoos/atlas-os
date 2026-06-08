@@ -66,21 +66,28 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
   let session: ImproverSession | null = null
   let sentinelSeen = false
   let textSinceTurn = ''
+  // Set once accept/reject/cancel begins. It both makes finalization one-shot
+  // (so a teardown cancel can't restoreBackup over an accepted skill) and tells
+  // the message loop / catch to ignore the abort-induced result/throw.
+  let finalizing = false
 
   // Watch streamed text for the report sentinel; on a hit, read + parse the
-  // report file and emit it. Guarded so it only fires once.
+  // report file and emit it. The report file may land on disk a beat after the
+  // sentinel streams, so a missing file just means "retry on the next token";
+  // only a file that exists-but-won't-parse is a real error.
   async function checkSentinel() {
     if (sentinelSeen || !session) return
     if (!textSinceTurn.includes(REPORT_SENTINEL)) return
-    sentinelSeen = true
+    let raw: string
     try {
-      const raw = await readFile(session.reportPath, 'utf8')
-      const report = parseImproverReport(raw)
-      if (report) opts.emit({ type: 'report', report })
-      else opts.emit({ type: 'error', message: 'Report file was malformed' })
+      raw = await readFile(session.reportPath, 'utf8')
     } catch {
-      opts.emit({ type: 'error', message: 'Report file was not found' })
+      return // not written yet — retry when more text streams
     }
+    sentinelSeen = true
+    const report = parseImproverReport(raw)
+    if (report) opts.emit({ type: 'report', report })
+    else opts.emit({ type: 'error', message: 'Report file was malformed' })
   }
 
   const done = (async (): Promise<void> => {
@@ -136,31 +143,49 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
           }
         }
       } else if (message.type === 'result') {
-        // End of a turn → the agent is waiting for the next user reply.
+        // A turn finished. Abort-induced results during finalization are ignored.
+        if (finalizing) continue
         textSinceTurn = ''
-        opts.emit({ type: 'awaiting-input' })
+        if (message.subtype === 'success') {
+          // The agent is now waiting for the next user reply.
+          opts.emit({ type: 'awaiting-input' })
+        } else {
+          // Non-success (max turns, execution error, …): the session is dead, so
+          // surface it instead of inviting a reply into a stalled run.
+          const reason = message.errors?.join('; ') || message.subtype
+          opts.emit({ type: 'error', message: `Improver run failed: ${reason}` })
+        }
       }
     }
   })().catch((error) => {
+    // An intentional abort during finalization is not a failure.
+    if (finalizing) return
     const message = error instanceof Error ? error.message : 'Unknown error'
     logger.error('Improver run failed', message)
     opts.emit({ type: 'error', message })
   })
 
+  // Stop the live SDK loop. Shared by all three finalizers.
+  function stop() {
+    mailbox?.close()
+    controller.abort()
+    queryRef?.interrupt().catch(() => {})
+  }
+
   return {
     reply: (text: string) => mailbox?.push(text),
     accept: async () => {
-      mailbox?.close()
-      controller.abort()
-      queryRef?.interrupt().catch(() => {})
+      if (finalizing) return
+      finalizing = true
+      stop()
       await done
       if (session) await cleanupSession(session)
       opts.emit({ type: 'done' })
     },
     reject: async () => {
-      mailbox?.close()
-      controller.abort()
-      queryRef?.interrupt().catch(() => {})
+      if (finalizing) return
+      finalizing = true
+      stop()
       await done
       if (session) {
         await restoreBackup(session)
@@ -169,9 +194,9 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
       opts.emit({ type: 'aborted' })
     },
     cancel: () => {
-      mailbox?.close()
-      controller.abort()
-      queryRef?.interrupt().catch(() => {})
+      if (finalizing) return
+      finalizing = true
+      stop()
       void done.then(async () => {
         if (session) {
           await restoreBackup(session)

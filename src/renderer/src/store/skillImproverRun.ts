@@ -1,4 +1,4 @@
-import type { ImproverReport } from '@shared/skillImprover'
+import { type ImproverReport, REPORT_SENTINEL } from '@shared/skillImprover'
 import { create } from 'zustand'
 
 export interface TranscriptEntry {
@@ -54,16 +54,16 @@ export const useSkillImproverRun = create<ImproverRunState>((set) => ({
 
   appendToken: (text) => set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
 
-  // Commit the streamed assistant text as a transcript entry (called at turn end).
+  // Commit the streamed assistant text as a transcript entry (called at turn
+  // end). Strip the report sentinel so the raw token never shows in the chat —
+  // the rendered report replaces it.
   flushTurn: () =>
-    set((s) =>
-      s.streaming.trim()
-        ? {
-            transcript: [...s.transcript, { kind: 'assistant', text: s.streaming }],
-            streaming: '',
-          }
-        : { streaming: '' },
-    ),
+    set((s) => {
+      const text = s.streaming.split(REPORT_SENTINEL).join('').trimEnd()
+      return text.trim()
+        ? { transcript: [...s.transcript, { kind: 'assistant', text }], streaming: '' }
+        : { streaming: '' }
+    }),
 
   pushTool: (summary) =>
     set((s) => ({ transcript: [...s.transcript, { kind: 'tool', text: summary }] })),

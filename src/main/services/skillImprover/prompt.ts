@@ -1,7 +1,8 @@
-// Printed by the agent on its own line right after it writes the report JSON.
-// The service watches streamed text for this exact token, then reads + parses
-// the report file. Keep it unusual so it never collides with normal output.
-export const REPORT_SENTINEL = '<<ATLAS_REPORT_READY>>'
+import { REPORT_SENTINEL } from '@shared/skillImprover'
+
+// Re-export so existing importers (run service, prompt tests) keep importing the
+// token from here. Single source of truth lives in @shared/skillImprover.
+export { REPORT_SENTINEL }
 
 export interface ImproverPromptArgs {
   skillCreatorPath: string // absolute path to skill-creator's SKILL.md

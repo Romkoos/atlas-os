@@ -24,18 +24,25 @@ export async function createSession(
   const skillPath = join(skillsDir, skillId)
   const skillFile = join(skillPath, 'SKILL.md')
   const workspace = await mkdtemp(join(tmpdir(), 'atlas-improver-'))
-  const backupDir = join(workspace, 'backup')
-  await mkdir(backupDir, { recursive: true })
-  const backupFile = join(backupDir, 'SKILL.md')
-  await cp(skillFile, backupFile)
-  return {
-    requestId,
-    skillId,
-    skillPath,
-    skillFile,
-    workspace,
-    backupFile,
-    reportPath: join(workspace, 'report.json'),
+  // If backing up fails (e.g. SKILL.md missing/unreadable), remove the temp dir
+  // we just created before rethrowing — otherwise it leaks on every failed start.
+  try {
+    const backupDir = join(workspace, 'backup')
+    await mkdir(backupDir, { recursive: true })
+    const backupFile = join(backupDir, 'SKILL.md')
+    await cp(skillFile, backupFile)
+    return {
+      requestId,
+      skillId,
+      skillPath,
+      skillFile,
+      workspace,
+      backupFile,
+      reportPath: join(workspace, 'report.json'),
+    }
+  } catch (error) {
+    await rm(workspace, { recursive: true, force: true })
+    throw error
   }
 }
 
