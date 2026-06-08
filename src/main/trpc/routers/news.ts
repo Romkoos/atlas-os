@@ -1,3 +1,5 @@
+import { db } from '@main/db/client'
+import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { type NewsRun, readNews, runNews } from '@main/services/news'
 import { getSettings } from '@main/store'
@@ -17,10 +19,12 @@ export const newsRouter = router({
     .output(z.object({ raw: z.string(), updatedAt: z.string().nullable() }))
     .query(() => readNews()),
 
-  // Stream the daily-ai-news skill run live. Mirrors agent.run, minus the DB
-  // insert and saveMarkdown — the skill owns the file write.
+  // Stream the daily-ai-news skill run live. Mirrors agent.run — records an
+  // events row so the run shows up in Stats — minus saveMarkdown (the skill owns
+  // the file write).
   run: publicProcedure.input(z.object({ requestId: z.string().min(1) })).subscription(({ input }) =>
     observable<NewsEvent>((emit) => {
+      const startedAt = Date.now()
       let cancelled = false
       const model = getSettings().model ?? DEFAULT_MODEL_ID
 
@@ -32,7 +36,24 @@ export const newsRouter = router({
 
       run.done
         .then((result) => {
-          logger.info('News digest saved', { filePath: result.filePath })
+          const durationMs = Date.now() - startedAt
+
+          db()
+            .insert(events)
+            .values({
+              type: 'news.run',
+              model,
+              tokens: result.outputTokens,
+              filePath: result.filePath,
+              durationMs,
+            })
+            .run()
+
+          logger.info('News digest saved', {
+            filePath: result.filePath,
+            tokens: result.outputTokens,
+            durationMs,
+          })
           emit.next({ type: 'done', filePath: result.filePath })
           emit.complete()
         })

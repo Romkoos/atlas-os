@@ -1,3 +1,5 @@
+import { db } from '@main/db/client'
+import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { readTrending, runTrending, type TrendingRun } from '@main/services/trending'
 import { getSettings } from '@main/store'
@@ -17,10 +19,12 @@ export const trendingRouter = router({
     .output(z.object({ raw: z.string(), updatedAt: z.string().nullable() }))
     .query(() => readTrending()),
 
-  // Stream the github-trending skill run live. Mirrors news.run — the skill owns
-  // the file write. Reuses the generic NewsEvent DTO.
+  // Stream the github-trending skill run live. Mirrors news.run — records an
+  // events row so the run shows up in Stats — and the skill owns the file write.
+  // Reuses the generic NewsEvent DTO.
   run: publicProcedure.input(z.object({ requestId: z.string().min(1) })).subscription(({ input }) =>
     observable<NewsEvent>((emit) => {
+      const startedAt = Date.now()
       let cancelled = false
       const model = getSettings().model ?? DEFAULT_MODEL_ID
 
@@ -32,7 +36,24 @@ export const trendingRouter = router({
 
       run.done
         .then((result) => {
-          logger.info('Trending digest saved', { filePath: result.filePath })
+          const durationMs = Date.now() - startedAt
+
+          db()
+            .insert(events)
+            .values({
+              type: 'trending.run',
+              model,
+              tokens: result.outputTokens,
+              filePath: result.filePath,
+              durationMs,
+            })
+            .run()
+
+          logger.info('Trending digest saved', {
+            filePath: result.filePath,
+            tokens: result.outputTokens,
+            durationMs,
+          })
           emit.next({ type: 'done', filePath: result.filePath })
           emit.complete()
         })

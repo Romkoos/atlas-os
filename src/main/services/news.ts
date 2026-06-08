@@ -5,7 +5,7 @@ import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { storeRoot } from '@main/services/knowledge/store'
 
 export interface NewsRun {
-  done: Promise<{ filePath: string }>
+  done: Promise<{ filePath: string; outputTokens: number }>
   cancel: () => void
 }
 
@@ -60,7 +60,7 @@ export function runNews(opts: RunNewsOptions): NewsRun {
   const controller = new AbortController()
   let queryRef: Query | null = null
 
-  const done = (async (): Promise<{ filePath: string }> => {
+  const done = (async (): Promise<{ filePath: string; outputTokens: number }> => {
     // Ensure the target dir exists up front; the skill's Write also creates it,
     // but this guarantees a stable path even if the skill changes.
     mkdirSync(newsDir(), { recursive: true })
@@ -86,6 +86,7 @@ export function runNews(opts: RunNewsOptions): NewsRun {
     // Track the streaming block type so we can drop a newline after each finished
     // text block — otherwise separate status messages concatenate into one line.
     let blockType: string | null = null
+    let outputTokens = 0
 
     for await (const message of q as AsyncIterable<SDKMessage>) {
       if (message.type === 'stream_event') {
@@ -98,13 +99,16 @@ export function runNews(opts: RunNewsOptions): NewsRun {
           if (blockType === 'text') opts.onToken('\n')
           blockType = null
         }
-      } else if (message.type === 'result' && message.subtype !== 'success') {
-        const reason = message.errors?.join('; ') || message.subtype
-        throw new Error(`News run failed: ${reason}`)
+      } else if (message.type === 'result') {
+        outputTokens = message.usage.output_tokens ?? 0
+        if (message.subtype !== 'success') {
+          const reason = message.errors?.join('; ') || message.subtype
+          throw new Error(`News run failed: ${reason}`)
+        }
       }
     }
 
-    return { filePath: newsFilePath() }
+    return { filePath: newsFilePath(), outputTokens }
   })()
 
   return {
