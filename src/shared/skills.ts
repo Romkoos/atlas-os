@@ -40,3 +40,14 @@ export function groupByPrefix<T extends { id: string }>(items: T[]): Array<[stri
     return aMulti - bMulti || a[0].localeCompare(b[0])
   })
 }
+
+// Mirrors the server-side FRONTMATTER regex in main/services/skills.ts so the
+// editor can render a live preview from its own buffer without a round-trip.
+// Returns the raw YAML (without the --- fences) and the body after the fence.
+const FRONTMATTER_FENCE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n(?:\r?\n)?([\s\S]*)$/
+
+export function splitFrontmatter(raw: string): { frontmatter: string; body: string } {
+  const match = raw.match(FRONTMATTER_FENCE)
+  if (!match) return { frontmatter: '', body: raw }
+  return { frontmatter: match[1], body: match[2] }
+}
