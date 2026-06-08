@@ -183,7 +183,7 @@ export function Plugins() {
         }
       />
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 60 }}>
         {plugins.isLoading ? (
           <div style={hintStyle}>{'// loading…'}</div>
         ) : plugins.isError ? (

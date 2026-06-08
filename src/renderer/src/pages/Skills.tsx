@@ -105,7 +105,9 @@ export function Skills() {
         }}
       >
         {/* LEFT: skill list */}
-        <div style={{ overflow: 'auto', borderRight: '1px solid var(--line-dim)' }}>
+        <div
+          style={{ overflow: 'auto', paddingBottom: 60, borderRight: '1px solid var(--line-dim)' }}
+        >
           {skills.isLoading ? (
             <div style={hintStyle}>{'// loading…'}</div>
           ) : skills.isError ? (
