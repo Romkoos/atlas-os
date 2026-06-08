@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import type { SkillDetail, SkillMeta } from '@shared/skills'
@@ -91,4 +91,22 @@ export async function readSkill(id: string, dir: string = SKILLS_DIR): Promise<S
   } catch (error) {
     throw new Error(`Failed to parse SKILL.md for "${id}": ${(error as Error).message}`)
   }
+}
+
+// The full raw SKILL.md (frontmatter + body) for the editor. Unlike readSkill,
+// nothing is parsed or stripped — the editor saves back exactly what it shows.
+export async function readSkillRaw(id: string, dir: string = SKILLS_DIR): Promise<string> {
+  assertSafeId(id, dir)
+  return readFile(join(dir, id, 'SKILL.md'), 'utf8')
+}
+
+// Overwrite a skill's SKILL.md with raw editor content. assertSafeId already
+// guarantees the id is a direct child of `dir`, so the resolved path stays inside.
+export async function writeSkill(
+  id: string,
+  content: string,
+  dir: string = SKILLS_DIR,
+): Promise<void> {
+  assertSafeId(id, dir)
+  await writeFile(join(dir, id, 'SKILL.md'), content, 'utf8')
 }

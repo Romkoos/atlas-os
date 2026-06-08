@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { listSkills, readSkill } from '@main/services/skills'
+import { listSkills, readSkill, readSkillRaw, writeSkill } from '@main/services/skills'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 let dir: string
@@ -116,5 +116,32 @@ describe('readSkill', () => {
 
   it('rejects unknown skill ids', async () => {
     await expect(readSkill('no-such-skill', dir)).rejects.toThrow()
+  })
+})
+
+describe('readSkillRaw', () => {
+  it('returns the entire raw SKILL.md including frontmatter', async () => {
+    const raw = await readSkillRaw('beta', dir)
+    expect(raw).toContain('description: Just a description.')
+    expect(raw).toContain('Beta body.')
+    expect(raw.startsWith('---')).toBe(true)
+  })
+
+  it('rejects path-traversal ids', async () => {
+    await expect(readSkillRaw('../beta', dir)).rejects.toThrow()
+    await expect(readSkillRaw('alpha/../beta', dir)).rejects.toThrow()
+  })
+})
+
+describe('writeSkill', () => {
+  it('round-trips content through readSkillRaw', async () => {
+    const next = '---\nname: Beta\ndescription: Edited.\n---\n\nNew body.\n'
+    await writeSkill('beta', next, dir)
+    expect(await readSkillRaw('beta', dir)).toBe(next)
+  })
+
+  it('rejects path-traversal ids', async () => {
+    await expect(writeSkill('../escape', 'x', dir)).rejects.toThrow()
+    await expect(writeSkill('a/b', 'x', dir)).rejects.toThrow()
   })
 })
