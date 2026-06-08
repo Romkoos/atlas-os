@@ -6,6 +6,7 @@ import { newsRouter } from '@main/trpc/routers/news'
 import { pluginsRouter } from '@main/trpc/routers/plugins'
 import { productivityRouter } from '@main/trpc/routers/productivity'
 import { settingsRouter } from '@main/trpc/routers/settings'
+import { skillImproverRouter } from '@main/trpc/routers/skillImprover'
 import { skillsRouter } from '@main/trpc/routers/skills'
 import { statsRouter } from '@main/trpc/routers/stats'
 import { trendingRouter } from '@main/trpc/routers/trending'
@@ -17,6 +18,7 @@ export const appRouter = router({
   agent: agentRouter,
   stats: statsRouter,
   skills: skillsRouter,
+  skillImprover: skillImproverRouter,
   productivity: productivityRouter,
   benchmark: benchmarkRouter,
   knowledge: knowledgeRouter,
