@@ -1,11 +1,11 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { groupByPrefix, type SkillMeta } from '@shared/skills'
-import { skipToken } from '@tanstack/react-query'
-import { ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import { groupByPrefix, type SkillMeta, splitFrontmatter } from '@shared/skills'
+import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { toast } from 'sonner'
 
 function titleCase(tag: string): string {
   return tag.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -53,11 +53,202 @@ function SkillItem({
   )
 }
 
+// Pull allowed-tools from raw frontmatter for the live preview chips. Supports
+// both the inline list ("Read, Write") and the YAML block list (- Read).
+function parseToolsFromFrontmatter(frontmatter: string): string[] {
+  const lines = frontmatter.split(/\r?\n/)
+  const idx = lines.findIndex((l) => /^allowed-tools\s*:/.test(l))
+  if (idx === -1) return []
+  const inline = lines[idx].replace(/^allowed-tools\s*:/, '').trim()
+  if (inline) {
+    return inline
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean)
+  }
+  const tools: string[] = []
+  for (let i = idx + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*-\s*(.+?)\s*$/)
+    if (!m) break
+    tools.push(m[1].replace(/^["']|["']$/g, ''))
+  }
+  return tools
+}
+
+function SkillEditorPane({ skillId }: { skillId: string }) {
+  const utils = trpc.useUtils()
+  const raw = trpc.skills.getRaw.useQuery({ id: skillId })
+  const save = trpc.skills.save.useMutation()
+
+  const [buffer, setBuffer] = useState('')
+  const [savedContent, setSavedContent] = useState('')
+  const [editorOpen, setEditorOpen] = useState(true)
+  const [previewOpen, setPreviewOpen] = useState(true)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Load the buffer whenever the fetched content changes. The caller keys this
+  // component by skillId, so selecting another skill remounts and resets state.
+  useEffect(() => {
+    if (raw.data) {
+      setBuffer(raw.data.content)
+      setSavedContent(raw.data.content)
+    }
+  }, [raw.data])
+
+  // Auto-grow the textarea so the OUTER container owns the single shared scroll.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-run when buffer or editorOpen changes so the textarea resizes
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [buffer, editorOpen])
+
+  const dirty = buffer !== savedContent
+
+  function doSave() {
+    if (!dirty || save.isPending) return
+    save.mutate(
+      { id: skillId, content: buffer },
+      {
+        onSuccess: () => {
+          setSavedContent(buffer)
+          void utils.skills.list.invalidate()
+          void utils.skills.get.invalidate({ id: skillId })
+          toast.success('Skill saved')
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    )
+  }
+
+  // Cmd/Ctrl+S saves. Scoped to the editor region so it does not fight global keys.
+  function onKeyDown(e: React.KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault()
+      doSave()
+    }
+  }
+
+  const { frontmatter, body } = splitFrontmatter(buffer)
+  const tools = parseToolsFromFrontmatter(frontmatter)
+
+  const splitClass = !previewOpen ? 'editor-only' : !editorOpen ? 'preview-only' : ''
+
+  return (
+    <div className="split-pane">
+      <div className="skill-split-head">
+        {editorOpen ? (
+          <div className="col-head editor-head">
+            <button
+              type="button"
+              className="col-head"
+              style={{ padding: 0 }}
+              onClick={() => setEditorOpen(false)}
+            >
+              <ChevronDown style={{ width: 10, height: 10 }} />
+              editor · SKILL.md {dirty ? <span className="dirty-dot">●</span> : null}
+            </button>
+            <span className="head-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={!dirty || save.isPending}
+                onClick={doSave}
+              >
+                Save ⌘S
+              </button>
+              <button type="button" className="btn" disabled title="Coming soon">
+                <Sparkles style={{ width: 11, height: 11 }} /> Improve
+              </button>
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="col-head editor-head"
+            onClick={() => setEditorOpen(true)}
+          >
+            <ChevronRight style={{ width: 10, height: 10 }} /> editor
+          </button>
+        )}
+        <button
+          type="button"
+          className="col-head preview-head"
+          onClick={() => setPreviewOpen((v) => !v)}
+        >
+          {previewOpen ? (
+            <ChevronDown style={{ width: 10, height: 10 }} />
+          ) : (
+            <ChevronRight style={{ width: 10, height: 10 }} />
+          )}
+          preview · rendered
+        </button>
+      </div>
+
+      <div className={`skill-split ${splitClass}`}>
+        {editorOpen ? (
+          <div className="editor-col">
+            {raw.isLoading ? (
+              <div style={{ ...hintStyle, padding: '16px 18px' }}>{'// loading…'}</div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                className="skill-editor"
+                spellCheck={false}
+                value={buffer}
+                onChange={(e) => setBuffer(e.target.value)}
+                onKeyDown={onKeyDown}
+              />
+            )}
+          </div>
+        ) : null}
+        {previewOpen ? (
+          <div className="preview-col">
+            {tools.length > 0 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '16px 24px 0',
+                }}
+              >
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+                  Tools:
+                </span>
+                {tools.map((tool) => (
+                  <span
+                    key={tool}
+                    style={{
+                      fontFamily: 'var(--mono)',
+                      fontSize: 10,
+                      color: 'var(--amber)',
+                      border: '1px solid var(--amber-dim)',
+                      padding: '1px 6px',
+                    }}
+                  >
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="md-prose">
+              <Markdown remarkPlugins={[remarkGfm]}>{formatSkillMarkdown(body)}</Markdown>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export function Skills() {
   const skills = trpc.skills.list.useQuery()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
-  const detail = trpc.skills.get.useQuery(selectedId ? { id: selectedId } : skipToken)
 
   const allItems = skills.data ?? []
   const items = filter
@@ -162,63 +353,22 @@ export function Skills() {
           )}
         </div>
 
-        {/* RIGHT: rendered preview */}
-        <div className="split-pane">
-          <div className="pane-head">
-            <span className="ttl">preview · rendered</span>
-            <span className="meta">{selectedId ? `${selectedId}.md` : 'no selection'}</span>
-          </div>
-          <div className="pane-body">
-            {!selectedId ? (
+        {/* RIGHT: editor + live preview */}
+        {selectedId ? (
+          <SkillEditorPane key={selectedId} skillId={selectedId} />
+        ) : (
+          <div className="split-pane">
+            <div className="pane-head">
+              <span className="ttl">editor · preview</span>
+              <span className="meta">no selection</span>
+            </div>
+            <div className="pane-body">
               <div style={{ ...hintStyle, padding: '20px 24px' }}>
-                {'// select a skill to read its SKILL.md'}
+                {'// select a skill to edit its SKILL.md'}
               </div>
-            ) : detail.isLoading ? (
-              <div style={{ ...hintStyle, padding: '20px 24px' }}>{'// loading…'}</div>
-            ) : detail.isError ? (
-              <div style={{ ...hintStyle, padding: '20px 24px', color: 'var(--amber)' }}>
-                {'// error loading skill content'}
-              </div>
-            ) : detail.data ? (
-              <>
-                {detail.data.meta.allowedTools.length > 0 ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '16px 24px 0',
-                    }}
-                  >
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
-                      Tools:
-                    </span>
-                    {detail.data.meta.allowedTools.map((tool) => (
-                      <span
-                        key={tool}
-                        style={{
-                          fontFamily: 'var(--mono)',
-                          fontSize: 10,
-                          color: 'var(--amber)',
-                          border: '1px solid var(--amber-dim)',
-                          padding: '1px 6px',
-                        }}
-                      >
-                        {tool}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="md-prose">
-                  <Markdown remarkPlugins={[remarkGfm]}>
-                    {formatSkillMarkdown(detail.data.content)}
-                  </Markdown>
-                </div>
-              </>
-            ) : null}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   )
