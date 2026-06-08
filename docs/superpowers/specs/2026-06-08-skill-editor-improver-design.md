@@ -134,6 +134,10 @@ Manages one interactive session at a time, keyed by `requestId`.
     a sibling of the skill dir.
   - At the very end, write a final structured report as JSON to `<reportPath>`
     matching the agreed schema, and apply the improved `SKILL.md` in place.
+  - Immediately after writing the report file, output exactly the line
+    `<<ATLAS_REPORT_READY>>` and nothing else. The service watches the streamed
+    text for this sentinel, then reads + parses `<reportPath>` and emits the
+    `report` event. This is a deterministic hand-off that avoids file-watching.
 - **Streaming input (mailbox).** The SDK `query()` is called with an
   `AsyncIterable<SDKUserMessage>` prompt. A mailbox async generator yields the
   initial wrapper message, then awaits user replies pushed via the `reply`
@@ -144,8 +148,10 @@ Manages one interactive session at a time, keyed by `requestId`.
   - **Accept:** delete `<workspace>` (incl. backup).
   - **Reject / Cancel:** copy backup back over `SKILL.md`, then delete
     `<workspace>`.
-- **SDK options:** `allowedTools: [Skill, Read, Write, Edit, Bash, Glob, Grep,
-  TodoWrite, WebSearch, WebFetch]`, `permissionMode: 'bypassPermissions'` (the
+- **SDK options:** `allowedTools: [Task, Skill, Read, Write, Edit, Bash, Glob,
+  Grep, TodoWrite, WebSearch, WebFetch]` (`Task` lets skill-creator spawn the
+  with-skill/baseline A/B runs as subagents), `permissionMode:
+  'bypassPermissions'` (the
   user is in the loop only for the agent's substantive questions, not for
   tool-permission prompts — mirrors `news.ts`), `settingSources: ['user']`,
   `includePartialMessages: true`, `cwd: homedir()`, `env: subscriptionEnv()`,
