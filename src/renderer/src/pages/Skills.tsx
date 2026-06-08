@@ -71,7 +71,7 @@ export function Skills() {
   return (
     <>
       <PageHeader
-        num="04"
+        num="07"
         title="SKILLS"
         description={
           <>

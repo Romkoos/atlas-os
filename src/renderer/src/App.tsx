@@ -2,10 +2,13 @@ import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
+import { NewsRunHost } from '@renderer/components/NewsRunHost'
+import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
 import { Knowledge } from '@renderer/pages/Knowledge'
+import { News } from '@renderer/pages/News'
 import { Plugins } from '@renderer/pages/Plugins'
 import { Productivity } from '@renderer/pages/Productivity'
 import { Settings } from '@renderer/pages/Settings'
@@ -20,6 +23,7 @@ const PAGES: Record<Section, ComponentType> = {
   stats: Stats,
   productivity: Productivity,
   knowledge: Knowledge,
+  news: News,
   info: Info,
   skills: Skills,
   plugins: Plugins,
@@ -61,6 +65,8 @@ export function App() {
           </main>
         </div>
       </div>
+      <NewsRunHost />
+      <TrendingRunHost />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )

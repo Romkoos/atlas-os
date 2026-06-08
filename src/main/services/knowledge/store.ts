@@ -16,6 +16,11 @@ import { load as parseYaml } from 'js-yaml'
 
 export const RESERVED = '_engine'
 
+// Store-root dirs that are never knowledge projects and must never appear on the
+// Knowledge page. `news/` holds the AI-news digest (its own NEWS tab), not a
+// per-project knowledge base.
+export const EXCLUDED: ReadonlySet<string> = new Set([RESERVED, 'news'])
+
 // Store root: env override, else ~/atlas-knowledge. Never hardcode the abspath.
 export function storeRoot(): string {
   return process.env.ATLAS_KB_STORE || join(homedir(), 'atlas-knowledge')
@@ -141,7 +146,7 @@ export function listProjects(root: string, tracked: ReadonlySet<string>): Knowle
   const projects = loadProjectsJson(root)
   const out: KnowledgeProject[] = []
   for (const name of readdirSync(root)) {
-    if (name === RESERVED) continue
+    if (EXCLUDED.has(name)) continue
     const dir = join(root, name)
     let st: ReturnType<typeof statSync> | null = null
     try {

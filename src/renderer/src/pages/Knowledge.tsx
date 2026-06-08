@@ -54,7 +54,7 @@ export function Knowledge() {
     <>
       <PageHeader
         num="04"
-        title="knowledge"
+        title="KNOWLEDGE"
         description="Per-project knowledge base — read-only."
         action={
           hasProjects ? (
@@ -82,66 +82,68 @@ export function Knowledge() {
         }
       />
 
-      {hasProjects && (
-        <div className="kb-search-warn">
-          <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
-          compile runs the LLM engine via Claude Code (uses your Claude usage). All tracked
-          projects, incremental — only new daily logs.
-        </div>
-      )}
+      <div className="kb-page">
+        {hasProjects && (
+          <div className="kb-search-warn">
+            <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
+            compile runs the LLM engine via Claude Code (uses your Claude usage). All tracked
+            projects, incremental — only new daily logs.
+          </div>
+        )}
 
-      {compile.data && (
-        <div className="panel mt-16">
-          <div className="panel-body">
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.7 }}>
-              {compile.data.map((r) => (
-                <div key={r.project}>
-                  <span
-                    style={{
-                      color:
-                        r.status === 'error'
-                          ? 'var(--red, #e66)'
-                          : r.status === 'compiled'
-                            ? 'var(--green, #6c6)'
-                            : 'var(--fg-3)',
-                    }}
-                  >
-                    {r.status === 'compiled' ? '✓' : r.status === 'nothing' ? '·' : '✗'}
-                  </span>{' '}
-                  <span style={{ color: 'var(--fg-2)' }}>{r.project}</span>{' '}
-                  <span style={{ color: 'var(--fg-3)' }}>— {r.summary}</span>
-                </div>
-              ))}
+        {compile.data && (
+          <div className="panel mt-16">
+            <div className="panel-body">
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.7 }}>
+                {compile.data.map((r) => (
+                  <div key={r.project}>
+                    <span
+                      style={{
+                        color:
+                          r.status === 'error'
+                            ? 'var(--red, #e66)'
+                            : r.status === 'compiled'
+                              ? 'var(--green, #6c6)'
+                              : 'var(--fg-3)',
+                      }}
+                    >
+                      {r.status === 'compiled' ? '✓' : r.status === 'nothing' ? '·' : '✗'}
+                    </span>{' '}
+                    <span style={{ color: 'var(--fg-2)' }}>{r.project}</span>{' '}
+                    <span style={{ color: 'var(--fg-3)' }}>— {r.summary}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {projects.isPending ? (
-        <Empty>loading…</Empty>
-      ) : projects.data && projects.data.length > 0 ? (
-        !active ? null : (
-          <>
-            <div className="tabs">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={tab === t.id ? 'on' : ''}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            {tab === 'browse' && <BrowseTab key={active} project={active} />}
-            {tab === 'daily' && <DailyTab key={active} project={active} />}
-            {tab === 'search' && <SearchTab key={active} project={active} />}
-          </>
-        )
-      ) : (
-        <Empty>no tracked projects with a knowledge base yet.</Empty>
-      )}
+        {projects.isPending ? (
+          <Empty>loading…</Empty>
+        ) : projects.data && projects.data.length > 0 ? (
+          !active ? null : (
+            <>
+              <div className="tabs">
+                {TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={tab === t.id ? 'on' : ''}
+                    onClick={() => setTab(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {tab === 'browse' && <BrowseTab key={active} project={active} />}
+              {tab === 'daily' && <DailyTab key={active} project={active} />}
+              {tab === 'search' && <SearchTab key={active} project={active} />}
+            </>
+          )
+        ) : (
+          <Empty>no tracked projects with a knowledge base yet.</Empty>
+        )}
+      </div>
     </>
   )
 }

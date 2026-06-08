@@ -5,6 +5,7 @@ export type Section =
   | 'stats'
   | 'productivity'
   | 'knowledge'
+  | 'news'
   | 'info'
   | 'skills'
   | 'plugins'

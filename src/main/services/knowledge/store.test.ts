@@ -130,6 +130,11 @@ describe('listProjects', () => {
     const projects = listProjects(root, new Set())
     expect(projects.map((p) => p.name)).not.toContain('broken')
   })
+  it('excludes the news dir even if it has a knowledge subfolder', () => {
+    mkdirSync(join(root, 'news', 'knowledge', 'concepts'), { recursive: true })
+    const projects = listProjects(root, new Set())
+    expect(projects.map((p) => p.name)).not.toContain('news')
+  })
 })
 
 describe('listArticles', () => {

@@ -14,7 +14,7 @@ export function Section({
     <section id={id} className="info-section">
       <h3 className="info-h">
         <span
-          style={{ color: 'var(--color-muted-fg)', marginRight: 8 }}
+          style={{ color: 'var(--amber-dim)', marginRight: 8 }}
         >{`§ ${title.split('.')[0]}`}</span>
         {title.split('.').slice(1).join('.').trim()}
       </h3>

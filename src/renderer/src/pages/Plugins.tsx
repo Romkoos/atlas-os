@@ -149,8 +149,8 @@ export function Plugins() {
   return (
     <>
       <PageHeader
-        num="07"
-        title="plugins"
+        num="08"
+        title="PLUGINS"
         description={
           <>
             Your global Claude Code plugins.{' '}
