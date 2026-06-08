@@ -61,11 +61,14 @@ export interface StartImproverOptions {
 // across turns until the mailbox is closed by accept/reject/cancel.
 export function startImproverRun(opts: StartImproverOptions): ImproverRun {
   const controller = new AbortController()
+  const startedAt = Date.now()
   let queryRef: Query | null = null
   let mailbox: Mailbox | null = null
   let session: ImproverSession | null = null
   let sentinelSeen = false
   let textSinceTurn = ''
+  // Output tokens summed across every turn's result, for the stats event row.
+  let outputTokens = 0
   // Set once accept/reject/cancel begins. It both makes finalization one-shot
   // (so a teardown cancel can't restoreBackup over an accepted skill) and tells
   // the message loop / catch to ignore the abort-induced result/throw.
@@ -143,7 +146,10 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
           }
         }
       } else if (message.type === 'result') {
-        // A turn finished. Abort-induced results during finalization are ignored.
+        // A turn finished. Count its output tokens before anything else so the
+        // total is captured even on the final (finalizing) turn.
+        outputTokens += message.usage.output_tokens ?? 0
+        // Abort-induced results during finalization are ignored.
         if (finalizing) continue
         textSinceTurn = ''
         if (message.subtype === 'success') {
@@ -180,7 +186,7 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
       stop()
       await done
       if (session) await cleanupSession(session)
-      opts.emit({ type: 'done' })
+      opts.emit({ type: 'done', tokens: outputTokens, durationMs: Date.now() - startedAt })
     },
     reject: async () => {
       if (finalizing) return
@@ -191,7 +197,7 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
         await restoreBackup(session)
         await cleanupSession(session)
       }
-      opts.emit({ type: 'aborted' })
+      opts.emit({ type: 'aborted', tokens: outputTokens, durationMs: Date.now() - startedAt })
     },
     cancel: () => {
       if (finalizing) return
@@ -202,7 +208,7 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
           await restoreBackup(session)
           await cleanupSession(session)
         }
-        opts.emit({ type: 'aborted' })
+        opts.emit({ type: 'aborted', tokens: outputTokens, durationMs: Date.now() - startedAt })
       })
     },
     done,

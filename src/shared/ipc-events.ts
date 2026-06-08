@@ -23,6 +23,8 @@ export type ImproverEvent =
   | { type: 'tool'; name: string; summary: string }
   | { type: 'awaiting-input' }
   | { type: 'report'; report: ImproverReport }
-  | { type: 'done' }
+  // `done`/`aborted` carry the session's totals so the router can log a stats
+  // event row (the run consumed tokens/time whether or not it was applied).
+  | { type: 'done'; tokens: number; durationMs: number }
   | { type: 'error'; message: string }
-  | { type: 'aborted' }
+  | { type: 'aborted'; tokens: number; durationMs: number }

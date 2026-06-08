@@ -45,6 +45,7 @@ export function SkillImproverHost() {
         case 'done':
           finish('done')
           void utils.skills.list.invalidate()
+          void utils.stats.invalidate()
           if (skillId) void utils.skills.getRaw.invalidate({ id: skillId })
           toast.success('Skill improvement applied')
           break
@@ -54,6 +55,7 @@ export function SkillImproverHost() {
           break
         case 'aborted':
           finish('aborted')
+          void utils.stats.invalidate()
           if (skillId) void utils.skills.getRaw.invalidate({ id: skillId })
           toast('Skill improvement reverted')
           break

@@ -1,3 +1,6 @@
+import { db } from '@main/db/client'
+import { events } from '@main/db/schema'
+import { logger } from '@main/logger'
 import { type ImproverRun, startImproverRun } from '@main/services/skillImprover'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -25,7 +28,28 @@ export const skillImproverRouter = router({
           requestId: input.requestId,
           skillId: input.skillId,
           model,
-          emit: (event) => emit.next(event),
+          emit: (event) => {
+            // Log a stats event when the session ends (applied or reverted) so the
+            // run shows up in Stats — the tokens/time were spent either way.
+            if (event.type === 'done' || event.type === 'aborted') {
+              db()
+                .insert(events)
+                .values({
+                  type: 'skill.improve',
+                  model,
+                  tokens: event.tokens,
+                  durationMs: event.durationMs,
+                })
+                .run()
+              logger.info('Skill improvement recorded', {
+                skillId: input.skillId,
+                applied: event.type === 'done',
+                tokens: event.tokens,
+                durationMs: event.durationMs,
+              })
+            }
+            emit.next(event)
+          },
         })
         runs.set(input.requestId, run)
 
