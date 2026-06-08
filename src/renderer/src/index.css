@@ -1137,6 +1137,87 @@
     background: var(--bg-2);
   }
 
+  /* ============ SKILLS EDITOR SPLIT ============ */
+  /* Skills editor: side-by-side editor|preview under ONE shared scroll. The
+     outer .skill-split is the scroll container; columns auto-grow so they scroll
+     together. Collapsing a column drops it from the grid. */
+  .skill-split-head {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--line-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-4);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .skill-split-head .col-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    user-select: none;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+  }
+  .skill-split-head .col-head.editor-head {
+    flex: 1;
+    border-right: 1px solid var(--line-dim);
+    justify-content: space-between;
+  }
+  .skill-split-head .col-head.preview-head {
+    flex: 1;
+  }
+  .skill-split-head .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .skill-split {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .skill-split.editor-only {
+    grid-template-columns: 1fr;
+  }
+  .skill-split.preview-only {
+    grid-template-columns: 1fr;
+  }
+  .skill-split .editor-col {
+    border-right: 1px solid var(--line-dim);
+    min-width: 0;
+  }
+  .skill-split .skill-editor {
+    width: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
+    padding: 16px 18px;
+    background: none;
+    border: none;
+    outline: none;
+    resize: none;
+    overflow: hidden; /* auto-grown to content; outer .skill-split scrolls */
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--fg-1);
+    white-space: pre;
+  }
+  .skill-split .preview-col {
+    min-width: 0;
+  }
+  .dirty-dot {
+    color: var(--amber);
+  }
+
   /* ============ KEY/VALUE ROWS ============ */
   .kv {
     display: grid;
