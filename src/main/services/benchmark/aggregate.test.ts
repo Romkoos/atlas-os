@@ -1,4 +1,9 @@
-import { buildAbSlice, type RawRun, summarizeRuns } from '@main/services/benchmark/aggregate'
+import {
+  buildAbSlice,
+  type RawRun,
+  rowToRawRun,
+  summarizeRuns,
+} from '@main/services/benchmark/aggregate'
 import type { InfraState } from '@main/services/productivity/infra'
 import { describe, expect, it } from 'vitest'
 
@@ -23,6 +28,36 @@ const run = (
   success,
   ts: new Date(tsMs),
   infraSnapshot: snap,
+})
+
+describe('rowToRawRun', () => {
+  it('copies all 11 fields through unchanged', () => {
+    const input: RawRun = {
+      taskId: 'task-1',
+      infraHash: 'abc123',
+      model: 'claude-sonnet-4-6',
+      tokensIn: 1000,
+      tokensOut: 250,
+      cacheReadTokens: 50,
+      cacheCreationTokens: 10,
+      totalCostUsd: 0.0042,
+      success: true,
+      ts: new Date(1700000000000),
+      infraSnapshot: snap,
+    }
+    const out = rowToRawRun(input)
+    expect(out.taskId).toBe(input.taskId)
+    expect(out.infraHash).toBe(input.infraHash)
+    expect(out.model).toBe(input.model)
+    expect(out.tokensIn).toBe(input.tokensIn)
+    expect(out.tokensOut).toBe(input.tokensOut)
+    expect(out.cacheReadTokens).toBe(input.cacheReadTokens)
+    expect(out.cacheCreationTokens).toBe(input.cacheCreationTokens)
+    expect(out.totalCostUsd).toBe(input.totalCostUsd)
+    expect(out.success).toBe(input.success)
+    expect(out.ts).toBe(input.ts)
+    expect(out.infraSnapshot).toBe(input.infraSnapshot)
+  })
 })
 
 describe('summarizeRuns', () => {

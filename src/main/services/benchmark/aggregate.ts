@@ -39,6 +39,26 @@ export interface AbRow {
   cost: Delta
 }
 
+// Pure helper: project a benchmark_runs-shaped row onto the RawRun interface.
+// Avoids verbatim field-mapping duplication across batch.ts and the reanalyze
+// procedure. Accepts any object that structurally satisfies RawRun (e.g. a full
+// Drizzle row with extra columns).
+export function rowToRawRun(r: RawRun): RawRun {
+  return {
+    taskId: r.taskId,
+    infraHash: r.infraHash,
+    model: r.model,
+    tokensIn: r.tokensIn,
+    tokensOut: r.tokensOut,
+    cacheReadTokens: r.cacheReadTokens,
+    cacheCreationTokens: r.cacheCreationTokens,
+    totalCostUsd: r.totalCostUsd,
+    success: r.success,
+    ts: r.ts,
+    infraSnapshot: r.infraSnapshot,
+  }
+}
+
 function toRep(r: RawRun): RepMetric {
   return {
     tokensIn: r.tokensIn,
