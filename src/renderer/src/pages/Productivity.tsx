@@ -1,3 +1,4 @@
+import { BenchmarkChatOverlay } from '@renderer/components/BenchmarkChatOverlay'
 import { ChartFrame } from '@renderer/components/charts/ChartFrame'
 import { kpiMeta, todayByHourMeta, tokensPerDayMeta } from '@renderer/components/charts/chartMeta'
 import { dailyDateAxis, overlayPrevious } from '@renderer/components/charts/compareSeries'
@@ -2236,6 +2237,7 @@ function BenchmarkTab() {
           </table>
         )}
       </div>
+      <BenchmarkChatOverlay />
     </>
   )
 }
