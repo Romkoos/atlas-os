@@ -160,3 +160,27 @@ export const benchmarkRuns = sqliteTable(
     index('idx_bench_ts').on(t.ts),
   ],
 )
+
+// One row per completed batch's auto-analysis. The UI reads the newest row, so
+// it behaves as "replaced each batch". `dataJson` is the A/B slice the summary
+// was based on; it also seeds the discuss-chat. `summary` is null when the
+// analysis call failed.
+export const benchmarkAnalysis = sqliteTable(
+  'benchmark_analysis',
+  {
+    id: text('id').primaryKey(),
+    batchId: text('batch_id').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    model: text('model').notNull(),
+    infraHash: text('infra_hash').notNull(),
+    baselineInfraHash: text('baseline_infra_hash'),
+    summary: text('summary'),
+    dataJson: text('data_json', { mode: 'json' })
+      .$type<import('@main/services/benchmark/aggregate').AbRow[]>()
+      .notNull(),
+  },
+  (t) => [index('idx_bench_analysis_created').on(t.createdAt)],
+)
+
+export type BenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferSelect
+export type NewBenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferInsert
