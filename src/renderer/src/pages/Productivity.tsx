@@ -1982,6 +1982,14 @@ function BenchmarkTab() {
     }
   }, [liveProgress, utils])
 
+  // While running, refresh the results table on the same 2s cadence as progress
+  // so rows appear as each run lands instead of all-at-once at the end.
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => void utils.benchmark.results.invalidate(), 2000)
+    return () => clearInterval(id)
+  }, [running, utils])
+
   const taskCount = tasks.data?.length ?? 0
   const estimated = taskCount * k
 
@@ -2055,7 +2063,7 @@ function BenchmarkTab() {
             {liveProgress ? (
               <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
                 {liveProgress.done}/{liveProgress.total} done · {liveProgress.failed} failed
-                {liveProgress.running ? ' · running…' : ''}
+                {liveProgress.running ? ` · ${liveProgress.phase}…` : ''}
               </span>
             ) : null}
           </div>
