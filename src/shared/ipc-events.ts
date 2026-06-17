@@ -28,3 +28,13 @@ export type ImproverEvent =
   | { type: 'done'; tokens: number; durationMs: number }
   | { type: 'error'; message: string }
   | { type: 'aborted'; tokens: number; durationMs: number }
+
+// Events streamed from main → renderer during a benchmark-discussion chat
+// (tRPC subscription). Mirrors the improver shape minus accept/reject/report.
+export type BenchmarkChatEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool'; name: string; summary: string }
+  | { type: 'awaiting-input' }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+  | { type: 'aborted' }
