@@ -35,6 +35,7 @@ const progressShape = z
     done: z.number(),
     failed: z.number(),
     running: z.boolean(),
+    phase: z.enum(['running', 'retrying', 'analyzing', 'done']),
     error: z.string().nullable(),
   })
   .nullable()
