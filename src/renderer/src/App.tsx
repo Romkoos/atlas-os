@@ -1,3 +1,4 @@
+import { BenchmarkChatHost } from '@renderer/components/BenchmarkChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
@@ -69,6 +70,7 @@ export function App() {
       <NewsRunHost />
       <TrendingRunHost />
       <SkillImproverHost />
+      <BenchmarkChatHost />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )
