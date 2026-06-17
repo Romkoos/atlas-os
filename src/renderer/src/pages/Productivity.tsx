@@ -2120,7 +2120,7 @@ function BenchmarkTab() {
                   type="button"
                   className="btn"
                   disabled={reanalyze.isPending}
-                  onClick={() => reanalyze.mutate()}
+                  onClick={() => reanalyze.mutate({ batchId: analysis.data?.batchId ?? '' })}
                 >
                   {reanalyze.isPending ? 'RETRYING…' : 'RETRY ANALYSIS'}
                 </button>

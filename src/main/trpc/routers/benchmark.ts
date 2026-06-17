@@ -210,32 +210,38 @@ export const benchmarkRouter = router({
     }),
 
   // Recompute the analysis from current data and persist a fresh row. Used by
-  // the "analysis unavailable" retry button. Derives model/infra from the most
-  // recent run.
-  reanalyze: publicProcedure.output(z.object({ ok: z.boolean() })).mutation(async () => {
-    const rows = db().select().from(benchmarkRuns).all()
-    if (rows.length === 0) return { ok: false }
-    const newest = rows.reduce((a, b) => (a.ts.getTime() >= b.ts.getTime() ? a : b))
-    const slice = buildAbSlice(summarizeRuns(rows.map(rowToRawRun)))
-    const summary =
-      slice.length > 0
-        ? await runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() })
-        : null
-    db()
-      .insert(benchmarkAnalysis)
-      .values({
-        id: randomUUID(),
-        batchId: newest.batchId,
-        createdAt: new Date(),
-        model: newest.model,
-        infraHash: newest.infraHash,
-        baselineInfraHash: slice[0]?.beforeInfraHash ?? null,
-        summary,
-        dataJson: slice,
-      })
-      .run()
-    return { ok: summary !== null }
-  }),
+  // the "analysis unavailable" retry button. Scoped to the card's batchId so
+  // the inserted row is always labeled with the correct batch/infraHash pair.
+  // The A/B slice is computed globally (all runs) — it compares the latest infra
+  // variant vs the previous one regardless of which batch triggered the retry.
+  reanalyze: publicProcedure
+    .input(z.object({ batchId: z.string().min(1) }))
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const rows = db().select().from(benchmarkRuns).all()
+      const batchRows = rows.filter((r) => r.batchId === input.batchId)
+      if (batchRows.length === 0) return { ok: false }
+      const newest = batchRows.reduce((a, b) => (a.ts.getTime() >= b.ts.getTime() ? a : b))
+      const slice = buildAbSlice(summarizeRuns(rows.map(rowToRawRun)))
+      const summary =
+        slice.length > 0
+          ? await runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() })
+          : null
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId: input.batchId,
+          createdAt: new Date(),
+          model: newest.model,
+          infraHash: newest.infraHash,
+          baselineInfraHash: slice[0]?.beforeInfraHash ?? null,
+          summary,
+          dataJson: slice,
+        })
+        .run()
+      return { ok: summary !== null }
+    }),
 
   // Infra compare: prev = second-most-recent batch's snapshot, last = newest
   // batch's snapshot, live = live-from-disk infra. Rows with ts <= baseline
