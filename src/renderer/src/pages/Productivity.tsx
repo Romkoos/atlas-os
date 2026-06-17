@@ -9,6 +9,7 @@ import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
+import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { groupByPrefix } from '@shared/skills'
 import { ChevronRight } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
@@ -1941,6 +1942,10 @@ function BenchmarkTab() {
   const utils = trpc.useUtils()
   const tasks = trpc.benchmark.tasks.useQuery()
   const results = trpc.benchmark.results.useQuery()
+  const analysis = trpc.benchmark.latestAnalysis.useQuery()
+  const reanalyze = trpc.benchmark.reanalyze.useMutation({
+    onSuccess: () => void utils.benchmark.latestAnalysis.invalidate(),
+  })
   const [batchId, setBatchId] = useState<string | null>(null)
   const [k, setK] = useState(5)
   const [model, setModel] = useState('claude-sonnet-4-6')
@@ -1979,6 +1984,7 @@ function BenchmarkTab() {
     if (liveProgress && !liveProgress.running) {
       void utils.benchmark.results.invalidate()
       void utils.benchmark.infraCompare.invalidate()
+      void utils.benchmark.latestAnalysis.invalidate()
     }
   }, [liveProgress, utils])
 
@@ -2082,6 +2088,46 @@ function BenchmarkTab() {
           ) : null}
         </div>
       </div>
+
+      {analysis.data ? (
+        <div className="panel mt-16">
+          <div className="panel-head">
+            <span className="ttl">analysis</span>
+            <span className="meta">plain-language read of the latest A/B infra change</span>
+          </div>
+          <div className="panel-body">
+            {analysis.data.summary ? (
+              <>
+                <p style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--fg-1)' }}>
+                  {analysis.data.summary}
+                </p>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ marginTop: 12 }}
+                  onClick={() => useBenchmarkChatRun.getState().start(analysis.data?.batchId ?? '')}
+                >
+                  DISCUSS
+                </button>
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)' }}>
+                  analysis unavailable
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={reanalyze.isPending}
+                  onClick={() => reanalyze.mutate()}
+                >
+                  {reanalyze.isPending ? 'RETRYING…' : 'RETRY ANALYSIS'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <InfraComparePanel />
 
