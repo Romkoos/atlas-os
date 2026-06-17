@@ -2,8 +2,10 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { db } from '@main/db/client'
-import { benchmarkRuns } from '@main/db/schema'
+import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
 import { appPaths } from '@main/paths'
+import { buildAbSlice, summarizeRuns } from '@main/services/benchmark/aggregate'
+import { runAnalysis } from '@main/services/benchmark/analysis'
 import { infraFingerprint } from '@main/services/benchmark/fingerprint'
 import { repoCommit, runBenchmarkTask } from '@main/services/benchmark/runner'
 import { selectTransientFailures } from '@main/services/benchmark/sweep'
@@ -170,7 +172,59 @@ async function runLoop(
       .where(eq(benchmarkRuns.batchId, batchId))
       .all()
       .filter((r) => !r.success).length
-    // after the main loop
+    // Auto-analysis: explain the A/B effect of this infra change in 2-3 plain
+    // sentences. Isolated try/catch — a failed analysis must NOT mark the batch
+    // errored; we persist a null-summary row instead so the UI can offer retry.
+    progress.phase = 'analyzing'
+    try {
+      const allRows = db().select().from(benchmarkRuns).all()
+      const slice = buildAbSlice(
+        summarizeRuns(
+          allRows.map((r) => ({
+            taskId: r.taskId,
+            infraHash: r.infraHash,
+            model: r.model,
+            tokensIn: r.tokensIn,
+            tokensOut: r.tokensOut,
+            cacheReadTokens: r.cacheReadTokens,
+            cacheCreationTokens: r.cacheCreationTokens,
+            totalCostUsd: r.totalCostUsd,
+            success: r.success,
+            ts: r.ts,
+            infraSnapshot: r.infraSnapshot,
+          })),
+        ),
+      )
+      const summary = slice.length > 0 ? await runAnalysis({ slice, model, repoRoot }) : null
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId,
+          createdAt: new Date(),
+          model,
+          infraHash,
+          baselineInfraHash: slice[0]?.beforeInfraHash ?? null,
+          summary,
+          dataJson: slice,
+        })
+        .run()
+    } catch (err) {
+      console.error('[benchmark] analysis step failed:', err)
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId,
+          createdAt: new Date(),
+          model,
+          infraHash,
+          baselineInfraHash: null,
+          summary: null,
+          dataJson: [],
+        })
+        .run()
+    }
   } catch (err) {
     progress.error = err instanceof Error ? err.message : String(err)
     console.error('[benchmark] runLoop crashed:', err)
