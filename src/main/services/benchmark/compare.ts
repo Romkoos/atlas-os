@@ -13,7 +13,7 @@
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from '@main/db/client'
-import { benchmarkRuns } from '@main/db/schema'
+import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
 import { appPaths } from '@main/paths'
 import { type InfraState, readInfraState } from '@main/services/productivity/infra'
 
@@ -46,6 +46,7 @@ export async function clearCompareBaseline(): Promise<{ clearedAt: number }> {
 // confirm before calling this (irreversible: token-cost data is destroyed).
 export async function wipeBenchmarkRuns(): Promise<{ deleted: number }> {
   const result = db().delete(benchmarkRuns).run()
+  db().delete(benchmarkAnalysis).run()
   try {
     await unlink(baselineMarkerPath())
   } catch {

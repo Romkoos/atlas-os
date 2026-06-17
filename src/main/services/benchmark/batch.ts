@@ -2,14 +2,18 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { db } from '@main/db/client'
-import { benchmarkRuns } from '@main/db/schema'
+import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
 import { appPaths } from '@main/paths'
+import { buildAbSlice, rowToRawRun, summarizeRuns } from '@main/services/benchmark/aggregate'
+import { runAnalysis } from '@main/services/benchmark/analysis'
 import { infraFingerprint } from '@main/services/benchmark/fingerprint'
 import { repoCommit, runBenchmarkTask } from '@main/services/benchmark/runner'
+import { selectTransientFailures } from '@main/services/benchmark/sweep'
 import { TASKS } from '@main/services/benchmark/tasks'
 import type { BenchmarkTask } from '@main/services/benchmark/types'
 import { readInfraState } from '@main/services/productivity/infra'
-import { app } from 'electron'
+import { eq } from 'drizzle-orm'
+import { app, Notification } from 'electron'
 
 const DEFAULT_K = 5
 const DEFAULT_MODEL = 'claude-sonnet-4-6'
@@ -20,6 +24,7 @@ export interface Progress {
   done: number
   failed: number
   running: boolean
+  phase: 'running' | 'retrying' | 'analyzing' | 'done'
   error: string | null
 }
 
@@ -50,7 +55,15 @@ export function startBatch(opts: StartOptions): { batchId: string; total: number
   const tasks = opts.taskIds ? TASKS.filter((t) => opts.taskIds?.includes(t.id)) : TASKS
   const total = tasks.length * k
   const batchId = randomUUID()
-  const progress: Progress = { batchId, total, done: 0, failed: 0, running: true, error: null }
+  const progress: Progress = {
+    batchId,
+    total,
+    done: 0,
+    failed: 0,
+    running: true,
+    phase: 'running',
+    error: null,
+  }
   batches.set(batchId, progress)
   latestBatchId = batchId
   void runLoop(batchId, tasks, k, model, progress)
@@ -120,10 +133,97 @@ async function runLoop(
         if (!result.success) progress.failed += 1
       }
     }
+    // Retry sweep: transient failures already got one inline retry; give them a
+    // single final attempt now that the run is otherwise done (a transient blip
+    // may have cleared). REPLACE the row in place so k stays clean.
+    progress.phase = 'retrying'
+    const tasksById = new Map(tasks.map((t) => [t.id, t]))
+    const failedRows = db()
+      .select()
+      .from(benchmarkRuns)
+      .where(eq(benchmarkRuns.batchId, batchId))
+      .all()
+    for (const row of selectTransientFailures(failedRows)) {
+      const task = tasksById.get(row.taskId)
+      if (!task) continue
+      const retry = await runBenchmarkTask(task, { model, repoRoot })
+      db()
+        .update(benchmarkRuns)
+        .set({
+          ts: new Date(),
+          tokensIn: retry.tokensIn,
+          tokensOut: retry.tokensOut,
+          cacheReadTokens: retry.cacheReadTokens,
+          cacheCreationTokens: retry.cacheCreationTokens,
+          totalCostUsd: retry.totalCostUsd,
+          numTurns: retry.numTurns,
+          durationMs: retry.durationMs,
+          success: retry.success,
+          failReason: retry.failReason,
+          transcriptPath: retry.sessionId,
+        })
+        .where(eq(benchmarkRuns.id, row.id))
+        .run()
+    }
+    // Recompute failed count after the sweep.
+    progress.failed = db()
+      .select()
+      .from(benchmarkRuns)
+      .where(eq(benchmarkRuns.batchId, batchId))
+      .all()
+      .filter((r) => !r.success).length
+    // Auto-analysis: explain the A/B effect of this infra change in 2-3 plain
+    // sentences. Isolated try/catch — a failed analysis must NOT mark the batch
+    // errored; we persist a null-summary row instead so the UI can offer retry.
+    progress.phase = 'analyzing'
+    try {
+      const allRows = db().select().from(benchmarkRuns).all()
+      const slice = buildAbSlice(summarizeRuns(allRows.map(rowToRawRun)))
+      const summary = slice.length > 0 ? await runAnalysis({ slice, model, repoRoot }) : null
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId,
+          createdAt: new Date(),
+          model,
+          infraHash,
+          baselineInfraHash: slice[0]?.beforeInfraHash ?? null,
+          summary,
+          dataJson: slice,
+        })
+        .run()
+    } catch (err) {
+      console.error('[benchmark] analysis step failed:', err)
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId,
+          createdAt: new Date(),
+          model,
+          infraHash,
+          baselineInfraHash: null,
+          summary: null,
+          dataJson: [],
+        })
+        .run()
+    }
   } catch (err) {
     progress.error = err instanceof Error ? err.message : String(err)
     console.error('[benchmark] runLoop crashed:', err)
   } finally {
     progress.running = false
+    progress.phase = 'done'
+    try {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Benchmark done',
+          body: `${progress.done}/${progress.total} runs · ${progress.failed} failed`,
+        }).show()
+      }
+    } catch {
+      // Notifications are best-effort; never let one break batch teardown.
+    }
   }
 }

@@ -1,6 +1,9 @@
 // src/main/trpc/routers/benchmark.ts
+import { randomUUID } from 'node:crypto'
 import { db } from '@main/db/client'
-import { benchmarkRuns } from '@main/db/schema'
+import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
+import { buildAbSlice, rowToRawRun, summarizeRuns } from '@main/services/benchmark/aggregate'
+import { runAnalysis } from '@main/services/benchmark/analysis'
 import { getLatest, getProgress, startBatch } from '@main/services/benchmark/batch'
 import {
   clearCompareBaseline,
@@ -10,7 +13,26 @@ import {
 import { summarize, type TaskInfraSummary } from '@main/services/benchmark/stats'
 import { TASKS } from '@main/services/benchmark/tasks'
 import { publicProcedure, router } from '@main/trpc/trpc'
+import { desc } from 'drizzle-orm'
+import { app } from 'electron'
 import { z } from 'zod'
+
+const deltaShape = z.object({
+  taskId: z.string(),
+  before: z.number(),
+  after: z.number(),
+  absDelta: z.number(),
+  pctDelta: z.number(),
+})
+
+const abRowShape = z.object({
+  taskId: z.string(),
+  beforeInfraHash: z.string(),
+  afterInfraHash: z.string(),
+  tokens: deltaShape,
+  output: deltaShape,
+  cost: deltaShape,
+})
 
 // Shape for InfraState — matches src/main/services/productivity/infra.ts.
 // Kept inline (rather than importing) because tRPC output schemas must be Zod
@@ -35,6 +57,7 @@ const progressShape = z
     done: z.number(),
     failed: z.number(),
     running: z.boolean(),
+    phase: z.enum(['running', 'retrying', 'analyzing', 'done']),
     error: z.string().nullable(),
   })
   .nullable()
@@ -155,6 +178,69 @@ export const benchmarkRouter = router({
         })
       }
       return summaries
+    }),
+
+  latestAnalysis: publicProcedure
+    .output(
+      z
+        .object({
+          batchId: z.string(),
+          createdAt: z.number(),
+          model: z.string(),
+          summary: z.string().nullable(),
+          dataJson: z.array(abRowShape),
+        })
+        .nullable(),
+    )
+    .query(() => {
+      const row = db()
+        .select()
+        .from(benchmarkAnalysis)
+        .orderBy(desc(benchmarkAnalysis.createdAt))
+        .limit(1)
+        .get()
+      if (!row) return null
+      return {
+        batchId: row.batchId,
+        createdAt: row.createdAt.getTime(),
+        model: row.model,
+        summary: row.summary,
+        dataJson: row.dataJson,
+      }
+    }),
+
+  // Recompute the analysis from current data and persist a fresh row. Used by
+  // the "analysis unavailable" retry button. Scoped to the card's batchId so
+  // the inserted row is always labeled with the correct batch/infraHash pair.
+  // The A/B slice is computed globally (all runs) — it compares the latest infra
+  // variant vs the previous one regardless of which batch triggered the retry.
+  reanalyze: publicProcedure
+    .input(z.object({ batchId: z.string().min(1) }))
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const rows = db().select().from(benchmarkRuns).all()
+      const batchRows = rows.filter((r) => r.batchId === input.batchId)
+      if (batchRows.length === 0) return { ok: false }
+      const newest = batchRows.reduce((a, b) => (a.ts.getTime() >= b.ts.getTime() ? a : b))
+      const slice = buildAbSlice(summarizeRuns(rows.map(rowToRawRun)))
+      const summary =
+        slice.length > 0
+          ? await runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() })
+          : null
+      db()
+        .insert(benchmarkAnalysis)
+        .values({
+          id: randomUUID(),
+          batchId: input.batchId,
+          createdAt: new Date(),
+          model: newest.model,
+          infraHash: newest.infraHash,
+          baselineInfraHash: slice[0]?.beforeInfraHash ?? null,
+          summary,
+          dataJson: slice,
+        })
+        .run()
+      return { ok: summary !== null }
     }),
 
   // Infra compare: prev = second-most-recent batch's snapshot, last = newest

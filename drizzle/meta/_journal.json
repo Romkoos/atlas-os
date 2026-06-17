@@ -43,6 +43,13 @@
       "when": 1779694956860,
       "tag": "0005_complex_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1781696135676,
+      "tag": "0006_reflective_spirit",
+      "breakpoints": true
     }
   ]
 }
