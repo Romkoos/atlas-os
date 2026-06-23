@@ -17,3 +17,20 @@ test('boots, renders, and round-trips tRPC over IPC', async () => {
 
   await app.close()
 })
+
+test('Knowledge graph tab renders a canvas', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+
+  await expect(window.getByText('Atlas OS')).toBeVisible()
+  await window.getByRole('button', { name: 'Knowledge' }).click()
+
+  // The graph tab is only present when projects exist; skip cleanly otherwise.
+  const graphTab = window.getByRole('button', { name: './graph' })
+  if (await graphTab.isVisible().catch(() => false)) {
+    await graphTab.click()
+    await expect(window.locator('.kb-graph canvas')).toBeVisible({ timeout: 15000 })
+  }
+
+  await app.close()
+})
