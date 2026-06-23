@@ -2,16 +2,18 @@ import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDate } from '@renderer/lib/utils'
+import { GraphTab } from '@renderer/pages/knowledge/GraphTab'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleKind, ArticleMeta } from '@shared/knowledge'
 import { type ReactNode, useMemo, useState } from 'react'
 
-type Tab = 'browse' | 'daily' | 'search'
+type Tab = 'browse' | 'daily' | 'search' | 'graph'
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: 'browse', label: './browse' },
   { id: 'daily', label: './daily' },
   { id: 'search', label: './search' },
+  { id: 'graph', label: './graph' },
 ]
 
 const KIND_LABEL: Record<ArticleKind, string> = {
@@ -138,6 +140,7 @@ export function Knowledge() {
               {tab === 'browse' && <BrowseTab key={active} project={active} />}
               {tab === 'daily' && <DailyTab key={active} project={active} />}
               {tab === 'search' && <SearchTab key={active} project={active} />}
+              {tab === 'graph' && <GraphTab key={active} project={active} />}
             </>
           )
         ) : (
