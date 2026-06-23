@@ -30,8 +30,6 @@ const conceptId = (project: string, relPath: string): string => `${project}::${s
 const dailyId = (project: string, date: string): string => `${project}::daily/${date}`
 const ghostId = (project: string, target: string): string => `${project}::ghost::${target}`
 
-const WIKILINK = /\[\[([^\]]+)\]\]/g
-
 // Build the knowledge graph from per-project articles + daily entries. Pure: no
 // fs, no clustering (community is 0 on every node here — assignCommunities fills
 // it). Wikilinks are project-relative, so resolution is scoped per project.
@@ -151,10 +149,7 @@ export function buildGraph(
       const [targetId, type] = resolveTarget(a.project, raw)
       addEdge(sourceId, targetId, type)
     }
-    WIKILINK.lastIndex = 0
-    let m: RegExpExecArray | null
-    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
-    while ((m = WIKILINK.exec(a.body)) !== null) {
+    for (const m of a.body.matchAll(/\[\[([^\]]+)\]\]/g)) {
       const [targetId, type] = resolveTarget(a.project, m[1])
       addEdge(sourceId, targetId, type)
     }
