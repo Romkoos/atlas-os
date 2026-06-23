@@ -1,3 +1,4 @@
+import { computeGraph } from '@main/services/knowledge/graph'
 import {
   compileAll,
   listArticles,
@@ -5,6 +6,7 @@ import {
   listProjects,
   readArticle,
   readDaily,
+  readGraphSources,
   readIndex,
   runQuery,
   storeRoot,
@@ -16,6 +18,7 @@ import {
   articleMetaSchema,
   compileResultSchema,
   dailyEntrySchema,
+  knowledgeGraphSchema,
   knowledgeProjectSchema,
 } from '@shared/knowledge'
 import { z } from 'zod'
@@ -29,6 +32,11 @@ export const knowledgeRouter = router({
   projects: publicProcedure
     .output(z.array(knowledgeProjectSchema))
     .query(() => listProjects(storeRoot(), tracked())),
+
+  graph: publicProcedure.output(knowledgeGraphSchema).query(() => {
+    const { articles, daily } = readGraphSources(storeRoot(), tracked())
+    return computeGraph(articles, daily)
+  }),
 
   index: publicProcedure
     .input(projectInput)

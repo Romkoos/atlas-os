@@ -13,6 +13,7 @@ import {
   type KnowledgeProject,
 } from '@shared/knowledge'
 import { load as parseYaml } from 'js-yaml'
+import type { GraphArticleInput, GraphDailyInput } from './graph'
 
 export const RESERVED = '_engine'
 
@@ -107,7 +108,7 @@ function asStrArray(v: unknown): string[] {
 }
 
 // All article files for a project, paired with parsed frontmatter + raw body.
-function readAllArticles(
+export function readAllArticles(
   root: string,
   project: string,
 ): Array<{ relPath: string; kind: ArticleKind; doc: ArticleDoc }> {
@@ -290,4 +291,33 @@ export async function compileAll(
       ? s.value
       : { project: projects[i], status: 'error', summary: String(s.reason) },
   )
+}
+
+// Gather articles (with body) + daily entries across every visible project —
+// the raw input computeGraph needs. fs glue; logic lives in the graph builder.
+export function readGraphSources(
+  root: string,
+  tracked: ReadonlySet<string>,
+): { articles: GraphArticleInput[]; daily: GraphDailyInput[] } {
+  const articles: GraphArticleInput[] = []
+  const daily: GraphDailyInput[] = []
+  for (const { name: project } of listProjects(root, tracked)) {
+    for (const { relPath, kind, doc } of readAllArticles(root, project)) {
+      articles.push({
+        project,
+        relPath,
+        kind,
+        title: asStr(doc.frontmatter.title) ?? basename(relPath, '.md'),
+        tags: asStrArray(doc.frontmatter.tags),
+        aliases: asStrArray(doc.frontmatter.aliases),
+        updated: asStr(doc.frontmatter.updated),
+        sources: asStrArray(doc.frontmatter.sources),
+        body: doc.body,
+      })
+    }
+    for (const d of listDaily(root, project)) {
+      daily.push({ project, date: d.date, relPath: d.relPath })
+    }
+  }
+  return { articles, daily }
 }
