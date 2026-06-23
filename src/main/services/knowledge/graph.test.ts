@@ -139,6 +139,11 @@ describe('buildGraph', () => {
     )
     expect(g.nodes.map((n) => n.id).sort()).toEqual(['p1::concepts/x', 'p2::concepts/x'])
   })
+
+  it('maps a qa-kind article to a concept node', () => {
+    const g = buildGraph([article({ relPath: 'qa/q.md', kind: 'qa' })], [])
+    expect(g.nodes[0].type).toBe('concept')
+  })
 })
 
 describe('assignCommunities', () => {
