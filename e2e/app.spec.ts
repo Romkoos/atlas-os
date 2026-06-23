@@ -27,6 +27,7 @@ test('Knowledge graph tab renders a canvas', async () => {
 
   // The graph tab is only present when projects exist; skip cleanly otherwise.
   const graphTab = window.getByRole('button', { name: './graph' })
+  await graphTab.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
   if (await graphTab.isVisible().catch(() => false)) {
     await graphTab.click()
     await expect(window.locator('.kb-graph canvas')).toBeVisible({ timeout: 15000 })
