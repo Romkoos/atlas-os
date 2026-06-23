@@ -69,3 +69,32 @@ export function countInbound(
   }
   return n
 }
+
+export const graphNodeTypeSchema = z.enum(['concept', 'connection', 'daily', 'ghost'])
+export type GraphNodeType = z.infer<typeof graphNodeTypeSchema>
+
+export const graphNodeSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: graphNodeTypeSchema,
+  project: z.string(),
+  relPath: z.string(),
+  inDegree: z.number(),
+  tags: z.array(z.string()),
+  updated: z.string().nullable(),
+  community: z.number(),
+})
+export type GraphNode = z.infer<typeof graphNodeSchema>
+
+export const graphEdgeSchema = z.object({
+  source: z.string(),
+  target: z.string(),
+  type: z.enum(['link', 'source']),
+})
+export type GraphEdge = z.infer<typeof graphEdgeSchema>
+
+export const knowledgeGraphSchema = z.object({
+  nodes: z.array(graphNodeSchema),
+  edges: z.array(graphEdgeSchema),
+})
+export type KnowledgeGraph = z.infer<typeof knowledgeGraphSchema>
