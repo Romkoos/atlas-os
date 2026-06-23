@@ -46,7 +46,6 @@ describe('mergePersistedUi', () => {
   it('SECTIONS contains the canonical pages', () => {
     expect(SECTIONS).toContain('dashboard')
     expect(SECTIONS).not.toContain('benchmark' as never) // sanity: benchmark is a tab, not a section
-    expect(SECTIONS.includes('benchmark' as never)).toBe(false)
   })
 })
 

@@ -53,7 +53,10 @@ export function Knowledge() {
     },
   })
 
-  const active = selectedProject ?? projects.data?.[0]?.name ?? null
+  const active =
+    (selectedProject && projects.data?.some((p) => p.name === selectedProject)
+      ? selectedProject
+      : projects.data?.[0]?.name) ?? null
   const hasProjects = projects.data && projects.data.length > 0
 
   return (
