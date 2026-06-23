@@ -6,14 +6,14 @@ test('boots, renders, and round-trips tRPC over IPC', async () => {
   const window = await app.firstWindow()
 
   // Renderer mounted.
-  await expect(window.getByText('Atlas OS')).toBeVisible()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
 
-  // query IPC: the health badge resolves to "Backend OK".
-  await expect(window.getByText(/Backend OK/)).toBeVisible({ timeout: 15000 })
+  // query IPC: the sidebar auth badge resolves to the online indicator.
+  await expect(window.getByText('● ok')).toBeVisible({ timeout: 15000 })
 
   // query IPC: opening Settings renders the form from settings.get.
-  await window.getByRole('button', { name: 'Settings' }).click()
-  await expect(window.getByText('Default model')).toBeVisible()
+  await window.getByRole('button', { name: '09 SETTINGS' }).click()
+  await expect(window.getByText('default model')).toBeVisible()
 
   await app.close()
 })
@@ -22,8 +22,8 @@ test('Knowledge graph tab renders a canvas', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
 
-  await expect(window.getByText('Atlas OS')).toBeVisible()
-  await window.getByRole('button', { name: 'Knowledge' }).click()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
 
   // The graph tab is only present when projects exist; skip cleanly otherwise.
   const graphTab = window.getByRole('button', { name: './graph' })
