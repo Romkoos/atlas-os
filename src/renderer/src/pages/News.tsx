@@ -4,7 +4,8 @@ import { formatDateTime } from '@renderer/lib/utils'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import { useNewsRun } from '@renderer/store/newsRun'
 import { useTrendingRun } from '@renderer/store/trendingRun'
-import { useMemo, useState } from 'react'
+import { useUiStore } from '@renderer/store/ui'
+import { useMemo } from 'react'
 
 type FeedId = 'ai-news' | 'trending'
 
@@ -50,7 +51,11 @@ const FEEDS: Record<
 }
 
 export function News() {
-  const [active, setActive] = useState<FeedId>('ai-news')
+  const storedFeed = useUiStore((s) => s.tabsBySection.news)
+  const setTab = useUiStore((s) => s.setTab)
+  const active: FeedId =
+    storedFeed === 'trending' || storedFeed === 'ai-news' ? storedFeed : 'ai-news'
+  const setActive = (id: FeedId) => setTab('news', id)
 
   // Both feeds' read queries and run stores are read unconditionally (hooks can't
   // be conditional); the active feed selects which set drives the render. Run
