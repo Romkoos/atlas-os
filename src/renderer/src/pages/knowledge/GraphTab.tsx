@@ -1,6 +1,7 @@
 import { trpc } from '@renderer/lib/trpc'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleMeta, GraphNode, GraphNodeType } from '@shared/knowledge'
+import { forceCollide } from 'd3-force'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { colorForCommunity, colorForProject } from './graph-colors'
@@ -8,6 +9,13 @@ import { colorForCommunity, colorForProject } from './graph-colors'
 type FgNode = GraphNode & { x?: number; y?: number }
 type FgLink = { source: string | FgNode; target: string | FgNode; type: 'link' | 'source' }
 type ColorBy = 'community' | 'project'
+
+// Node sizing: react-force-graph paints a circle of radius √(val) × nodeRelSize.
+// Log-compress inDegree so hubs stay prominent without dwarfing everything
+// (inDegree 0→r≈5px, 39→r≈13px instead of 4→25px with a raw-inDegree scale).
+const NODE_REL_SIZE = 5
+const nodeValOf = (n: FgNode): number => 1 + Math.log2(1 + Math.max(0, n.inDegree))
+const nodeRadius = (n: FgNode): number => Math.sqrt(nodeValOf(n)) * NODE_REL_SIZE
 
 const TYPE_OPTIONS: ReadonlyArray<{ id: GraphNodeType; label: string }> = [
   { id: 'concept', label: 'concepts' },
@@ -86,6 +94,20 @@ export function GraphTab({ project }: { project: string }) {
     }
     return map
   }, [data.links])
+
+  // Inject a collision force sized to each node's painted radius so large hubs
+  // don't overlap each other or smaller nodes, and strengthen charge repulsion
+  // for breathing room between clusters. Re-applied (and reheated) whenever the
+  // visible set changes. Default d3-force has no radius-aware collision, which
+  // is why big nodes pile up without this.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reheat on visible-set change
+  useEffect(() => {
+    const fg = fgRef.current
+    if (!fg) return
+    fg.d3Force('collide', forceCollide((n: FgNode) => nodeRadius(n) + 3).iterations(2))
+    fg.d3Force('charge')?.strength(-160)
+    fg.d3ReheatSimulation?.()
+  }, [data])
 
   const nodeColor = (n: FgNode): string => {
     const dim = hovered && hovered !== n.id && !neighbors.get(hovered)?.has(n.id)
@@ -220,8 +242,9 @@ export function GraphTab({ project }: { project: string }) {
             graphData={data}
             backgroundColor="transparent"
             nodeId="id"
+            nodeRelSize={NODE_REL_SIZE}
             nodeLabel={(n) => (n as FgNode).label}
-            nodeVal={(n) => Math.max(1, (n as FgNode).inDegree)}
+            nodeVal={(n) => nodeValOf(n as FgNode)}
             nodeColor={(n) => nodeColor(n as FgNode)}
             onNodeClick={(n) => setSelected(n as FgNode)}
             onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
