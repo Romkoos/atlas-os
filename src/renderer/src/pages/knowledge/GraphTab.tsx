@@ -1,7 +1,7 @@
 import { trpc } from '@renderer/lib/trpc'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleMeta, GraphNode, GraphNodeType } from '@shared/knowledge'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { colorForCommunity, colorForProject } from './graph-colors'
 
@@ -22,8 +22,8 @@ export function GraphTab({ project }: { project: string }) {
   const graph = trpc.knowledge.graph.useQuery()
   // biome-ignore lint/suspicious/noExplicitAny: ForceGraph ref has no exported type
   const fgRef = useRef<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState({ w: 800, h: 600 })
+  const roRef = useRef<ResizeObserver | null>(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
 
   const [colorBy, setColorBy] = useState<ColorBy>('community')
   const [hidden, setHidden] = useState<Set<GraphNodeType>>(new Set())
@@ -32,12 +32,21 @@ export function GraphTab({ project }: { project: string }) {
   const [selected, setSelected] = useState<FgNode | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
+  // Attach the ResizeObserver via a callback ref so it fires when the container
+  // actually mounts. The early-return guards (loading/error/empty) mean .kb-graph
+  // isn't in the DOM on the first render, so a useEffect([]) would observe a null
+  // ref and never re-run — leaving the canvas stuck at its initial size.
+  const setContainer = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect()
+    if (!el) {
+      roRef.current = null
+      return
+    }
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    return () => ro.disconnect()
+    roRef.current = ro
   }, [])
 
   const allProjects = useMemo(
@@ -203,7 +212,7 @@ export function GraphTab({ project }: { project: string }) {
       </div>
 
       <div className="kb-graph-body">
-        <div className="kb-graph" ref={containerRef}>
+        <div className="kb-graph" ref={setContainer}>
           <ForceGraph2D
             ref={fgRef}
             width={size.w}

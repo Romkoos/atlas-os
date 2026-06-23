@@ -30,7 +30,19 @@ test('Knowledge graph tab renders a canvas', async () => {
   await graphTab.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
   if (await graphTab.isVisible().catch(() => false)) {
     await graphTab.click()
-    await expect(window.locator('.kb-graph canvas')).toBeVisible({ timeout: 15000 })
+    const canvas = window.locator('.kb-graph canvas')
+    await expect(canvas).toBeVisible({ timeout: 15000 })
+
+    // The canvas must fill its .kb-graph container, not stay at a fixed size.
+    const containerBox = await window.locator('.kb-graph').boundingBox()
+    const canvasBox = await canvas.boundingBox()
+    expect(containerBox).not.toBeNull()
+    expect(canvasBox).not.toBeNull()
+    if (containerBox && canvasBox) {
+      // Within the 1px border on each side.
+      expect(Math.abs(canvasBox.width - containerBox.width)).toBeLessThan(8)
+      expect(Math.abs(canvasBox.height - containerBox.height)).toBeLessThan(8)
+    }
   }
 
   await app.close()
