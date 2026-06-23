@@ -4,6 +4,7 @@ import { trpc } from '@renderer/lib/trpc'
 import { formatDate } from '@renderer/lib/utils'
 import { GraphTab } from '@renderer/pages/knowledge/GraphTab'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
+import { useUiStore } from '@renderer/store/ui'
 import type { ArticleKind, ArticleMeta } from '@shared/knowledge'
 import { type ReactNode, useMemo, useState } from 'react'
 
@@ -38,8 +39,11 @@ function Empty({ children }: { children: ReactNode }) {
 export function Knowledge() {
   const utils = trpc.useUtils()
   const projects = trpc.knowledge.projects.useQuery()
-  const [project, setProject] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('browse')
+  const selectedProject = useUiStore((s) => s.selectedProject)
+  const setSelectedProject = useUiStore((s) => s.setSelectedProject)
+  const storedTab = useUiStore((s) => s.tabsBySection.knowledge)
+  const setTab = useUiStore((s) => s.setTab)
+  const tab: Tab = TABS.some((t) => t.id === storedTab) ? (storedTab as Tab) : 'browse'
 
   const compile = trpc.knowledge.compileAll.useMutation({
     onSuccess: () => {
@@ -49,7 +53,10 @@ export function Knowledge() {
     },
   })
 
-  const active = project ?? projects.data?.[0]?.name ?? null
+  const active =
+    (selectedProject && projects.data?.some((p) => p.name === selectedProject)
+      ? selectedProject
+      : projects.data?.[0]?.name) ?? null
   const hasProjects = projects.data && projects.data.length > 0
 
   return (
@@ -64,7 +71,7 @@ export function Knowledge() {
               <TermSelect
                 aria-label="Project"
                 value={active ?? ''}
-                onValueChange={setProject}
+                onValueChange={(v) => setSelectedProject(v)}
                 options={(projects.data ?? []).map((p) => ({
                   value: p.name,
                   label: `${p.name} (${p.articleCount})`,
@@ -131,7 +138,7 @@ export function Knowledge() {
                     key={t.id}
                     type="button"
                     className={tab === t.id ? 'on' : ''}
-                    onClick={() => setTab(t.id)}
+                    onClick={() => setTab('knowledge', t.id)}
                   >
                     {t.label}
                   </button>

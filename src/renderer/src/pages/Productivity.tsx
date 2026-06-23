@@ -11,6 +11,7 @@ import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
+import { useUiStore } from '@renderer/store/ui'
 import { groupByPrefix } from '@shared/skills'
 import { ChevronRight } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
@@ -2246,9 +2247,12 @@ export function Productivity() {
   const utils = trpc.useUtils()
   const refresh = trpc.productivity.refresh.useMutation()
   const projects = trpc.productivity.projects.useQuery()
-  const [tab, setTab] = useState<Tab>('overview')
   const [days, setDays] = useState(30)
-  const [projectPath, setProjectPath] = useState<string | undefined>(undefined)
+  const selectedProject = useUiStore((s) => s.selectedProject)
+  const setSelectedProject = useUiStore((s) => s.setSelectedProject)
+  const storedTab = useUiStore((s) => s.tabsBySection.productivity)
+  const setTab = useUiStore((s) => s.setTab)
+  const tab: Tab = TABS.some((t) => t.id === storedTab) ? (storedTab as Tab) : 'overview'
 
   const onRefresh = async () => {
     try {
@@ -2263,6 +2267,8 @@ export function Productivity() {
   }
 
   const projectList = projects.data ?? []
+  const matchedProject = projectList.find((p) => p.project === selectedProject)
+  const projectPath = matchedProject?.projectPath
 
   return (
     <>
@@ -2280,24 +2286,33 @@ export function Productivity() {
             <TermSelect
               aria-label="Project filter"
               value={projectPath ?? ALL_PROJECTS}
-              onValueChange={(v) => setProjectPath(v === ALL_PROJECTS ? undefined : v)}
+              onValueChange={(v) => {
+                if (v === ALL_PROJECTS) {
+                  setSelectedProject(null)
+                  return
+                }
+                const picked = projectList.find((p) => p.projectPath === v)
+                setSelectedProject(picked ? picked.project : null)
+              }}
               options={[
                 { value: ALL_PROJECTS, label: `all projects · ${projectList.length}` },
                 ...projectList.map((p) => ({ value: p.projectPath, label: p.project })),
               ]}
             />
-            <div className="seg">
-              {RANGES.map((r) => (
-                <button
-                  key={r.days}
-                  type="button"
-                  className={days === r.days ? 'on' : ''}
-                  onClick={() => setDays(r.days)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            {tab !== 'benchmark' && (
+              <div className="seg">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.days}
+                    type="button"
+                    className={days === r.days ? 'on' : ''}
+                    onClick={() => setDays(r.days)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <button type="button" className="btn" onClick={onRefresh} disabled={refresh.isPending}>
               ↻ REFRESH
             </button>
@@ -2312,7 +2327,7 @@ export function Productivity() {
               key={id}
               type="button"
               className={tab === id ? 'on' : ''}
-              onClick={() => setTab(id)}
+              onClick={() => setTab('productivity', id)}
             >
               {label}
             </button>
