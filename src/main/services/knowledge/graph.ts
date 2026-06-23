@@ -6,6 +6,8 @@ import type {
   KnowledgeGraph,
 } from '@shared/knowledge'
 import { resolveWikilink } from '@shared/knowledge'
+import Graph from 'graphology'
+import louvain from 'graphology-communities-louvain'
 
 export interface GraphArticleInput {
   project: string
@@ -163,9 +165,6 @@ export function buildGraph(
   return { nodes: [...nodes.values()], edges }
 }
 
-import Graph from 'graphology'
-import louvain from 'graphology-communities-louvain'
-
 // Assign a community id to every node via Louvain modularity. Isolated nodes
 // (no edges) each get their own community. Self-loops are skipped; the graph is
 // treated as undirected for clustering.
@@ -190,6 +189,7 @@ export function assignCommunities(graph: KnowledgeGraph): KnowledgeGraph {
   }
 
   return {
+    // ?? 0 only fires if louvain omits a node id (shouldn't happen); keeps the type total.
     nodes: graph.nodes.map((n) => ({ ...n, community: communities[n.id] ?? 0 })),
     edges: graph.edges,
   }
