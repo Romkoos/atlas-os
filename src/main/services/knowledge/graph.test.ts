@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, type GraphArticleInput, type GraphDailyInput } from './graph'
+import { buildGraph, computeGraph, type GraphArticleInput, type GraphDailyInput } from './graph'
 
 const article = (over: Partial<GraphArticleInput>): GraphArticleInput => ({
   project: 'p',
@@ -138,5 +138,38 @@ describe('buildGraph', () => {
       [],
     )
     expect(g.nodes.map((n) => n.id).sort()).toEqual(['p1::concepts/x', 'p2::concepts/x'])
+  })
+})
+
+describe('assignCommunities', () => {
+  it('assigns the same community to two linked nodes', () => {
+    const g = computeGraph(
+      [
+        article({ relPath: 'concepts/a.md', body: '[[concepts/b]]' }),
+        article({ relPath: 'concepts/b.md' }),
+      ],
+      [],
+    )
+    const a = g.nodes.find((n) => n.id === 'p::concepts/a')
+    const b = g.nodes.find((n) => n.id === 'p::concepts/b')
+    expect(a?.community).toBe(b?.community)
+  })
+
+  it('assigns different communities to two unconnected nodes', () => {
+    const g = computeGraph(
+      [article({ relPath: 'concepts/a.md' }), article({ relPath: 'concepts/b.md' })],
+      [],
+    )
+    const a = g.nodes.find((n) => n.id === 'p::concepts/a')
+    const b = g.nodes.find((n) => n.id === 'p::concepts/b')
+    expect(a?.community).not.toBe(b?.community)
+  })
+
+  it('returns a community number for every node, including ghosts', () => {
+    const g = computeGraph(
+      [article({ relPath: 'concepts/a.md', body: '[[concepts/missing]]' })],
+      [],
+    )
+    expect(g.nodes.every((n) => Number.isInteger(n.community))).toBe(true)
   })
 })
