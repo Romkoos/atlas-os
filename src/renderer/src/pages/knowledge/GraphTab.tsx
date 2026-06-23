@@ -124,12 +124,14 @@ export function GraphTab({ project }: { project: string }) {
   )
 
   // ArticleMeta list for the selected node's project, so MarkdownView can resolve
-  // [[links]] and recenter the graph on click.
+  // [[links]] and recenter the graph on click. Keyed on the project only, so it does
+  // not recompute when switching between two nodes in the same project.
+  const selectedProject = selected?.project
   const panelArticles: ArticleMeta[] = useMemo(() => {
-    if (!selected) return []
+    if (!selectedProject) return []
     return (graph.data?.nodes ?? [])
       .filter(
-        (n) => n.project === selected.project && (n.type === 'concept' || n.type === 'connection'),
+        (n) => n.project === selectedProject && (n.type === 'concept' || n.type === 'connection'),
       )
       .map((n) => ({
         relPath: n.relPath,
@@ -140,7 +142,7 @@ export function GraphTab({ project }: { project: string }) {
         updated: n.updated,
         inboundLinks: n.inDegree,
       }))
-  }, [graph.data, selected])
+  }, [graph.data, selectedProject])
 
   const navigateTo = (relPath: string): void => {
     if (!selected) return
