@@ -70,6 +70,9 @@ export class JobRegistry extends EventEmitter {
     this.emit('change')
   }
 
+  // Fires the abort callback only; the job is not removed from active here. The process's
+  // terminal signal (promise rejection or terminal event) later calls finish('error'),
+  // which moves the job to recent and emits 'change'.
   cancel(id: string): boolean {
     const job = this.active.get(id)
     if (!job?.abort) return false
