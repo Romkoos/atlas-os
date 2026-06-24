@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { assertInside, isTracked, parseCompileOutput, parseFrontmatter } from './store'
+import {
+  assertInside,
+  isTracked,
+  parseCompileOutput,
+  parseFrontmatter,
+  summarizeCompile,
+} from './store'
 
 describe('parseFrontmatter', () => {
   it('splits YAML frontmatter from body', () => {
@@ -170,8 +176,6 @@ describe('readArticle / readIndex / listDaily', () => {
     expect(() => listArticles(root, '../../etc')).toThrow(/invalid project|escapes/)
   })
 })
-
-import { summarizeCompile } from './store'
 
 describe('summarizeCompile', () => {
   it('counts compiled/up-to-date/error, omitting zeros', () => {
