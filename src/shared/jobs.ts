@@ -1,12 +1,13 @@
-// Shared job types for the global process indicator. Plain structurally-cloneable
-// shapes — they cross the electron-trpc IPC boundary with no transformer.
+// Shared job types for the process indicator + dashboard panel. Plain
+// structurally-cloneable shapes — they cross the electron-trpc IPC boundary
+// with no transformer.
 
-// 'error' also represents user-aborted runs (the indicator shows status, not a
-// distinct aborted state).
+// 'error' also represents user-aborted runs (status only, no distinct aborted).
 export type JobStatus = 'running' | 'done' | 'error'
 
 // A job as seen by the renderer. Never carries the abort callback; `cancellable`
 // is the derived boolean the UI uses to decide whether to render the abort button.
+// The meta fields are null when not applicable to that process kind.
 export interface JobView {
   id: string
   kind: string
@@ -15,6 +16,11 @@ export interface JobView {
   startedAt: number
   endedAt: number | null
   cancellable: boolean
+  model: string | null
+  detail: string | null
+  tokens: number | null
+  resultPath: string | null
+  error: string | null
 }
 
 // Payload streamed over jobs.list. `running` first, then the most-recent-first
