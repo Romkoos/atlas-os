@@ -1,3 +1,4 @@
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { computeGraph } from '@main/services/knowledge/graph'
 import {
   compileAll,
@@ -67,10 +68,20 @@ export const knowledgeRouter = router({
     .input(projectInput.extend({ q: z.string().min(1) }))
     .output(z.object({ answer: z.string() }))
     .mutation(async ({ input }) => ({
-      answer: await runQuery(storeRoot(), input.project, input.q),
+      answer: await trackJob(
+        jobRegistry,
+        { kind: 'knowledge.query', label: 'Knowledge search' },
+        runQuery(storeRoot(), input.project, input.q),
+      ),
     })),
 
   compileAll: publicProcedure
     .output(z.array(compileResultSchema))
-    .mutation(() => compileAll(storeRoot(), tracked())),
+    .mutation(() =>
+      trackJob(
+        jobRegistry,
+        { kind: 'knowledge.compile', label: 'Knowledge compile' },
+        compileAll(storeRoot(), tracked()),
+      ),
+    ),
 })
