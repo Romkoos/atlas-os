@@ -1,6 +1,7 @@
 import { db } from '@main/db/client'
 import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
+import { jobRegistry } from '@main/services/jobs/registry'
 import { type ImproverRun, startImproverRun } from '@main/services/skillImprover'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -24,6 +25,13 @@ export const skillImproverRouter = router({
       observable<ImproverEvent>((emit) => {
         // Model resolved server-side from settings, mirroring the news router.
         const model = getSettings().model ?? DEFAULT_MODEL_ID
+        const job = jobRegistry.register({
+          kind: 'skill.improve',
+          label: 'Skill improver',
+          // Resolve via the runs map so we don't reference `run` before its
+          // declaration; cancel reverts the workspace.
+          abort: () => runs.get(input.requestId)?.cancel(),
+        })
         const run = startImproverRun({
           requestId: input.requestId,
           skillId: input.skillId,
@@ -47,7 +55,9 @@ export const skillImproverRouter = router({
                 tokens: event.tokens,
                 durationMs: event.durationMs,
               })
+              job.finish(event.type === 'done' ? 'done' : 'error')
             }
+            if (event.type === 'error') job.finish('error')
             emit.next(event)
           },
         })
@@ -61,6 +71,7 @@ export const skillImproverRouter = router({
             r.cancel()
             runs.delete(input.requestId)
           }
+          job.finish('error')
         }
       }),
     ),

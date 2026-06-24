@@ -4,6 +4,7 @@ import { benchmarkAnalysis } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { type BenchmarkChatRun, startBenchmarkChat } from '@main/services/benchmarkChat/run'
 import { buildChatSeed } from '@main/services/benchmarkChat/seed'
+import { jobRegistry } from '@main/services/jobs/registry'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import type { BenchmarkChatEvent } from '@shared/ipc-events'
@@ -32,6 +33,11 @@ export const benchmarkChatRouter = router({
         }
         const model = getSettings().model ?? DEFAULT_MODEL_ID
         const seed = buildChatSeed(analysis.summary, analysis.dataJson)
+        const job = jobRegistry.register({
+          kind: 'benchmark.chat',
+          label: 'Benchmark chat',
+          abort: () => runs.get(input.requestId)?.cancel(),
+        })
         const run = startBenchmarkChat({
           requestId: input.requestId,
           seed,
@@ -41,6 +47,8 @@ export const benchmarkChatRouter = router({
             if (event.type === 'error' || event.type === 'aborted') {
               logger.info('Benchmark chat ended', { type: event.type })
             }
+            if (event.type === 'done') job.finish('done')
+            if (event.type === 'error' || event.type === 'aborted') job.finish('error')
             emit.next(event)
           },
         })
@@ -51,6 +59,7 @@ export const benchmarkChatRouter = router({
             r.cancel()
             runs.delete(input.requestId)
           }
+          job.finish('error')
         }
       }),
     ),
