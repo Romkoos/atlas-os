@@ -28,6 +28,7 @@ export const skillImproverRouter = router({
         const job = jobRegistry.register({
           kind: 'skill.improve',
           label: 'Skill improver',
+          model,
           // Resolve via the runs map so we don't reference `run` before its
           // declaration; cancel reverts the workspace.
           abort: () => runs.get(input.requestId)?.cancel(),
@@ -55,7 +56,7 @@ export const skillImproverRouter = router({
                 tokens: event.tokens,
                 durationMs: event.durationMs,
               })
-              job.finish(event.type === 'done' ? 'done' : 'error')
+              job.finish(event.type === 'done' ? 'done' : 'error', { tokens: event.tokens })
             }
             if (event.type === 'error') job.finish('error')
             emit.next(event)

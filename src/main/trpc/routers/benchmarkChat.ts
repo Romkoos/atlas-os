@@ -36,6 +36,7 @@ export const benchmarkChatRouter = router({
         const job = jobRegistry.register({
           kind: 'benchmark.chat',
           label: 'Benchmark chat',
+          model,
           abort: () => runs.get(input.requestId)?.cancel(),
         })
         const run = startBenchmarkChat({
