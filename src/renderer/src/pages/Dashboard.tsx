@@ -1,3 +1,4 @@
+import { ProcessesPanel } from '@renderer/components/dashboard/ProcessesPanel'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
@@ -629,6 +630,8 @@ export function Dashboard() {
           <ActivityPanel />
           <QuickActions />
         </div>
+
+        <ProcessesPanel />
 
         <div className="grid-2 mt-16">
           <RecentActivity />

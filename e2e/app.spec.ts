@@ -99,3 +99,18 @@ test('top bar shows the process indicator at idle', async () => {
 
   await app.close()
 })
+
+test('Dashboard shows the processes panel', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  await window.getByRole('button', { name: '01 DASHBOARD' }).click()
+
+  // Panel title + both group labels render (idle state is deterministic).
+  await expect(window.getByText('processes', { exact: true })).toBeVisible({ timeout: 15000 })
+  await expect(window.getByText('active', { exact: true })).toBeVisible()
+  await expect(window.getByText('nothing running')).toBeVisible()
+
+  await app.close()
+})
