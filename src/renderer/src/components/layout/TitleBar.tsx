@@ -1,3 +1,4 @@
+import { JobIndicator } from '@renderer/components/layout/JobIndicator'
 import { NAV } from '@renderer/components/layout/nav'
 import { trpc } from '@renderer/lib/trpc'
 import type { Section } from '@renderer/store/ui'
@@ -55,9 +56,7 @@ export function TitleBar({ section }: { section: Section }) {
       <div className="right">
         {health.data ? <span>uptime {formatUptime(health.data.uptimeMs)}</span> : null}
         {health.data ? <span>mem {health.data.memMB}M</span> : null}
-        <span className={online ? 'live' : 'down'}>
-          {online ? '● backend.ok' : '● backend.down'}
-        </span>
+        <JobIndicator online={online} />
         <span style={{ color: 'var(--fg-3)' }}>{clock}</span>
       </div>
     </div>
