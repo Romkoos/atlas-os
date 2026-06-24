@@ -199,6 +199,19 @@ export function readDaily(root: string, project: string, relPath: string): strin
 
 const execFileAsync = promisify(execFile)
 
+// One-line summary of a compileAll result set, for the process indicator detail.
+export function summarizeCompile(results: CompileResult[]): string {
+  if (results.length === 0) return 'nothing to compile'
+  const compiled = results.filter((r) => r.status === 'compiled').length
+  const nothing = results.filter((r) => r.status === 'nothing').length
+  const errored = results.filter((r) => r.status === 'error').length
+  const parts: string[] = []
+  if (compiled > 0) parts.push(`${compiled} compiled`)
+  if (nothing > 0) parts.push(`${nothing} up to date`)
+  if (errored > 0) parts.push(`${errored} error`)
+  return parts.join(' · ')
+}
+
 // Shell out to the engine's query.py (read-only: NO --file-back). Spends API
 // tokens — callers must gate this behind an explicit user action. ATLAS_KB_ROOT
 // points at the per-project root; the engine resolves knowledge/ from there.

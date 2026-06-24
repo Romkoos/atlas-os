@@ -228,7 +228,7 @@ export const benchmarkRouter = router({
         slice.length > 0
           ? await trackJob(
               jobRegistry,
-              { kind: 'benchmark.analyze', label: 'Benchmark analysis' },
+              { kind: 'benchmark.analyze', label: 'Benchmark analysis', model: newest.model },
               runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() }),
             )
           : null

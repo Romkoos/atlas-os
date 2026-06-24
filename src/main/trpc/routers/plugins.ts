@@ -20,13 +20,21 @@ export const pluginsRouter = router({
   checkUpdates: publicProcedure
     .output(z.array(updateInfoSchema))
     .mutation(() =>
-      trackJob(jobRegistry, { kind: 'plugins', label: 'Plugin update check' }, checkUpdates()),
+      trackJob(
+        jobRegistry,
+        { kind: 'plugins', label: 'Plugin update check', detail: 'all marketplaces' },
+        checkUpdates(),
+      ),
     ),
 
   update: publicProcedure
     .input(idInput)
     .output(updateResultSchema)
     .mutation(({ input }) =>
-      trackJob(jobRegistry, { kind: 'plugins', label: 'Plugin update' }, updatePlugin(input.id)),
+      trackJob(
+        jobRegistry,
+        { kind: 'plugins', label: 'Plugin update', detail: input.id },
+        updatePlugin(input.id),
+      ),
     ),
 })

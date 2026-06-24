@@ -11,6 +11,7 @@ import {
   readIndex,
   runQuery,
   storeRoot,
+  summarizeCompile,
 } from '@main/services/knowledge/store'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -70,7 +71,7 @@ export const knowledgeRouter = router({
     .mutation(async ({ input }) => ({
       answer: await trackJob(
         jobRegistry,
-        { kind: 'knowledge.query', label: 'Knowledge search' },
+        { kind: 'knowledge.query', label: 'Knowledge search', detail: input.q.slice(0, 80) },
         runQuery(storeRoot(), input.project, input.q),
       ),
     })),
@@ -82,6 +83,7 @@ export const knowledgeRouter = router({
         jobRegistry,
         { kind: 'knowledge.compile', label: 'Knowledge compile' },
         compileAll(storeRoot(), tracked()),
+        (results) => ({ detail: summarizeCompile(results) }),
       ),
     ),
 })

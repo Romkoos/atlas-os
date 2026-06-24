@@ -170,3 +170,30 @@ describe('readArticle / readIndex / listDaily', () => {
     expect(() => listArticles(root, '../../etc')).toThrow(/invalid project|escapes/)
   })
 })
+
+import { summarizeCompile } from './store'
+
+describe('summarizeCompile', () => {
+  it('counts compiled/up-to-date/error, omitting zeros', () => {
+    expect(
+      summarizeCompile([
+        { project: 'a', status: 'compiled', summary: '' },
+        { project: 'b', status: 'compiled', summary: '' },
+        { project: 'c', status: 'error', summary: '' },
+      ]),
+    ).toBe('2 compiled · 1 error')
+  })
+
+  it('reports up to date when nothing changed', () => {
+    expect(
+      summarizeCompile([
+        { project: 'a', status: 'nothing', summary: '' },
+        { project: 'b', status: 'nothing', summary: '' },
+      ]),
+    ).toBe('2 up to date')
+  })
+
+  it('handles an empty list', () => {
+    expect(summarizeCompile([])).toBe('nothing to compile')
+  })
+})

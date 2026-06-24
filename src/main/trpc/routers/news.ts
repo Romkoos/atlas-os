@@ -39,8 +39,9 @@ export const newsRouter = router({
       // already owns run.done for its own emit logic, so swallow here.
       trackJob(
         jobRegistry,
-        { kind: 'news', label: 'News digest', abort: () => run.cancel() },
+        { kind: 'news', label: 'News digest', model, abort: () => run.cancel() },
         run.done,
+        (r) => ({ tokens: r.outputTokens, resultPath: r.filePath }),
       ).catch(() => {})
 
       run.done

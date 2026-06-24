@@ -37,8 +37,9 @@ export const trendingRouter = router({
 
       trackJob(
         jobRegistry,
-        { kind: 'trending', label: 'Trending digest', abort: () => run.cancel() },
+        { kind: 'trending', label: 'Trending digest', model, abort: () => run.cancel() },
         run.done,
+        (r) => ({ tokens: r.outputTokens, resultPath: r.filePath }),
       ).catch(() => {})
 
       run.done
