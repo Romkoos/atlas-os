@@ -1,5 +1,6 @@
 import { trpc } from '@renderer/lib/trpc'
 import type { JobsSnapshot, JobView } from '@shared/jobs'
+import { skipToken } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 // Human-readable elapsed time. Seconds under a minute, m+ss under an hour,
@@ -44,7 +45,7 @@ function JobRow({ job, now }: { job: JobView; now: number }) {
 // backend is unreachable. Hovering reveals running + recent jobs.
 export function JobIndicator({ online }: { online: boolean }) {
   const [snap, setSnap] = useState<JobsSnapshot>(EMPTY)
-  trpc.jobs.list.useSubscription(undefined, {
+  trpc.jobs.list.useSubscription(online ? undefined : skipToken, {
     onData: (data) => setSnap(data),
   })
 
@@ -64,7 +65,7 @@ export function JobIndicator({ online }: { online: boolean }) {
   const empty = snap.running.length === 0 && snap.recent.length === 0
 
   return (
-    <span className={`jobs ${count > 0 ? 'live' : ''}`}>
+    <span className={count > 0 ? 'jobs live' : 'jobs'}>
       <span className="jobs-label">{count === 0 ? '● idle' : `◐ ${count} running`}</span>
       <div className="jobs-pop">
         {empty ? <div className="jobs-empty">no recent processes</div> : null}
