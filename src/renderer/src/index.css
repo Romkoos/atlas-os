@@ -2317,12 +2317,15 @@ textarea.input:focus,
 .jobs {
   position: relative;
   cursor: default;
+  /* The title bar is a drag region (-webkit-app-region: drag); interactive
+     children must opt out or they never receive hover/click events. */
+  -webkit-app-region: no-drag;
 }
 .jobs .jobs-label {
   color: var(--ok);
 }
 .jobs.live .jobs-label {
-  color: var(--accent, var(--ok));
+  color: var(--ok);
 }
 .jobs-pop {
   display: none;
@@ -2360,7 +2363,7 @@ textarea.input:focus,
   text-align: center;
 }
 .jobs-row.running .jobs-icon {
-  color: var(--accent, var(--ok));
+  color: var(--ok);
 }
 .jobs-row.done .jobs-icon {
   color: var(--ok);
