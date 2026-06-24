@@ -1,4 +1,4 @@
-import { formatDuration } from '@renderer/components/layout/JobIndicator'
+import { formatDuration } from '@renderer/hooks/useJobs'
 import { describe, expect, it } from 'vitest'
 
 describe('formatDuration', () => {
