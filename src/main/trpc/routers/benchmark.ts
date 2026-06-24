@@ -12,6 +12,7 @@ import {
 } from '@main/services/benchmark/compare'
 import { summarize, type TaskInfraSummary } from '@main/services/benchmark/stats'
 import { TASKS } from '@main/services/benchmark/tasks'
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { desc } from 'drizzle-orm'
 import { app } from 'electron'
@@ -225,7 +226,11 @@ export const benchmarkRouter = router({
       const slice = buildAbSlice(summarizeRuns(rows.map(rowToRawRun)))
       const summary =
         slice.length > 0
-          ? await runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() })
+          ? await trackJob(
+              jobRegistry,
+              { kind: 'benchmark.analyze', label: 'Benchmark analysis' },
+              runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() }),
+            )
           : null
       db()
         .insert(benchmarkAnalysis)
