@@ -1,3 +1,4 @@
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { checkUpdates, listPlugins, setEnabled, updatePlugin } from '@main/services/plugins/cli'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { pluginSchema, updateInfoSchema, updateResultSchema } from '@shared/plugins'
@@ -16,10 +17,24 @@ export const pluginsRouter = router({
     }),
 
   // Network I/O (refreshes marketplaces) — gated behind an explicit user action.
-  checkUpdates: publicProcedure.output(z.array(updateInfoSchema)).mutation(() => checkUpdates()),
+  checkUpdates: publicProcedure
+    .output(z.array(updateInfoSchema))
+    .mutation(() =>
+      trackJob(
+        jobRegistry,
+        { kind: 'plugins', label: 'Plugin update check', detail: 'all marketplaces' },
+        checkUpdates(),
+      ),
+    ),
 
   update: publicProcedure
     .input(idInput)
     .output(updateResultSchema)
-    .mutation(({ input }) => updatePlugin(input.id)),
+    .mutation(({ input }) =>
+      trackJob(
+        jobRegistry,
+        { kind: 'plugins', label: 'Plugin update', detail: input.id },
+        updatePlugin(input.id),
+      ),
+    ),
 })

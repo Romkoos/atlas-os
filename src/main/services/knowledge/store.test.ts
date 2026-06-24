@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { assertInside, isTracked, parseCompileOutput, parseFrontmatter } from './store'
+import {
+  assertInside,
+  isTracked,
+  parseCompileOutput,
+  parseFrontmatter,
+  summarizeCompile,
+} from './store'
 
 describe('parseFrontmatter', () => {
   it('splits YAML frontmatter from body', () => {
@@ -168,5 +174,30 @@ describe('readArticle / readIndex / listDaily', () => {
   })
   it('rejects project traversal in listArticles', () => {
     expect(() => listArticles(root, '../../etc')).toThrow(/invalid project|escapes/)
+  })
+})
+
+describe('summarizeCompile', () => {
+  it('counts compiled/up-to-date/error, omitting zeros', () => {
+    expect(
+      summarizeCompile([
+        { project: 'a', status: 'compiled', summary: '' },
+        { project: 'b', status: 'compiled', summary: '' },
+        { project: 'c', status: 'error', summary: '' },
+      ]),
+    ).toBe('2 compiled · 1 error')
+  })
+
+  it('reports up to date when nothing changed', () => {
+    expect(
+      summarizeCompile([
+        { project: 'a', status: 'nothing', summary: '' },
+        { project: 'b', status: 'nothing', summary: '' },
+      ]),
+    ).toBe('2 up to date')
+  })
+
+  it('handles an empty list', () => {
+    expect(summarizeCompile([])).toBe('nothing to compile')
   })
 })

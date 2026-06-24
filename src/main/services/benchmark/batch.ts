@@ -11,6 +11,7 @@ import { repoCommit, runBenchmarkTask } from '@main/services/benchmark/runner'
 import { selectTransientFailures } from '@main/services/benchmark/sweep'
 import { TASKS } from '@main/services/benchmark/tasks'
 import type { BenchmarkTask } from '@main/services/benchmark/types'
+import { type JobHandle, jobRegistry } from '@main/services/jobs/registry'
 import { readInfraState } from '@main/services/productivity/infra'
 import { eq } from 'drizzle-orm'
 import { app, Notification } from 'electron'
@@ -66,7 +67,13 @@ export function startBatch(opts: StartOptions): { batchId: string; total: number
   }
   batches.set(batchId, progress)
   latestBatchId = batchId
-  void runLoop(batchId, tasks, k, model, progress)
+  const job = jobRegistry.register({
+    kind: 'benchmark',
+    label: 'Benchmark batch',
+    model,
+    detail: `0/${total} · running`,
+  })
+  void runLoop(batchId, tasks, k, model, progress, job)
   return { batchId, total }
 }
 
@@ -76,8 +83,11 @@ async function runLoop(
   k: number,
   model: string,
   progress: Progress,
+  job: JobHandle,
 ): Promise<void> {
   try {
+    const pushDetail = () =>
+      job.update({ detail: `${progress.done}/${progress.total} · ${progress.phase}` })
     const repoRoot = app.getAppPath()
     const commit = repoCommit(repoRoot)
     const p = appPaths()
@@ -131,12 +141,14 @@ async function runLoop(
           .run()
         progress.done += 1
         if (!result.success) progress.failed += 1
+        pushDetail()
       }
     }
     // Retry sweep: transient failures already got one inline retry; give them a
     // single final attempt now that the run is otherwise done (a transient blip
     // may have cleared). REPLACE the row in place so k stays clean.
     progress.phase = 'retrying'
+    pushDetail()
     const tasksById = new Map(tasks.map((t) => [t.id, t]))
     const failedRows = db()
       .select()
@@ -176,6 +188,7 @@ async function runLoop(
     // sentences. Isolated try/catch — a failed analysis must NOT mark the batch
     // errored; we persist a null-summary row instead so the UI can offer retry.
     progress.phase = 'analyzing'
+    pushDetail()
     try {
       const allRows = db().select().from(benchmarkRuns).all()
       const slice = buildAbSlice(summarizeRuns(allRows.map(rowToRawRun)))
@@ -213,6 +226,10 @@ async function runLoop(
     progress.error = err instanceof Error ? err.message : String(err)
     console.error('[benchmark] runLoop crashed:', err)
   } finally {
+    job.finish(progress.error ? 'error' : 'done', {
+      detail: `${progress.done}/${progress.total} runs${progress.failed ? ` · ${progress.failed} failed` : ''}`,
+      error: progress.error ?? undefined,
+    })
     progress.running = false
     progress.phase = 'done'
     try {

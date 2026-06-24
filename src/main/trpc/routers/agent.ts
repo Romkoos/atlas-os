@@ -3,6 +3,7 @@ import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { type ClaudeRun, runClaude } from '@main/services/claude'
 import { revealInFinder, saveMarkdown } from '@main/services/files'
+import { jobRegistry } from '@main/services/jobs/registry'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import type { AgentEvent } from '@shared/ipc-events'
@@ -35,6 +36,13 @@ export const agentRouter = router({
         })
         runs.set(input.requestId, run)
 
+        const job = jobRegistry.register({
+          kind: 'agent',
+          label: 'Agent run',
+          model: input.model,
+          abort: () => run.cancel(),
+        })
+
         run.done
           .then(async (result) => {
             const durationMs = Date.now() - startedAt
@@ -62,17 +70,20 @@ export const agentRouter = router({
               filePath,
             })
             emit.next({ type: 'done', filePath, tokens: result.outputTokens, durationMs })
+            job.finish('done', { tokens: result.outputTokens, resultPath: filePath })
             emit.complete()
           })
           .catch((error) => {
             if (cancelled) {
               emit.next({ type: 'aborted' })
+              job.finish('error')
               emit.complete()
               return
             }
             const message = error instanceof Error ? error.message : 'Unknown error'
             logger.error('Agent run failed', message)
             emit.next({ type: 'error', message })
+            job.finish('error', { error: message })
             emit.complete()
           })
           .finally(() => {

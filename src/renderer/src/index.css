@@ -2311,3 +2311,167 @@ textarea.input:focus,
   font-size: 12px;
   color: var(--fg-3);
 }
+
+/* Top-bar process indicator. The popover is hover-revealed; anchored to the
+   indicator so it hangs below the title bar. */
+.jobs {
+  position: relative;
+  cursor: default;
+  /* The title bar is a drag region (-webkit-app-region: drag); interactive
+     children must opt out or they never receive hover/click events. */
+  -webkit-app-region: no-drag;
+}
+.jobs .jobs-label {
+  color: var(--ok);
+}
+.jobs.live .jobs-label {
+  color: var(--ok);
+}
+.jobs-pop {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  min-width: 240px;
+  max-width: 360px;
+  padding: 6px;
+  background: var(--bg-1, #15161a);
+  border: 1px solid var(--fg-4, #333);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+.jobs:hover .jobs-pop {
+  display: block;
+}
+.jobs-empty {
+  color: var(--fg-3);
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.jobs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.jobs-row .jobs-icon {
+  width: 12px;
+  text-align: center;
+}
+.jobs-row.running .jobs-icon {
+  color: var(--ok);
+}
+.jobs-row.done .jobs-icon {
+  color: var(--ok);
+}
+.jobs-row.error .jobs-icon {
+  color: var(--warn);
+}
+.jobs-row .jobs-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jobs-row .jobs-time {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.jobs-x {
+  background: none;
+  border: none;
+  color: var(--fg-3);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.jobs-x:hover {
+  color: var(--warn);
+}
+
+/* Dashboard processes panel: rich rows for active + recent jobs. */
+.proc-group {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-4);
+  padding: 4px 0;
+}
+.proc-group-recent {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.proc-empty {
+  color: var(--fg-3);
+  font-size: 12px;
+  padding: 6px 2px;
+}
+.proc-row {
+  display: grid;
+  grid-template-columns: 16px minmax(160px, 1.4fr) 1.2fr 0.6fr 1.6fr 64px 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.proc-row .proc-icon {
+  text-align: center;
+}
+.proc-row.running .proc-icon {
+  color: var(--ok);
+}
+.proc-row.done .proc-icon {
+  color: var(--ok);
+}
+.proc-row.error .proc-icon {
+  color: var(--warn);
+}
+.proc-label {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.proc-kind {
+  color: var(--fg-4);
+  font-size: 10px;
+}
+.proc-model,
+.proc-detail {
+  color: var(--fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proc-row.error .proc-detail {
+  color: var(--warn);
+}
+.proc-tokens,
+.proc-time {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.proc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.proc-x,
+.proc-open {
+  background: none;
+  border: none;
+  color: var(--fg-3);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.proc-x:hover {
+  color: var(--warn);
+}
+.proc-open:hover {
+  color: var(--ok);
+}
