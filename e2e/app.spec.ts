@@ -86,3 +86,16 @@ test('Productivity benchmark tab hides the days range selector', async () => {
 
   await app.close()
 })
+
+test('top bar shows the process indicator at idle', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  // The JobIndicator subscribes to jobs.list and settles to idle when nothing
+  // is running — proves the subscription round-trips over IPC.
+  await expect(window.getByText('● idle')).toBeVisible({ timeout: 15000 })
+
+  await app.close()
+})
