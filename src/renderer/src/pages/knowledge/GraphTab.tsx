@@ -1,7 +1,7 @@
 import { trpc } from '@renderer/lib/trpc'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleMeta, GraphNode, GraphNodeType } from '@shared/knowledge'
-import { forceCollide } from 'd3-force'
+import { forceCollide, forceX, forceY } from 'd3-force'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { colorForCommunity, colorForProject } from './graph-colors'
@@ -95,17 +95,26 @@ export function GraphTab({ project }: { project: string }) {
     return map
   }, [data.links])
 
-  // Inject a collision force sized to each node's painted radius so large hubs
-  // don't overlap each other or smaller nodes, and strengthen charge repulsion
-  // for breathing room between clusters. Re-applied (and reheated) whenever the
-  // visible set changes. Default d3-force has no radius-aware collision, which
-  // is why big nodes pile up without this.
+  // Round disc layout: pull every node toward the origin with a gravity-like
+  // forceX/forceY, while mild charge repulsion + radius-aware collision push
+  // them apart. The equilibrium of uniform repulsion against central gravity is
+  // a densely, evenly packed circle — so the whole graph reads as one round disc
+  // (links keep each community locally clustered as a colour patch within it,
+  // rather than flinging clusters apart). Re-applied (and reheated) whenever the
+  // visible set changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reheat on visible-set change
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('collide', forceCollide((n: FgNode) => nodeRadius(n) + 3).iterations(2))
-    fg.d3Force('charge')?.strength(-160)
+
+    fg.d3Force('collide', forceCollide((n: FgNode) => nodeRadius(n) + 6).iterations(2))
+    fg.d3Force('charge')?.strength(-140)
+    // Central gravity → round, centred disc. forceX/Y at the origin also keeps the
+    // layout centred, so the built-in centring force is redundant. Weak gravity +
+    // strong charge spreads the nodes out for breathing room while staying round.
+    fg.d3Force('x', forceX(0).strength(0.07))
+    fg.d3Force('y', forceY(0).strength(0.07))
+    fg.d3Force('center', null)
     fg.d3ReheatSimulation?.()
   }, [data])
 
@@ -250,6 +259,7 @@ export function GraphTab({ project }: { project: string }) {
             onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
             linkColor={() => 'rgba(120,120,120,0.25)'}
             linkWidth={(l) => ((l as FgLink).type === 'source' ? 0.5 : 1)}
+            onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
           />
         </div>
 
