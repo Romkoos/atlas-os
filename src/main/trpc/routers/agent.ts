@@ -3,6 +3,7 @@ import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { type ClaudeRun, runClaude } from '@main/services/claude'
 import { revealInFinder, saveMarkdown } from '@main/services/files'
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import type { AgentEvent } from '@shared/ipc-events'
@@ -34,6 +35,12 @@ export const agentRouter = router({
           onToken: (text) => emit.next({ type: 'token', text }),
         })
         runs.set(input.requestId, run)
+
+        trackJob(
+          jobRegistry,
+          { kind: 'agent', label: 'Agent run', abort: () => run.cancel() },
+          run.done,
+        ).catch(() => {})
 
         run.done
           .then(async (result) => {

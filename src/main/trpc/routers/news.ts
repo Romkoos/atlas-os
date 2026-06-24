@@ -1,6 +1,7 @@
 import { db } from '@main/db/client'
 import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { type NewsRun, readNews, runNews } from '@main/services/news'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -33,6 +34,14 @@ export const newsRouter = router({
         onToken: (text) => emit.next({ type: 'token', text }),
       })
       runs.set(input.requestId, run)
+
+      // Mirror the run into the global job registry. Fire-and-forget: this router
+      // already owns run.done for its own emit logic, so swallow here.
+      trackJob(
+        jobRegistry,
+        { kind: 'news', label: 'News digest', abort: () => run.cancel() },
+        run.done,
+      ).catch(() => {})
 
       run.done
         .then((result) => {

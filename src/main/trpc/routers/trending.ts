@@ -1,6 +1,7 @@
 import { db } from '@main/db/client'
 import { events } from '@main/db/schema'
 import { logger } from '@main/logger'
+import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { readTrending, runTrending, type TrendingRun } from '@main/services/trending'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
@@ -33,6 +34,12 @@ export const trendingRouter = router({
         onToken: (text) => emit.next({ type: 'token', text }),
       })
       runs.set(input.requestId, run)
+
+      trackJob(
+        jobRegistry,
+        { kind: 'trending', label: 'Trending digest', abort: () => run.cancel() },
+        run.done,
+      ).catch(() => {})
 
       run.done
         .then((result) => {
