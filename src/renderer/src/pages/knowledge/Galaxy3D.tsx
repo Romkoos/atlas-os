@@ -173,9 +173,9 @@ export default function Galaxy3D({
       if (composer) {
         bloom = new UnrealBloomPass(
           new THREE.Vector2(Math.max(width, 1), Math.max(height, 1)),
-          0.5, // strength — subtle glow, not a wash-out
+          0.8, // strength — moderate glow
           0.6, // radius
-          0.28, // threshold — only the brightest nodes bloom
+          0.15, // threshold — brighter nodes bloom
         )
         composer.addPass(bloom)
       }
