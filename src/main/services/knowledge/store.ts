@@ -100,6 +100,17 @@ function loadProjectsJson(root: string): Record<string, string> {
   }
 }
 
+// Map a real filesystem project path (as stored in agent_sessions.projectPath)
+// to its knowledge-store project name, via _engine/projects.json. Null if the
+// path isn't a registered knowledge project.
+export function projectNameForPath(root: string, projectPath: string): string | null {
+  const projects = loadProjectsJson(root)
+  for (const [name, abspath] of Object.entries(projects)) {
+    if (abspath === projectPath) return name
+  }
+  return null
+}
+
 function asStr(v: unknown): string | null {
   return typeof v === 'string' ? v : null
 }

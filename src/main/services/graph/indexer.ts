@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { basename, join, relative } from 'node:path'
+import { basename, join, relative, sep } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import { agentSessions, agentTurns } from '@main/db/schema'
-import { listProjects, readAllArticles, storeRoot } from '@main/services/knowledge/store'
+import { projectNameForPath, readAllArticles, storeRoot } from '@main/services/knowledge/store'
 import type { CodeGraph } from '@shared/graph'
 import { eq } from 'drizzle-orm'
 import { type AssembleInput, assembleGraph } from './assemble'
@@ -86,7 +86,7 @@ function docLinksFor(docRel: string, content: string, fileSet: ReadonlySet<strin
 
 function knowledgeProjectName(projectPath: string): string | null {
   try {
-    return listProjects(storeRoot(), new Set()).find((p) => p.path === projectPath)?.name ?? null
+    return projectNameForPath(storeRoot(), projectPath)
   } catch {
     return null
   }
@@ -153,9 +153,10 @@ export function indexProject(database: AppDatabase, projectPath: string): CodeGr
     const touched = new Set<string>()
     for (const t of turns) {
       for (const abs of t.filesTouched ?? []) {
-        const rel = abs.startsWith(projectPath)
-          ? relative(projectPath, abs).split('\\').join('/')
-          : abs
+        const rel =
+          abs === projectPath || abs.startsWith(projectPath + sep)
+            ? relative(projectPath, abs).split('\\').join('/')
+            : abs
         touched.add(rel)
       }
     }

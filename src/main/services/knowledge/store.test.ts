@@ -95,7 +95,14 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll } from 'vitest'
-import { listArticles, listDaily, listProjects, readArticle, readIndex } from './store'
+import {
+  listArticles,
+  listDaily,
+  listProjects,
+  projectNameForPath,
+  readArticle,
+  readIndex,
+} from './store'
 
 let root: string
 
@@ -140,6 +147,23 @@ describe('listProjects', () => {
     mkdirSync(join(root, 'news', 'knowledge', 'concepts'), { recursive: true })
     const projects = listProjects(root, new Set())
     expect(projects.map((p) => p.name)).not.toContain('news')
+  })
+})
+
+describe('projectNameForPath', () => {
+  it('maps a registered abspath to its project name', () => {
+    expect(projectNameForPath(root, '/abs/proj')).toBe('proj')
+  })
+  it('returns null for an unregistered abspath', () => {
+    expect(projectNameForPath(root, '/abs/other')).toBeNull()
+  })
+  it('returns null when projects.json is absent', () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), 'kb-empty-'))
+    try {
+      expect(projectNameForPath(emptyRoot, '/abs/proj')).toBeNull()
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true })
+    }
   })
 })
 
