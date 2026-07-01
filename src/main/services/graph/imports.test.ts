@@ -7,6 +7,8 @@ describe('langForExt', () => {
     expect(langForExt('a/b.tsx')).toBe('js')
     expect(langForExt('a/b.jsx')).toBe('js')
     expect(langForExt('a/b.mjs')).toBe('js')
+    expect(langForExt('a/b.js')).toBe('js')
+    expect(langForExt('a/b.cjs')).toBe('js')
     expect(langForExt('a/b.py')).toBe('py')
     expect(langForExt('a/b.md')).toBeNull()
   })
@@ -34,6 +36,11 @@ describe('parseImports js', () => {
 
   it('dedupes repeated specifiers', () => {
     expect(parseImports("import x from './x'\nimport './x'", 'js')).toEqual(['./x'])
+  })
+
+  it('does not match import/require as a substring of another identifier or prose', () => {
+    expect(parseImports("const x = reimport('./oops')", 'js')).toEqual([])
+    expect(parseImports("// this config is important from './legacy-notes'", 'js')).toEqual([])
   })
 })
 

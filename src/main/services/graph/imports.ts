@@ -13,10 +13,10 @@ export function langForExt(relPath: string): Lang | null {
 
 const JS_PATTERNS: RegExp[] = [
   // import ... from '...'  /  export ... from '...'  /  import '...'
-  /(?:import|export)[^'"()]*?from\s*['"]([^'"]+)['"]/g,
-  /import\s*['"]([^'"]+)['"]/g,
+  /\b(?:import|export)\b[^'"()]*?from\s*['"]([^'"]+)['"]/g,
+  /\bimport\b\s*['"]([^'"]+)['"]/g,
   // require('...') and dynamic import('...')
-  /(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  /\b(?:require|import)\b\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
 ]
 
 const PY_PATTERNS: RegExp[] = [/^\s*from\s+([.\w]+)\s+import\s+/gm, /^\s*import\s+([.\w]+)/gm]
