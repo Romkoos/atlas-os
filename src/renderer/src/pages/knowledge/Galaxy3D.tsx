@@ -53,19 +53,19 @@ export default function Galaxy3D({
     const fg = fgRef.current
     if (!fg) return
     const anchors = clusterAnchors(graphData.nodes.map((n) => clusterKey(n)))
-    const anchorOf = (n: any) => anchors.get(String(clusterKey(n)))
-    fg.d3Force('x', forceX((n: any) => anchorOf(n)?.x ?? 0).strength(0.12))
-    fg.d3Force('y', forceY((n: any) => anchorOf(n)?.y ?? 0).strength(0.12))
-    fg.d3Force('z', forceZ((n: any) => anchorOf(n)?.z ?? 0).strength(0.12))
+    const anchorOf = (n: GalaxyNode) => anchors.get(String(clusterKey(n)))
+    fg.d3Force('x', forceX((n: GalaxyNode) => anchorOf(n)?.x ?? 0).strength(0.12))
+    fg.d3Force('y', forceY((n: GalaxyNode) => anchorOf(n)?.y ?? 0).strength(0.12))
+    fg.d3Force('z', forceZ((n: GalaxyNode) => anchorOf(n)?.z ?? 0).strength(0.12))
     fg.d3Force('charge')?.strength(-120)
     fg.d3Force(
       'collide',
-      forceCollide((n: any) => radiusOf(nodeVal(n)) + 2),
+      forceCollide((n: GalaxyNode) => radiusOf(nodeVal(n)) + 2),
     )
     fg.d3ReheatSimulation?.()
   }, [graphData])
 
-  const handleClick = (node: any): void => {
+  const handleClick = (node: GalaxyNode): void => {
     const fg = fgRef.current
     if (fg && node.x != null && node.y != null) {
       const dist = 120
@@ -89,9 +89,9 @@ export default function Galaxy3D({
       backgroundColor="#05060a"
       nodeId="id"
       nodeRelSize={NODE_REL_SIZE}
-      nodeVal={(n: any) => nodeVal(n)}
-      nodeColor={(n: any) => nodeColor(n)}
-      nodeLabel={(n: any) => nodeLabel(n)}
+      nodeVal={nodeVal}
+      nodeColor={nodeColor}
+      nodeLabel={nodeLabel}
       nodeOpacity={0.95}
       linkColor={linkColor ?? (() => 'rgba(120,120,120,0.25)')}
       linkOpacity={0.4}
@@ -99,7 +99,7 @@ export default function Galaxy3D({
       warmupTicks={20}
       cooldownTicks={120}
       onNodeClick={handleClick}
-      onNodeHover={(n: any) => onNodeHover?.(n ?? null)}
+      onNodeHover={(n: GalaxyNode | null) => onNodeHover?.(n ?? null)}
     />
   )
 }

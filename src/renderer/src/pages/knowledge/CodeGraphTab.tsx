@@ -3,6 +3,7 @@ import type { CodeGraphNode, CodeNodeKind } from '@shared/graph'
 import { forceCollide, forceX, forceY } from 'd3-force'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
+import { Graph3DBoundary } from './Graph3DBoundary'
 import { colorForKind } from './graph-colors'
 import { type ViewMode, ViewToggle } from './ViewToggle'
 
@@ -128,7 +129,7 @@ export function CodeGraphTab({ project }: { project: string }) {
     fg.d3Force('y', forceY(0).strength(0.06))
     fg.d3Force('center', null)
     fg.d3ReheatSimulation?.()
-  }, [data])
+  }, [data, viewMode])
 
   const neighbors = trpc.graph.queryNeighbors.useQuery(
     { nodeId: selected?.id ?? '', depth: 1 },
@@ -211,21 +212,23 @@ export function CodeGraphTab({ project }: { project: string }) {
               onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
             />
           ) : (
-            <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
-              <Galaxy3D
-                graphData={data}
-                width={size.w}
-                height={size.h}
-                nodeColor={(n) => colorForKind((n as FgNode).kind)}
-                nodeVal={() => 1}
-                nodeLabel={(n) => `${(n as FgNode).label} [${(n as FgNode).kind}]`}
-                clusterKey={(n) => (n as FgNode).community ?? -1}
-                linkColor={(l) =>
-                  (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
-                }
-                onNodeClick={(n) => setSelected(n as FgNode)}
-              />
-            </Suspense>
+            <Graph3DBoundary onError={() => setViewMode('2d')}>
+              <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
+                <Galaxy3D
+                  graphData={data}
+                  width={size.w}
+                  height={size.h}
+                  nodeColor={(n) => colorForKind((n as FgNode).kind)}
+                  nodeVal={() => 1}
+                  nodeLabel={(n) => `${(n as FgNode).label} [${(n as FgNode).kind}]`}
+                  clusterKey={(n) => (n as FgNode).community ?? -1}
+                  linkColor={(l) =>
+                    (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
+                  }
+                  onNodeClick={(n) => setSelected(n as FgNode)}
+                />
+              </Suspense>
+            </Graph3DBoundary>
           )}
         </div>
 

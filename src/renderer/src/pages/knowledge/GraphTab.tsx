@@ -4,6 +4,7 @@ import type { ArticleMeta, GraphNode, GraphNodeType } from '@shared/knowledge'
 import { forceCollide, forceX, forceY } from 'd3-force'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
+import { Graph3DBoundary } from './Graph3DBoundary'
 import { colorForCommunity, colorForProject } from './graph-colors'
 import { type ViewMode, ViewToggle } from './ViewToggle'
 
@@ -120,7 +121,7 @@ export function GraphTab({ project }: { project: string }) {
     fg.d3Force('y', forceY(0).strength(0.07))
     fg.d3Force('center', null)
     fg.d3ReheatSimulation?.()
-  }, [data])
+  }, [data, viewMode])
 
   const nodeColor = (n: FgNode): string => {
     const dim = hovered && hovered !== n.id && !neighbors.get(hovered)?.has(n.id)
@@ -269,19 +270,21 @@ export function GraphTab({ project }: { project: string }) {
               onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
             />
           ) : (
-            <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
-              <Galaxy3D
-                graphData={data}
-                width={size.w}
-                height={size.h}
-                nodeColor={(n) => nodeColor(n as FgNode)}
-                nodeVal={(n) => nodeValOf(n as FgNode)}
-                nodeLabel={(n) => (n as FgNode).label}
-                clusterKey={(n) => (n as FgNode).community}
-                onNodeClick={(n) => setSelected(n as FgNode)}
-                onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
-              />
-            </Suspense>
+            <Graph3DBoundary onError={() => setViewMode('2d')}>
+              <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
+                <Galaxy3D
+                  graphData={data}
+                  width={size.w}
+                  height={size.h}
+                  nodeColor={(n) => nodeColor(n as FgNode)}
+                  nodeVal={(n) => nodeValOf(n as FgNode)}
+                  nodeLabel={(n) => (n as FgNode).label}
+                  clusterKey={(n) => (n as FgNode).community}
+                  onNodeClick={(n) => setSelected(n as FgNode)}
+                  onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
+                />
+              </Suspense>
+            </Graph3DBoundary>
           )}
         </div>
 
