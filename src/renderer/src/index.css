@@ -2311,6 +2311,46 @@ textarea.input:focus,
   font-size: 12px;
   color: var(--fg-3);
 }
+.kb-graph-status {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.kb-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.kb-graph-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.kb-graph-legend-item .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.kb-graph-detail {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.kb-graph-detail code {
+  display: block;
+  margin-top: 4px;
+  word-break: break-all;
+  color: var(--fg-3);
+}
+.kb-graph-detail .dim {
+  color: var(--fg-3);
+}
 
 /* Top-bar process indicator. The popover is hover-revealed; anchored to the
    indicator so it hangs below the title bar. */
