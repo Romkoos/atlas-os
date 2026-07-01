@@ -1,0 +1,1 @@
+ALTER TABLE `roadmap_items` ADD `claude_prompt` text DEFAULT '' NOT NULL;

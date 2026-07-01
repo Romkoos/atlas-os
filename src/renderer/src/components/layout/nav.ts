@@ -10,12 +10,13 @@ export interface NavItem {
 
 export const NAV: ReadonlyArray<NavItem> = [
   { id: 'dashboard', key: '01', label: 'DASHBOARD' },
-  { id: 'stats', key: '02', label: 'STATS' },
-  { id: 'productivity', key: '03', label: 'PRODUCTIVITY' },
-  { id: 'knowledge', key: '04', label: 'KNOWLEDGE' },
-  { id: 'news', key: '05', label: 'NEWS' },
-  { id: 'info', key: '06', label: 'INFO' },
-  { id: 'skills', key: '07', label: 'SKILLS' },
-  { id: 'plugins', key: '08', label: 'PLUGINS' },
-  { id: 'settings', key: '09', label: 'SETTINGS' },
+  { id: 'roadmap', key: '02', label: 'ROADMAP' },
+  { id: 'stats', key: '03', label: 'STATS' },
+  { id: 'productivity', key: '04', label: 'PRODUCTIVITY' },
+  { id: 'knowledge', key: '05', label: 'KNOWLEDGE' },
+  { id: 'news', key: '06', label: 'NEWS' },
+  { id: 'info', key: '07', label: 'INFO' },
+  { id: 'skills', key: '08', label: 'SKILLS' },
+  { id: 'plugins', key: '09', label: 'PLUGINS' },
+  { id: 'settings', key: '10', label: 'SETTINGS' },
 ]
