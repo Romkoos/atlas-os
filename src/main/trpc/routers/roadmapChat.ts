@@ -1,4 +1,7 @@
+import { db } from '@main/db/client'
 import { logger } from '@main/logger'
+import { getSubgraphContext } from '@main/services/graph/context'
+import { loadGraph } from '@main/services/graph/store'
 import { jobRegistry } from '@main/services/jobs/registry'
 import { createRoadmapItem, listRoadmap } from '@main/services/roadmap/store'
 import { type RoadmapChatRun, startRoadmapChat } from '@main/services/roadmapChat/run'
@@ -19,7 +22,16 @@ export const roadmapChatRouter = router({
     .subscription(({ input }) =>
       observable<RoadmapChatEvent>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
-        const seed = buildRoadmapChatSeed(input.idea, listRoadmap())
+        const repoRoot = app.getAppPath()
+        // Demo integration: append graph context for the app's own repo when indexed.
+        // getSubgraphContext returns '' for an unindexed repo, so this is a safe no-op.
+        const graphContext = getSubgraphContext(loadGraph(db(), repoRoot), {
+          query: input.idea,
+          depth: 1,
+          budget: 1000,
+        })
+        const baseSeed = buildRoadmapChatSeed(input.idea, listRoadmap())
+        const seed = graphContext ? `${baseSeed}\n\n${graphContext}` : baseSeed
         const job = jobRegistry.register({
           kind: 'roadmap.chat',
           label: 'Roadmap idea chat',
@@ -31,7 +43,7 @@ export const roadmapChatRouter = router({
           requestId: input.requestId,
           seed,
           model,
-          repoRoot: app.getAppPath(),
+          repoRoot,
           onProposal: (proposal) => {
             try {
               const item = createRoadmapItem(proposal)

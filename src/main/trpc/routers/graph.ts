@@ -1,5 +1,6 @@
 import { db } from '@main/db/client'
 import { summarizeClusters } from '@main/services/graph/cluster'
+import { getSubgraphContext } from '@main/services/graph/context'
 import { type GraphifyDeepMapRun, runGraphifyDeepMap } from '@main/services/graph/graphifyRunner'
 import { indexProject } from '@main/services/graph/indexer'
 import { neighborsOf } from '@main/services/graph/query'
@@ -64,6 +65,26 @@ export const graphRouter = router({
     .input(z.object({ projectPath: z.string().min(1).optional() }))
     .output(z.array(graphClusterSchema))
     .query(({ input }) => summarizeClusters(loadGraph(db(), input.projectPath ?? '__all__'))),
+
+  context: publicProcedure
+    .input(
+      z.object({
+        projectPath: z.string().min(1),
+        seedNodeId: z.string().optional(),
+        query: z.string().optional(),
+        depth: z.number().int().min(1).max(3).default(1),
+        budget: z.number().int().min(100).max(8000).default(1200),
+      }),
+    )
+    .output(z.object({ context: z.string() }))
+    .query(({ input }) => ({
+      context: getSubgraphContext(loadGraph(db(), input.projectPath), {
+        seedNodeId: input.seedNodeId,
+        query: input.query,
+        depth: input.depth,
+        budget: input.budget,
+      }),
+    })),
 
   deepMap: publicProcedure
     .input(z.object({ requestId: z.string().min(1), projectPath: z.string().min(1) }))
