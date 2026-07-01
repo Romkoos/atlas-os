@@ -1,6 +1,7 @@
 import { agentRouter } from '@main/trpc/routers/agent'
 import { benchmarkRouter } from '@main/trpc/routers/benchmark'
 import { benchmarkChatRouter } from '@main/trpc/routers/benchmarkChat'
+import { graphRouter } from '@main/trpc/routers/graph'
 import { healthRouter } from '@main/trpc/routers/health'
 import { jobsRouter } from '@main/trpc/routers/jobs'
 import { knowledgeRouter } from '@main/trpc/routers/knowledge'
@@ -28,6 +29,7 @@ export const appRouter = router({
   benchmark: benchmarkRouter,
   benchmarkChat: benchmarkChatRouter,
   knowledge: knowledgeRouter,
+  graph: graphRouter,
   news: newsRouter,
   trending: trendingRouter,
   plugins: pluginsRouter,
