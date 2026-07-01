@@ -233,7 +233,7 @@ export default function Galaxy3D({
       width={width}
       height={height}
       graphData={graphData}
-      backgroundColor="#05060a"
+      backgroundColor="#010103"
       controlType="orbit"
       nodeId="id"
       nodeRelSize={NODE_REL_SIZE}
@@ -241,8 +241,8 @@ export default function Galaxy3D({
       nodeColor={nodeColor}
       nodeLabel={nodeLabel}
       nodeOpacity={0.95}
-      linkColor={linkColor ?? (() => 'rgba(120,120,120,0.25)')}
-      linkOpacity={0.4}
+      linkColor={linkColor ?? (() => 'rgba(160,170,205,0.5)')}
+      linkOpacity={0.6}
       linkDirectionalParticles={graphData.links.length <= PARTICLE_LINK_BUDGET ? 2 : 0}
       linkDirectionalParticleSpeed={0.006}
       linkDirectionalParticleWidth={1.4}
