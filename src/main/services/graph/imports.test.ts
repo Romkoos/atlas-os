@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { langForExt, parseImports } from './imports'
+import { langForExt, parseImports, resolveImport } from './imports'
 
 describe('langForExt', () => {
   it('maps js/ts family to js and py to py', () => {
@@ -50,5 +50,38 @@ describe('parseImports py', () => {
       '\n',
     )
     expect(parseImports(src, 'py')).toEqual(['.rel', '..pkg', 'os', 'a.b.c'])
+  })
+})
+
+describe('resolveImport js', () => {
+  const files = new Set(['src/a.ts', 'src/b/index.ts', 'src/c.tsx', 'src/util.js'])
+
+  it('resolves with added extension', () => {
+    expect(resolveImport('src/main.ts', './a', files, 'js')).toBe('src/a.ts')
+  })
+  it('resolves a directory to its index file', () => {
+    expect(resolveImport('src/main.ts', './b', files, 'js')).toBe('src/b/index.ts')
+  })
+  it('resolves parent-relative and .tsx', () => {
+    expect(resolveImport('src/b/x.ts', '../c', files, 'js')).toBe('src/c.tsx')
+  })
+  it('returns null for bare/external specifiers', () => {
+    expect(resolveImport('src/a.ts', 'react', files, 'js')).toBeNull()
+  })
+  it('returns null when nothing matches', () => {
+    expect(resolveImport('src/a.ts', './nope', files, 'js')).toBeNull()
+  })
+})
+
+describe('resolveImport py', () => {
+  const files = new Set(['pkg/mod.py', 'pkg/sub/__init__.py'])
+  it('resolves a single-dot relative module', () => {
+    expect(resolveImport('pkg/main.py', '.mod', files, 'py')).toBe('pkg/mod.py')
+  })
+  it('resolves a relative package to __init__.py', () => {
+    expect(resolveImport('pkg/main.py', '.sub', files, 'py')).toBe('pkg/sub/__init__.py')
+  })
+  it('returns null for absolute/stdlib imports', () => {
+    expect(resolveImport('pkg/main.py', 'os', files, 'py')).toBeNull()
   })
 })
