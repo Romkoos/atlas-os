@@ -1,9 +1,10 @@
 import { trpc } from '@renderer/lib/trpc'
 import type { CodeGraphNode, CodeNodeKind } from '@shared/graph'
 import { forceCollide, forceX, forceY } from 'd3-force'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { colorForKind } from './graph-colors'
+import { type ViewMode, ViewToggle } from './ViewToggle'
 
 type FgNode = CodeGraphNode & { x?: number; y?: number }
 type FgLink = { source: string; target: string; inferred: boolean }
@@ -17,6 +18,8 @@ const KIND_LABELS: ReadonlyArray<{ id: CodeNodeKind; label: string }> = [
   { id: 'session', label: 'sessions' },
 ]
 
+const Galaxy3D = lazy(() => import('./Galaxy3D'))
+
 export function CodeGraphTab({ project }: { project: string }) {
   const projects = trpc.graph.listProjects.useQuery()
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -24,6 +27,7 @@ export function CodeGraphTab({ project }: { project: string }) {
   const [showInferred, setShowInferred] = useState(true)
   const [selected, setSelected] = useState<FgNode | null>(null)
   const [status, setStatus] = useState<string>('')
+  const [viewMode, setViewMode] = useState<ViewMode>('2d')
 
   // Default to the project matching the page's active project name, else the first.
   const activePath = useMemo(() => {
@@ -163,6 +167,7 @@ export function CodeGraphTab({ project }: { project: string }) {
           />
           show inferred
         </label>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
         <button
           type="button"
           className="btn"
@@ -188,7 +193,7 @@ export function CodeGraphTab({ project }: { project: string }) {
         <div className="kb-graph" ref={setContainer}>
           {data.nodes.length === 0 ? (
             <div className="kb-graph-empty">{'// no graph yet — pick a project and Build.'}</div>
-          ) : (
+          ) : viewMode === '2d' ? (
             <ForceGraph2D
               ref={fgRef}
               width={size.w}
@@ -205,6 +210,22 @@ export function CodeGraphTab({ project }: { project: string }) {
               linkLineDash={(l) => ((l as FgLink).inferred ? [3, 3] : null)}
               onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
             />
+          ) : (
+            <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
+              <Galaxy3D
+                graphData={data}
+                width={size.w}
+                height={size.h}
+                nodeColor={(n) => colorForKind((n as FgNode).kind)}
+                nodeVal={() => 1}
+                nodeLabel={(n) => `${(n as FgNode).label} [${(n as FgNode).kind}]`}
+                clusterKey={(n) => (n as FgNode).community ?? -1}
+                linkColor={(l) =>
+                  (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
+                }
+                onNodeClick={(n) => setSelected(n as FgNode)}
+              />
+            </Suspense>
           )}
         </div>
 
