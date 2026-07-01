@@ -1,13 +1,23 @@
 import { db } from '@main/db/client'
 import { summarizeClusters } from '@main/services/graph/cluster'
+import { type GraphifyDeepMapRun, runGraphifyDeepMap } from '@main/services/graph/graphifyRunner'
 import { indexProject } from '@main/services/graph/indexer'
 import { neighborsOf } from '@main/services/graph/query'
 import { listGraphProjects, loadGraph, saveStructuralGraph } from '@main/services/graph/store'
+import { jobRegistry } from '@main/services/jobs/registry'
+import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { codeGraphSchema, graphClusterSchema } from '@shared/graph'
+import type { GraphDeepMapEvent } from '@shared/ipc-events'
+import { DEFAULT_MODEL_ID } from '@shared/models'
+import { observable } from '@trpc/server/observable'
 import { z } from 'zod'
 
 const projectPathInput = z.object({ projectPath: z.string().min(1) })
+
+// requestId → in-flight deep-map run, so cancelDeepMap can route to the right
+// AbortController and a repeated subscribe for the same requestId is rejected.
+const deepRuns = new Map<string, GraphifyDeepMapRun>()
 
 export const graphRouter = router({
   listProjects: publicProcedure
@@ -54,4 +64,57 @@ export const graphRouter = router({
     .input(z.object({ projectPath: z.string().min(1).optional() }))
     .output(z.array(graphClusterSchema))
     .query(({ input }) => summarizeClusters(loadGraph(db(), input.projectPath ?? '__all__'))),
+
+  deepMap: publicProcedure
+    .input(z.object({ requestId: z.string().min(1), projectPath: z.string().min(1) }))
+    .subscription(({ input }) =>
+      observable<GraphDeepMapEvent>((emit) => {
+        if (deepRuns.has(input.requestId)) {
+          emit.next({ type: 'error', message: 'A deep map is already running for this request.' })
+          emit.complete()
+          return
+        }
+        const model = getSettings().model ?? DEFAULT_MODEL_ID
+        const job = jobRegistry.register({
+          kind: 'graph.deepMap',
+          label: `Graphify deep map: ${input.projectPath}`,
+          model,
+          abort: () => deepRuns.get(input.requestId)?.cancel(),
+        })
+
+        const run = runGraphifyDeepMap({
+          projectPath: input.projectPath,
+          model,
+          emit: (event) => {
+            if (event.type === 'done') job.finish('done')
+            if (event.type === 'error' || event.type === 'aborted') job.finish('error')
+            emit.next(event)
+            if (event.type === 'done' || event.type === 'error' || event.type === 'aborted') {
+              deepRuns.delete(input.requestId)
+              emit.complete()
+            }
+          },
+        })
+        deepRuns.set(input.requestId, run)
+
+        return () => {
+          const r = deepRuns.get(input.requestId)
+          if (r) {
+            r.cancel()
+            deepRuns.delete(input.requestId)
+          }
+          job.finish('error')
+        }
+      }),
+    ),
+
+  cancelDeepMap: publicProcedure
+    .input(z.object({ requestId: z.string().min(1) }))
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(({ input }) => {
+      const run = deepRuns.get(input.requestId)
+      run?.cancel()
+      deepRuns.delete(input.requestId)
+      return { ok: Boolean(run) }
+    }),
 })

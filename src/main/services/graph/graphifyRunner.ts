@@ -1,5 +1,9 @@
-import { basename } from 'node:path'
-
+import { readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { db } from '@main/db/client'
+import { logger } from '@main/logger'
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import {
   type CodeGraph,
   type CodeGraphEdge,
@@ -8,6 +12,9 @@ import {
   codeEdgeId,
   codeNodeId,
 } from '@shared/graph'
+import type { GraphDeepMapEvent } from '@shared/ipc-events'
+
+import { loadGraph, saveGraphifyGraph } from './store'
 
 export interface GraphifyNode {
   id: string
@@ -114,4 +121,91 @@ export function mergeGraphifyGraph(
   }
 
   return { nodes: [...newNodes.values()], edges }
+}
+
+export interface GraphifyDeepMapRun {
+  cancel: () => void
+  done: Promise<void>
+}
+export interface RunGraphifyOptions {
+  projectPath: string
+  model: string
+  emit: (event: GraphDeepMapEvent) => void
+}
+
+// Read-only-ish deep map: run the /graphify skill in a headless Claude session,
+// then merge its semantic edges. The skill needs to run its own tooling, so we
+// allow the standard tool set and bypass permissions (like roadmapChat).
+export function runGraphifyDeepMap(opts: RunGraphifyOptions): GraphifyDeepMapRun {
+  const controller = new AbortController()
+  let stopped = false
+  let failed = false
+
+  const done = (async (): Promise<void> => {
+    const { query } = await import('@anthropic-ai/claude-agent-sdk')
+    const prompt = `/graphify ${opts.projectPath} --no-viz`
+    const q = query({
+      prompt,
+      options: {
+        model: opts.model,
+        permissionMode: 'bypassPermissions',
+        settingSources: ['user', 'project'],
+        cwd: opts.projectPath,
+        env: subscriptionEnv(),
+        abortController: controller,
+      },
+    })
+
+    for await (const message of q as AsyncIterable<SDKMessage>) {
+      if (stopped) continue
+      if (message.type === 'assistant') {
+        for (const block of message.message.content) {
+          if (block.type === 'tool_use') {
+            opts.emit({ type: 'tool', name: block.name, summary: block.name })
+          }
+        }
+      } else if (message.type === 'result') {
+        if (message.subtype === 'success') {
+          opts.emit({ type: 'progress', message: 'graphify run finished; merging…' })
+        } else {
+          failed = true
+          const reason = message.errors?.join('; ') || message.subtype
+          opts.emit({ type: 'error', message: `Graphify run failed: ${reason}` })
+        }
+      }
+    }
+    if (stopped || failed) return
+
+    // Read + merge graph.json produced in projectPath/graphify-out/.
+    let raw: string
+    try {
+      raw = readFileSync(join(opts.projectPath, 'graphify-out', 'graph.json'), 'utf8')
+    } catch {
+      opts.emit({ type: 'error', message: 'graphify produced no graph.json' })
+      return
+    }
+    const structural = loadGraph(db(), opts.projectPath)
+    const additions = mergeGraphifyGraph(opts.projectPath, structural, parseGraphifyJson(raw))
+    saveGraphifyGraph(db(), opts.projectPath, additions)
+    opts.emit({
+      type: 'done',
+      nodesAdded: additions.nodes.length,
+      edgesAdded: additions.edges.length,
+    })
+  })().catch((error) => {
+    if (stopped) return
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    logger.error('Graphify deep-map failed', message)
+    opts.emit({ type: 'error', message })
+  })
+
+  return {
+    cancel: () => {
+      if (stopped) return
+      stopped = true
+      controller.abort()
+      void done.then(() => opts.emit({ type: 'aborted' }))
+    },
+    done,
+  }
 }
