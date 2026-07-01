@@ -32,7 +32,7 @@ export const graphRouter = router({
         }),
       ),
     )
-    .query(() => listGraphProjects(db())),
+    .query(() => listGraphProjects(db(), getSettings().trackedProjects ?? [])),
 
   buildGraph: publicProcedure
     .input(projectPathInput)

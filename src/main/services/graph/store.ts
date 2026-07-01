@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import { agentSessions, graphEdges, graphNodes } from '@main/db/schema'
 import type { CodeGraph, CodeGraphEdge, CodeGraphNode } from '@shared/graph'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 
 function toNodeRow(n: CodeGraphNode) {
   return {
@@ -106,12 +106,16 @@ export function loadGraph(database: AppDatabase, scope: string): CodeGraph {
 }
 
 // Atlas-tracked projects (distinct from agent_sessions) + graph presence.
+// `tracked` is the settings allowlist of approved project paths; an empty list
+// means "no allowlist" → show every project (mirrors the Productivity page).
 export function listGraphProjects(
   database: AppDatabase,
+  tracked: string[],
 ): Array<{ projectPath: string; project: string; hasGraph: boolean; builtAt: number | null }> {
   const projects = database
     .selectDistinct({ projectPath: agentSessions.projectPath })
     .from(agentSessions)
+    .where(tracked.length ? inArray(agentSessions.projectPath, tracked) : undefined)
     .all()
   const built = database
     .select({
