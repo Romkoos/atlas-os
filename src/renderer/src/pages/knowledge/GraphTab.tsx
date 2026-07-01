@@ -2,9 +2,10 @@ import { trpc } from '@renderer/lib/trpc'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import type { ArticleMeta, GraphNode, GraphNodeType } from '@shared/knowledge'
 import { forceCollide, forceX, forceY } from 'd3-force'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { colorForCommunity, colorForProject } from './graph-colors'
+import { type ViewMode, ViewToggle } from './ViewToggle'
 
 type FgNode = GraphNode & { x?: number; y?: number }
 type FgLink = { source: string | FgNode; target: string | FgNode; type: 'link' | 'source' }
@@ -26,6 +27,8 @@ const TYPE_OPTIONS: ReadonlyArray<{ id: GraphNodeType; label: string }> = [
 
 const idOf = (end: string | FgNode): string => (typeof end === 'string' ? end : end.id)
 
+const Galaxy3D = lazy(() => import('./Galaxy3D'))
+
 export function GraphTab({ project }: { project: string }) {
   const graph = trpc.knowledge.graph.useQuery()
   // biome-ignore lint/suspicious/noExplicitAny: ForceGraph ref has no exported type
@@ -39,6 +42,7 @@ export function GraphTab({ project }: { project: string }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<FgNode | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('2d')
 
   // Attach the ResizeObserver via a callback ref so it fires when the container
   // actually mounts. The early-return guards (loading/error/empty) mean .kb-graph
@@ -143,11 +147,12 @@ export function GraphTab({ project }: { project: string }) {
     const q = search.trim().toLowerCase()
     if (!q) return
     const hit = data.nodes.find((n) => n.label.toLowerCase().includes(q))
-    if (hit && fgRef.current && hit.x != null && hit.y != null) {
+    if (!hit) return
+    if (fgRef.current && hit.x != null && hit.y != null) {
       fgRef.current.centerAt(hit.x, hit.y, 800)
       fgRef.current.zoom(4, 800)
-      setSelected(hit)
     }
+    setSelected(hit)
   }
 
   // Side-panel article fetch (article vs daily vs ghost).
@@ -226,6 +231,7 @@ export function GraphTab({ project }: { project: string }) {
         >
           color: {colorBy}
         </button>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
         <form
           className="kb-graph-search"
           onSubmit={(e) => {
@@ -244,23 +250,39 @@ export function GraphTab({ project }: { project: string }) {
 
       <div className="kb-graph-body">
         <div className="kb-graph" ref={setContainer}>
-          <ForceGraph2D
-            ref={fgRef}
-            width={size.w}
-            height={size.h}
-            graphData={data}
-            backgroundColor="transparent"
-            nodeId="id"
-            nodeRelSize={NODE_REL_SIZE}
-            nodeLabel={(n) => (n as FgNode).label}
-            nodeVal={(n) => nodeValOf(n as FgNode)}
-            nodeColor={(n) => nodeColor(n as FgNode)}
-            onNodeClick={(n) => setSelected(n as FgNode)}
-            onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
-            linkColor={() => 'rgba(120,120,120,0.25)'}
-            linkWidth={(l) => ((l as FgLink).type === 'source' ? 0.5 : 1)}
-            onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
-          />
+          {viewMode === '2d' ? (
+            <ForceGraph2D
+              ref={fgRef}
+              width={size.w}
+              height={size.h}
+              graphData={data}
+              backgroundColor="transparent"
+              nodeId="id"
+              nodeRelSize={NODE_REL_SIZE}
+              nodeLabel={(n) => (n as FgNode).label}
+              nodeVal={(n) => nodeValOf(n as FgNode)}
+              nodeColor={(n) => nodeColor(n as FgNode)}
+              onNodeClick={(n) => setSelected(n as FgNode)}
+              onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
+              linkColor={() => 'rgba(120,120,120,0.25)'}
+              linkWidth={(l) => ((l as FgLink).type === 'source' ? 0.5 : 1)}
+              onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
+            />
+          ) : (
+            <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
+              <Galaxy3D
+                graphData={data}
+                width={size.w}
+                height={size.h}
+                nodeColor={(n) => nodeColor(n as FgNode)}
+                nodeVal={(n) => nodeValOf(n as FgNode)}
+                nodeLabel={(n) => (n as FgNode).label}
+                clusterKey={(n) => (n as FgNode).community}
+                onNodeClick={(n) => setSelected(n as FgNode)}
+                onNodeHover={(n) => setHovered((n as FgNode | null)?.id ?? null)}
+              />
+            </Suspense>
+          )}
         </div>
 
         {selected && (
