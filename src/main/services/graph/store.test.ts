@@ -83,6 +83,7 @@ describe('graph store', () => {
     const g = loadGraph(database, P)
     expect(g.edges.some((e) => e.origin === 'graphify')).toBe(true)
     expect(g.edges.filter((e) => e.origin === 'indexer')).toHaveLength(1)
+    expect(g.edges.find((e) => e.origin === 'graphify')?.meta).toEqual({ audit: 'INFERRED' })
   })
 
   it('scopes cleanup by project', () => {

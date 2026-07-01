@@ -66,12 +66,22 @@ export function saveGraphifyGraph(
 export function loadGraph(database: AppDatabase, scope: string): CodeGraph {
   const nodeRows =
     scope === '__all__'
-      ? database.select().from(graphNodes).all()
-      : database.select().from(graphNodes).where(eq(graphNodes.projectPath, scope)).all()
+      ? database.select().from(graphNodes).orderBy(graphNodes.id).all()
+      : database
+          .select()
+          .from(graphNodes)
+          .where(eq(graphNodes.projectPath, scope))
+          .orderBy(graphNodes.id)
+          .all()
   const edgeRows =
     scope === '__all__'
-      ? database.select().from(graphEdges).all()
-      : database.select().from(graphEdges).where(eq(graphEdges.projectPath, scope)).all()
+      ? database.select().from(graphEdges).orderBy(graphEdges.id).all()
+      : database
+          .select()
+          .from(graphEdges)
+          .where(eq(graphEdges.projectPath, scope))
+          .orderBy(graphEdges.id)
+          .all()
   const nodes: CodeGraphNode[] = nodeRows.map((r) => ({
     id: r.id,
     projectPath: r.projectPath,

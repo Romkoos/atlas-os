@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, join, relative, sep } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import { agentSessions, agentTurns } from '@main/db/schema'
@@ -30,8 +30,17 @@ const MAX_FILE_BYTES = 512 * 1024
 // Repo-relative POSIX paths, ignore-filtered, capped. fs walk only.
 export function walkProject(projectPath: string): string[] {
   const out: string[] = []
+  const visited = new Set<string>()
   const walk = (abs: string): void => {
     if (out.length >= MAX_FILES) return
+    let real: string
+    try {
+      real = realpathSync(abs)
+    } catch {
+      return
+    }
+    if (visited.has(real)) return
+    visited.add(real)
     let entries: string[]
     try {
       entries = readdirSync(abs)
