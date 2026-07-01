@@ -65,6 +65,39 @@ export default function Galaxy3D({
     fg.d3ReheatSimulation?.()
   }, [graphData])
 
+  // Frame the camera on the settled graph ourselves. The library's zoomToFit
+  // aims at a hardcoded origin and no-ops when its bbox is unavailable, so on
+  // small/degenerate per-project graphs (single node, link-less clouds) the
+  // camera stayed at its big-graph default and the canvas rendered black. We
+  // compute the centroid + extent from node positions and place the camera at a
+  // safe distance with a floor, which frames one node or hundreds alike.
+  const frameGraph = (): void => {
+    const fg = fgRef.current
+    if (!fg) return
+    const nodes = graphData.nodes
+    if (nodes.length === 0) return
+    let cx = 0
+    let cy = 0
+    let cz = 0
+    for (const n of nodes) {
+      cx += n.x ?? 0
+      cy += n.y ?? 0
+      cz += n.z ?? 0
+    }
+    cx /= nodes.length
+    cy /= nodes.length
+    cz /= nodes.length
+    let maxR = 0
+    for (const n of nodes) {
+      const r = Math.hypot((n.x ?? 0) - cx, (n.y ?? 0) - cy, (n.z ?? 0) - cz)
+      if (r > maxR) maxR = r
+    }
+    const fov = ((fg.camera?.()?.fov ?? 50) * Math.PI) / 180
+    const radius = Math.max(maxR + NODE_REL_SIZE * 3, 15)
+    const distance = Math.max(radius / Math.tan(fov / 2), 30)
+    fg.cameraPosition({ x: cx, y: cy, z: cz + distance }, { x: cx, y: cy, z: cz }, 600)
+  }
+
   const handleClick = (node: GalaxyNode): void => {
     const fg = fgRef.current
     if (fg && node.x != null && node.y != null) {
@@ -98,7 +131,7 @@ export default function Galaxy3D({
       enableNodeDrag={false}
       warmupTicks={20}
       cooldownTicks={120}
-      onEngineStop={() => fgRef.current?.zoomToFit(600, 60)}
+      onEngineStop={frameGraph}
       onNodeClick={handleClick}
       onNodeHover={(n: GalaxyNode | null) => onNodeHover?.(n ?? null)}
     />
