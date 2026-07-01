@@ -51,3 +51,12 @@ export type RoadmapChatEvent =
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'aborted' }
+
+// Events streamed from main → renderer during a graphify deep-map run (tRPC
+// subscription). `done` carries how many graphify nodes/edges were merged.
+export type GraphDeepMapEvent =
+  | { type: 'tool'; name: string; summary: string }
+  | { type: 'progress'; message: string }
+  | { type: 'done'; nodesAdded: number; edgesAdded: number }
+  | { type: 'error'; message: string }
+  | { type: 'aborted' }

@@ -1,3 +1,5 @@
+import type { CodeNodeKind } from '@shared/graph'
+
 // Categorical palette for graph node coloring (community or project). Chosen to
 // read on the dark terminal background.
 export const PALETTE: readonly string[] = [
@@ -21,4 +23,16 @@ export function colorForCommunity(community: number): string {
 export function colorForProject(project: string, projects: string[]): string {
   const i = Math.max(0, projects.indexOf(project))
   return PALETTE[i % PALETTE.length]
+}
+
+const KIND_COLORS: Record<CodeNodeKind, string> = {
+  code: '#59c2ff', // blue
+  doc: '#7fd962', // green
+  skill: '#d2a6ff', // violet
+  knowledge: '#e6b450', // amber
+  session: '#ff8f40', // orange
+}
+
+export function colorForKind(kind: CodeNodeKind): string {
+  return KIND_COLORS[kind] ?? '#888'
 }
