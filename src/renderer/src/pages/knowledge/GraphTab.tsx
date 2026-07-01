@@ -269,6 +269,8 @@ export function GraphTab({ project }: { project: string }) {
               linkWidth={(l) => ((l as FgLink).type === 'source' ? 0.5 : 1)}
               onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
             />
+          ) : data.nodes.length === 0 ? (
+            <div className="kb-graph-empty">{'// no nodes for this filter.'}</div>
           ) : (
             <Graph3DBoundary onError={() => setViewMode('2d')}>
               <Suspense fallback={<div className="kb-graph-empty">{'// loading 3D…'}</div>}>
