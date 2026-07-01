@@ -43,7 +43,7 @@ export function GraphTab({ project }: { project: string }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<FgNode | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('2d')
+  const [viewMode, setViewMode] = useState<ViewMode>('3d')
 
   // Attach the ResizeObserver via a callback ref so it fires when the container
   // actually mounts. The early-return guards (loading/error/empty) mean .kb-graph

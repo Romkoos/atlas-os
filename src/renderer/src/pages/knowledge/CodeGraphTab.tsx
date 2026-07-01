@@ -28,7 +28,7 @@ export function CodeGraphTab({ project }: { project: string }) {
   const [showInferred, setShowInferred] = useState(true)
   const [selected, setSelected] = useState<FgNode | null>(null)
   const [status, setStatus] = useState<string>('')
-  const [viewMode, setViewMode] = useState<ViewMode>('2d')
+  const [viewMode, setViewMode] = useState<ViewMode>('3d')
 
   // Default to the project matching the page's active project name, else the first.
   const activePath = useMemo(() => {
