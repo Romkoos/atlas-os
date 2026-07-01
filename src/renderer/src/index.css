@@ -2276,6 +2276,14 @@ textarea.input:focus,
 .kb-graph-search {
   display: inline-flex;
 }
+.kb-graph-toggle {
+  display: inline-flex;
+  gap: 4px;
+}
+.kb-graph-toggle .btn.on {
+  border-color: var(--amber);
+  color: var(--amber);
+}
 .kb-graph-body {
   display: flex;
   gap: 12px;
