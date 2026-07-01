@@ -12,7 +12,7 @@ test('boots, renders, and round-trips tRPC over IPC', async () => {
   await expect(window.getByText('● ok')).toBeVisible({ timeout: 15000 })
 
   // query IPC: opening Settings renders the form from settings.get.
-  await window.getByRole('button', { name: '09 SETTINGS' }).click()
+  await window.getByRole('button', { name: '10 SETTINGS' }).click()
   await expect(window.getByText('default model')).toBeVisible()
 
   await app.close()
@@ -23,7 +23,7 @@ test('Knowledge graph tab renders a canvas', async () => {
   const window = await app.firstWindow()
 
   await expect(window.getByText('ATLAS.OS')).toBeVisible()
-  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
 
   // The graph tab is only present when projects exist; skip cleanly otherwise.
   const graphTab = window.getByRole('button', { name: './graph' })
@@ -48,13 +48,48 @@ test('Knowledge graph tab renders a canvas', async () => {
   await app.close()
 })
 
+test('Roadmap page renders seeded items', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  await window.getByRole('button', { name: '02 ROADMAP' }).click()
+
+  // A seeded item + its category heading render (proves list.query round-trips).
+  await expect(window.getByText('Agent Orchestrator (multi-agent workflows)')).toBeVisible({
+    timeout: 15000,
+  })
+  await expect(window.getByRole('button', { name: /new idea/i })).toBeVisible()
+
+  await app.close()
+})
+
+test('Roadmap "new idea" opens the incubator chat', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  await window.getByRole('button', { name: '02 ROADMAP' }).click()
+  await window.getByRole('button', { name: /new idea/i }).click()
+
+  // The incubator overlay opens on its idea-entry step (no agent call yet).
+  await expect(window.getByRole('dialog', { name: 'Idea incubator' })).toBeVisible()
+  await expect(window.getByRole('button', { name: /start brainstorming/i })).toBeVisible()
+
+  // Close it without starting a session.
+  await window.getByRole('button', { name: 'close', exact: true }).click()
+  await expect(window.getByRole('dialog', { name: 'Idea incubator' })).toHaveCount(0)
+
+  await app.close()
+})
+
 test('restores last section + tab after reload', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
   await expect(window.getByText('ATLAS.OS')).toBeVisible()
 
   // Navigate to News and select the GitHub Trending feed tab.
-  await window.getByRole('button', { name: '05 NEWS' }).click()
+  await window.getByRole('button', { name: '06 NEWS' }).click()
   await window.getByRole('button', { name: /GITHUB TRENDING/ }).click()
   await expect(window.getByRole('button', { name: /GITHUB TRENDING/ })).toHaveClass(/on/)
 
@@ -73,7 +108,7 @@ test('Productivity benchmark tab hides the days range selector', async () => {
   const window = await app.firstWindow()
   await expect(window.getByText('ATLAS.OS')).toBeVisible()
 
-  await window.getByRole('button', { name: '03 PRODUCTIVITY' }).click()
+  await window.getByRole('button', { name: '04 PRODUCTIVITY' }).click()
 
   // On overview, the 30d range button is present.
   await expect(window.getByRole('button', { name: '30d', exact: true })).toBeVisible({

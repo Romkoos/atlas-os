@@ -1,3 +1,4 @@
+import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
 
 // Events streamed from main → renderer during an agent run (tRPC subscription).
@@ -35,6 +36,18 @@ export type BenchmarkChatEvent =
   | { type: 'token'; text: string }
   | { type: 'tool'; name: string; summary: string }
   | { type: 'awaiting-input' }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+  | { type: 'aborted' }
+
+// Events streamed from main → renderer during a roadmap brainstorming chat
+// (tRPC subscription). `saved` fires when the agent's finished idea has been
+// parsed from the stream and persisted; it carries the created item.
+export type RoadmapChatEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool'; name: string; summary: string }
+  | { type: 'awaiting-input' }
+  | { type: 'saved'; item: RoadmapItem }
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'aborted' }

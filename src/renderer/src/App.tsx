@@ -4,6 +4,7 @@ import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { NewsRunHost } from '@renderer/components/NewsRunHost'
+import { RoadmapChatHost } from '@renderer/components/RoadmapChatHost'
 import { SkillImproverHost } from '@renderer/components/SkillImproverHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { Toaster } from '@renderer/components/ui/sonner'
@@ -13,6 +14,7 @@ import { Knowledge } from '@renderer/pages/Knowledge'
 import { News } from '@renderer/pages/News'
 import { Plugins } from '@renderer/pages/Plugins'
 import { Productivity } from '@renderer/pages/Productivity'
+import { Roadmap } from '@renderer/pages/Roadmap'
 import { Settings } from '@renderer/pages/Settings'
 import { Skills } from '@renderer/pages/Skills'
 import { Stats } from '@renderer/pages/Stats'
@@ -22,6 +24,7 @@ import { type ComponentType, useEffect } from 'react'
 
 const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
+  roadmap: Roadmap,
   stats: Stats,
   productivity: Productivity,
   knowledge: Knowledge,
@@ -71,6 +74,7 @@ export function App() {
       <TrendingRunHost />
       <SkillImproverHost />
       <BenchmarkChatHost />
+      <RoadmapChatHost />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )

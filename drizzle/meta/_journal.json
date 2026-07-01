@@ -50,6 +50,20 @@
       "when": 1781696135676,
       "tag": "0006_reflective_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1782890835044,
+      "tag": "0007_calm_scrambler",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782892407119,
+      "tag": "0008_jazzy_moonstone",
+      "breakpoints": true
     }
   ]
 }

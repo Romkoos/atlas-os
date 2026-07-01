@@ -184,3 +184,31 @@ export const benchmarkAnalysis = sqliteTable(
 
 export type BenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferSelect
 export type NewBenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferInsert
+
+// ── Roadmap ─────────────────────────────────────────────────────────────────
+// One candidate feature for Atlas OS, shown on the ROADMAP page. Seeded once
+// from the brainstorm list (guarded by a store flag), then user-editable.
+export const roadmapItems = sqliteTable(
+  'roadmap_items',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    category: text('category').notNull(), // intelligence | observability | macos | connectivity | wow
+    status: text('status').notNull().default('idea'), // idea | planned | in-progress | done
+    priority: text('priority').notNull().default('medium'), // low | medium | high
+    // English implementation brief for Claude Code — what the idea is, briefly.
+    claudePrompt: text('claude_prompt').notNull().default(''),
+    position: integer('position').notNull().default(0), // manual order within a category
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index('idx_roadmap_category').on(t.category), index('idx_roadmap_status').on(t.status)],
+)
+
+export type RoadmapItemRow = typeof roadmapItems.$inferSelect
+export type NewRoadmapItemRow = typeof roadmapItems.$inferInsert

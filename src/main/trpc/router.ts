@@ -7,6 +7,8 @@ import { knowledgeRouter } from '@main/trpc/routers/knowledge'
 import { newsRouter } from '@main/trpc/routers/news'
 import { pluginsRouter } from '@main/trpc/routers/plugins'
 import { productivityRouter } from '@main/trpc/routers/productivity'
+import { roadmapRouter } from '@main/trpc/routers/roadmap'
+import { roadmapChatRouter } from '@main/trpc/routers/roadmapChat'
 import { settingsRouter } from '@main/trpc/routers/settings'
 import { skillImproverRouter } from '@main/trpc/routers/skillImprover'
 import { skillsRouter } from '@main/trpc/routers/skills'
@@ -29,6 +31,8 @@ export const appRouter = router({
   news: newsRouter,
   trending: trendingRouter,
   plugins: pluginsRouter,
+  roadmap: roadmapRouter,
+  roadmapChat: roadmapChatRouter,
 })
 
 export type AppRouter = typeof appRouter

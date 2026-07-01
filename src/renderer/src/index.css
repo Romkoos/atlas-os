@@ -2475,3 +2475,365 @@ textarea.input:focus,
 .proc-open:hover {
   color: var(--ok);
 }
+
+/* ============ ROADMAP ============ */
+/* Mission-control build manifest: hairline panels, mono indices, a segmented
+   status switch per item, priority-keyed edge accents. Zero radii throughout. */
+.rm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.rm-cat-index {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+  letter-spacing: 0.08em;
+}
+.rm-rows {
+  display: flex;
+  flex-direction: column;
+}
+.rm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 13px 16px 13px 14px;
+  border-bottom: 1px solid var(--line-dim);
+  border-left: 2px solid transparent;
+  transition:
+    background 0.12s,
+    border-left-color 0.12s;
+}
+.rm-rows .rm-row:last-child {
+  border-bottom: 0;
+}
+.rm-row:hover {
+  background: var(--bg-2);
+}
+.rm-row.p-high {
+  border-left-color: var(--amber);
+}
+.rm-row.p-med {
+  border-left-color: var(--amber-dim);
+}
+.rm-row.p-low {
+  border-left-color: var(--line);
+}
+.rm-idx {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.rm-row:hover .rm-idx {
+  color: var(--amber-dim);
+}
+.rm-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rm-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg);
+  line-height: 1.4;
+}
+.rm-desc {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg-3);
+  line-height: 1.55;
+  max-width: 74ch;
+}
+.rm-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 1px;
+  flex-shrink: 0;
+}
+.rm-prio {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  white-space: nowrap;
+  min-width: 40px;
+  text-align: right;
+}
+.rm-prio.p-high {
+  color: var(--amber);
+}
+.rm-prio.p-med {
+  color: var(--amber-dim);
+}
+
+/* Segmented status switch — the active segment lights in its state color. */
+.rm-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.rm-seg button {
+  appearance: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--line-dim);
+  padding: 5px 9px;
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+.rm-seg button:first-child {
+  border-left: 0;
+}
+.rm-seg button:hover {
+  color: var(--fg-2);
+  background: var(--panel-2);
+}
+.rm-seg button.on {
+  color: var(--fg);
+  background: var(--panel-2);
+}
+.rm-seg button.on.st-idea {
+  color: var(--fg-2);
+}
+.rm-seg button.on.st-planned {
+  color: var(--amber-dim);
+}
+.rm-seg button.on.st-active {
+  color: var(--amber);
+  background: color-mix(in oklch, var(--amber) 14%, transparent);
+}
+.rm-seg button.on.st-done {
+  color: var(--ok);
+  background: color-mix(in oklch, var(--ok) 12%, transparent);
+}
+
+.rm-actions {
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.rm-row:hover .rm-actions {
+  opacity: 1;
+}
+.rm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--fg-4);
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
+}
+.rm-icon:hover {
+  color: var(--fg);
+  border-color: var(--line);
+}
+.rm-icon.danger:hover {
+  color: var(--warn);
+  border-color: color-mix(in oklch, var(--warn) 45%, transparent);
+}
+.rm-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.rm-empty {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-4);
+  padding: 40px 4px;
+}
+
+/* Editor modal — a floating target panel with the same corner reticle. */
+.rm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: atlas-fade-in 0.18s ease both;
+}
+@keyframes atlas-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.rm-backdrop-btn {
+  position: absolute;
+  inset: 0;
+  background: none;
+  border: 0;
+  cursor: default;
+}
+.rm-modal {
+  position: relative;
+  z-index: 1;
+  width: min(600px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 80px color-mix(in srgb, black 55%, transparent);
+}
+.rm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.rm-modal-head .tag {
+  color: var(--amber);
+}
+.rm-modal-head .tag::before {
+  content: "▸ ";
+  color: var(--amber);
+}
+.rm-modal-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.rm-field-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+.rm-field-label .req {
+  color: var(--amber);
+  margin-left: 4px;
+}
+.rm-grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.rm-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line-dim);
+}
+
+/* ── Idea Incubator chat overlay ─────────────────────────────────────────── */
+.rm-chat {
+  width: min(680px, 100%);
+  height: min(78vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+.rm-chat .rm-modal-head {
+  flex: 0 0 auto;
+}
+.rm-chat-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+.rm-chat-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+  line-height: 1.6;
+}
+.rm-chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rm-chat-entry {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rm-chat-entry.user {
+  align-self: flex-end;
+  max-width: 85%;
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--line-dim);
+  padding: 8px 11px;
+}
+.rm-chat-entry.assistant {
+  max-width: 94%;
+  color: var(--fg-2);
+}
+.rm-chat-entry.tool {
+  color: var(--fg-4);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.rm-chat-saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ok);
+  border: 1px solid color-mix(in oklch, var(--ok) 45%, transparent);
+  background: color-mix(in oklch, var(--ok) 10%, transparent);
+  padding: 8px 11px;
+}
+.rm-chat-foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line-dim);
+}
+.rm-chat-foot .input {
+  flex: 1;
+}

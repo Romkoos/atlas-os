@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 
 export type Section =
   | 'dashboard'
+  | 'roadmap'
   | 'stats'
   | 'productivity'
   | 'knowledge'
@@ -14,6 +15,7 @@ export type Section =
 
 export const SECTIONS: readonly Section[] = [
   'dashboard',
+  'roadmap',
   'stats',
   'productivity',
   'knowledge',
