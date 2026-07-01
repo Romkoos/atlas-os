@@ -1,6 +1,8 @@
 import { forceCollide, forceX, forceY, forceZ } from 'd3-force-3d'
 import { useEffect, useRef } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
+import * as THREE from 'three'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { clusterAnchors } from './cluster-anchors'
 
 interface GalaxyNode {
@@ -28,6 +30,38 @@ interface Galaxy3DProps {
 
 const NODE_REL_SIZE = 5
 const radiusOf = (nodeVal: number): number => Math.sqrt(Math.max(1, nodeVal)) * NODE_REL_SIZE
+
+// Directional link particles are pretty but cost a sprite per particle per link;
+// only enable them on smaller graphs so thousand-edge views stay smooth.
+const PARTICLE_LINK_BUDGET = 400
+
+// A faint field of distant stars placed on a large spherical shell well beyond
+// the graph, to sell the "deep space" backdrop. Cheap: one draw call.
+function makeStarfield(): THREE.Points {
+  const count = 1600
+  const positions = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    const r = 3500 + Math.random() * 3500
+    const theta = Math.random() * Math.PI * 2
+    const phi = Math.acos(2 * Math.random() - 1)
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+    positions[i * 3 + 2] = r * Math.cos(phi)
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 2.4,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.75,
+    depthWrite: false,
+  })
+  const points = new THREE.Points(geometry, material)
+  points.name = 'galaxy-starfield'
+  return points
+}
 
 export default function Galaxy3D({
   graphData,
@@ -111,6 +145,73 @@ export default function Galaxy3D({
     fg.cameraPosition({ x: cx, y: cy, z: cz + distance }, { x: cx, y: cy, z: cz }, 600)
   }
 
+  // Visual effects: bloom glow, a starfield backdrop, and idle auto-rotation.
+  // Deferred a frame (like the force setup) so the renderer/scene/controls exist,
+  // and fully torn down on cleanup so a StrictMode double-mount doesn't stack
+  // duplicate bloom passes or star fields. Mount-only.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time scene setup
+  useEffect(() => {
+    const fg = fgRef.current
+    if (!fg) return
+    let bloom: UnrealBloomPass | null = null
+    let stars: THREE.Points | null = null
+    // biome-ignore lint/suspicious/noExplicitAny: three controls has no exported type here
+    let controls: any = null
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const onInteractionStart = (): void => {
+      if (idleTimer) clearTimeout(idleTimer)
+      if (controls) controls.autoRotate = false
+    }
+    const onInteractionEnd = (): void => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        if (controls) controls.autoRotate = true
+      }, 2500)
+    }
+    const raf = requestAnimationFrame(() => {
+      const composer = fg.postProcessingComposer?.()
+      if (composer) {
+        bloom = new UnrealBloomPass(
+          new THREE.Vector2(Math.max(width, 1), Math.max(height, 1)),
+          1.1, // strength
+          0.7, // radius
+          0.05, // threshold — low so colored nodes glow
+        )
+        composer.addPass(bloom)
+      }
+      const scene = fg.scene?.()
+      if (scene) {
+        stars = makeStarfield()
+        scene.add(stars)
+      }
+      controls = fg.controls?.()
+      if (controls) {
+        controls.autoRotate = true
+        controls.autoRotateSpeed = 0.4
+        controls.addEventListener?.('start', onInteractionStart)
+        controls.addEventListener?.('end', onInteractionEnd)
+      }
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (idleTimer) clearTimeout(idleTimer)
+      if (bloom) {
+        fg.postProcessingComposer?.()?.removePass?.(bloom)
+        bloom.dispose?.()
+      }
+      if (stars) {
+        fg.scene?.()?.remove(stars)
+        stars.geometry.dispose()
+        ;(stars.material as THREE.Material).dispose()
+      }
+      if (controls) {
+        controls.autoRotate = false
+        controls.removeEventListener?.('start', onInteractionStart)
+        controls.removeEventListener?.('end', onInteractionEnd)
+      }
+    }
+  }, [])
+
   const handleClick = (node: GalaxyNode): void => {
     const fg = fgRef.current
     if (fg && node.x != null && node.y != null) {
@@ -133,6 +234,7 @@ export default function Galaxy3D({
       height={height}
       graphData={graphData}
       backgroundColor="#05060a"
+      controlType="orbit"
       nodeId="id"
       nodeRelSize={NODE_REL_SIZE}
       nodeVal={nodeVal}
@@ -141,6 +243,9 @@ export default function Galaxy3D({
       nodeOpacity={0.95}
       linkColor={linkColor ?? (() => 'rgba(120,120,120,0.25)')}
       linkOpacity={0.4}
+      linkDirectionalParticles={graphData.links.length <= PARTICLE_LINK_BUDGET ? 2 : 0}
+      linkDirectionalParticleSpeed={0.006}
+      linkDirectionalParticleWidth={1.4}
       enableNodeDrag={false}
       warmupTicks={20}
       cooldownTicks={120}
