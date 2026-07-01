@@ -98,6 +98,7 @@ export default function Galaxy3D({
       enableNodeDrag={false}
       warmupTicks={20}
       cooldownTicks={120}
+      onEngineStop={() => fgRef.current?.zoomToFit(600, 60)}
       onNodeClick={handleClick}
       onNodeHover={(n: GalaxyNode | null) => onNodeHover?.(n ?? null)}
     />
