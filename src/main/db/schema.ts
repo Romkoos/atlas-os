@@ -212,3 +212,53 @@ export const roadmapItems = sqliteTable(
 
 export type RoadmapItemRow = typeof roadmapItems.$inferSelect
 export type NewRoadmapItemRow = typeof roadmapItems.$inferInsert
+
+// ── Project Intelligence Layer ──────────────────────────────────────────────
+// A code/project graph per Atlas-tracked repo. `origin` separates the two build
+// passes: 'indexer' (fast structural) and 'graphify' (LLM-inferred semantic),
+// so each can be rebuilt without wiping the other. See
+// docs/superpowers/specs/2026-07-01-project-intelligence-layer-design.md.
+export const graphNodes = sqliteTable(
+  'graph_nodes',
+  {
+    id: text('id').primaryKey(),
+    projectPath: text('project_path').notNull(),
+    kind: text('kind').notNull(), // code | doc | skill | knowledge | session
+    label: text('label').notNull(),
+    relPath: text('rel_path'),
+    meta: text('meta', { mode: 'json' }).$type<Record<string, unknown>>(),
+    community: integer('community'),
+    origin: text('origin').notNull(), // indexer | graphify
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index('idx_graph_nodes_project').on(t.projectPath),
+    index('idx_graph_nodes_kind').on(t.kind),
+  ],
+)
+
+export const graphEdges = sqliteTable(
+  'graph_edges',
+  {
+    id: text('id').primaryKey(),
+    projectPath: text('project_path').notNull(),
+    source: text('source').notNull(),
+    target: text('target').notNull(),
+    kind: text('kind').notNull(), // imports | doc_link | session_touched | mentions_knowledge | semantic
+    inferred: integer('inferred', { mode: 'boolean' }).notNull(),
+    origin: text('origin').notNull(), // indexer | graphify
+    meta: text('meta', { mode: 'json' }).$type<Record<string, unknown>>(),
+  },
+  (t) => [
+    index('idx_graph_edges_project').on(t.projectPath),
+    index('idx_graph_edges_source').on(t.source),
+    index('idx_graph_edges_target').on(t.target),
+  ],
+)
+
+export type GraphNodeRow = typeof graphNodes.$inferSelect
+export type NewGraphNodeRow = typeof graphNodes.$inferInsert
+export type GraphEdgeRow = typeof graphEdges.$inferSelect
+export type NewGraphEdgeRow = typeof graphEdges.$inferInsert
