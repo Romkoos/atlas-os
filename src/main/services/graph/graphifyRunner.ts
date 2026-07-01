@@ -72,7 +72,8 @@ export function mergeGraphifyGraph(
     if (rel && relToExistingId.has(rel)) return relToExistingId.get(rel) as string
     // graphify knows a file the structural pass didn't index → create it.
     const gn = gy.nodes.find((n) => n.id === gid)
-    const kind = kindForFileType(gn?.file_type)
+    if (!gn) return null // dangling reference: id not present in gy.nodes → skip, don't fabricate
+    const kind = kindForFileType(gn.file_type)
     const key = rel ?? gid
     const id = codeNodeId(projectPath, kind, key)
     if (!newNodes.has(id)) {

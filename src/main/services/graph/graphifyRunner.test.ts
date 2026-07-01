@@ -88,4 +88,18 @@ describe('mergeGraphifyGraph', () => {
     const documents = additions.edges.find((e) => e.meta?.relation === 'documents')
     expect(documents?.inferred).toBe(false)
   })
+
+  it('skips links that reference a graphify node id absent from nodes (no fabricated node/edge)', () => {
+    const dangling = JSON.stringify({
+      nodes: [{ id: 'src_a_ts', label: 'a.ts', source_file: 'src/a.ts', file_type: 'code' }],
+      links: [
+        { source: 'src_a_ts', target: 'ghost_missing', relation: 'calls', confidence: 'INFERRED' },
+      ],
+    })
+    const additions = mergeGraphifyGraph(P, structural, parseGraphifyJson(dangling))
+    expect(additions.edges).toHaveLength(0)
+    expect(
+      additions.nodes.some((n) => n.label === 'ghost_missing' || n.id.includes('ghost_missing')),
+    ).toBe(false)
+  })
 })
