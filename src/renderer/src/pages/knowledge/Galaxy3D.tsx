@@ -48,21 +48,34 @@ export default function Galaxy3D({
   // Pull each node toward its community's anchor point on a sphere so clusters
   // form distinct spatial regions ("galaxies"). Reheated whenever the visible
   // set changes. Anchors are recomputed from the current nodes' cluster keys.
+  //
+  // Deferred to the next animation frame on purpose: react-force-graph-3d builds
+  // its internal layout (state.layout) in a digest that is scheduled, not
+  // synchronous. Calling d3ReheatSimulation() before that digest runs flips
+  // engineRunning=true while state.layout is still undefined, and the next
+  // requestAnimationFrame tick then throws "Cannot read properties of undefined
+  // (reading 'tick')" from inside the library's animation loop — uncatchable by
+  // a React error boundary, so the canvas goes black until a full refresh. The
+  // race only bites larger graphs (slower digest) and StrictMode double-mounts.
+  // By the next rAF the digest's microtask has flushed and state.layout exists.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reheat on data change only
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    const anchors = clusterAnchors(graphData.nodes.map((n) => clusterKey(n)))
-    const anchorOf = (n: GalaxyNode) => anchors.get(String(clusterKey(n)))
-    fg.d3Force('x', forceX((n: GalaxyNode) => anchorOf(n)?.x ?? 0).strength(0.12))
-    fg.d3Force('y', forceY((n: GalaxyNode) => anchorOf(n)?.y ?? 0).strength(0.12))
-    fg.d3Force('z', forceZ((n: GalaxyNode) => anchorOf(n)?.z ?? 0).strength(0.12))
-    fg.d3Force('charge')?.strength(-120)
-    fg.d3Force(
-      'collide',
-      forceCollide((n: GalaxyNode) => radiusOf(nodeVal(n)) + 2),
-    )
-    fg.d3ReheatSimulation?.()
+    const raf = requestAnimationFrame(() => {
+      const anchors = clusterAnchors(graphData.nodes.map((n) => clusterKey(n)))
+      const anchorOf = (n: GalaxyNode) => anchors.get(String(clusterKey(n)))
+      fg.d3Force('x', forceX((n: GalaxyNode) => anchorOf(n)?.x ?? 0).strength(0.12))
+      fg.d3Force('y', forceY((n: GalaxyNode) => anchorOf(n)?.y ?? 0).strength(0.12))
+      fg.d3Force('z', forceZ((n: GalaxyNode) => anchorOf(n)?.z ?? 0).strength(0.12))
+      fg.d3Force('charge')?.strength(-120)
+      fg.d3Force(
+        'collide',
+        forceCollide((n: GalaxyNode) => radiusOf(nodeVal(n)) + 2),
+      )
+      fg.d3ReheatSimulation?.()
+    })
+    return () => cancelAnimationFrame(raf)
   }, [graphData])
 
   // Frame the camera on the settled graph ourselves. The library's zoomToFit
