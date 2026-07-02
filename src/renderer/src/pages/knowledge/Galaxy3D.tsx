@@ -1,3 +1,4 @@
+import { trpc } from '@renderer/lib/trpc'
 import { forceCollide, forceX, forceY, forceZ } from 'd3-force-3d'
 import { useEffect, useRef } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
@@ -37,9 +38,33 @@ const NODE_REL_SIZE = 5
 const radiusOf = (nodeVal: number): number => Math.sqrt(Math.max(1, nodeVal)) * NODE_REL_SIZE
 const BACKGROUND = '#000000'
 
-// Directional link particles are pretty but cost a sprite per particle per link;
-// only enable them on smaller graphs so thousand-edge views stay smooth.
-const PARTICLE_LINK_BUDGET = 400
+// Directional link particles cost a sprite per particle per link, so they're
+// gated to mid-size graphs. Bigger graphs should use the 'pulse' comet style,
+// which is a single draw call and has no such cap.
+const PARTICLE_LINK_BUDGET = 800
+
+// In the animated ('particles' / 'pulse') styles the raw edge lines are kept
+// barely visible — faint scaffolding while the animation carries the edge.
+const FAINT_LINK = '#6a76a6'
+const FAINT_LINK_OPACITY = 0.025
+
+// Glow color for the animated edges (particle stream + comet impulse). Bright
+// enough to blow out into the bloom pass.
+const EDGE_GLOW = '#8fb8ff'
+// Dimmed glow for edges outside the current focus set (matches the focus fog).
+const EDGE_GLOW_DIM = '#1a2036'
+
+// 'pulse' style = a comet/discharge fired along each edge on a loop: it streaks
+// from source to target, then the edge rests before the next pulse. Rendered as a
+// single THREE.Points system (one draw call) so it scales to thousand-edge graphs.
+const COMET_CYCLE_SEC = 3.2 // full period per edge (flight + idle rest)
+const COMET_ACTIVE_FRAC = 0.24 // fraction of the period the comet is in flight (lower = faster streak)
+const COMET_TAIL_SAMPLES = 8 // points per comet (head + tail)
+// Spacing between tail points in WORLD units (not a fraction of the edge), so the
+// comet keeps the same tight length and never gaps out on long edges.
+const COMET_TAIL_GAP_WORLD = 1.6
+const COMET_SIZE = 4.5 // point-sprite size (world units, size-attenuated)
+const COMET_BRIGHTNESS = 0.95 // near 1 keeps heads visible but out of the bloom blowout
 
 // A single soft radial-gradient texture, reused by the nebula sprites and the
 // selection halo. White so sprite.material.color can tint it per instance.
@@ -182,6 +207,15 @@ export default function Galaxy3D({
   const selectedRef = useRef<string | null>(selectedId ?? null)
   selectedRef.current = selectedId ?? null
 
+  // Which edge style to render. Read from the shared app settings; falls back to
+  // 'lines' until the query resolves (and on error).
+  const settingsQuery = trpc.settings.get.useQuery()
+  const edgeStyle = settingsQuery.data?.galaxyEdgeStyle ?? 'lines'
+
+  // rAF handle for the 'pulse' edge animation (kept separate from the halo's
+  // pulseRaf so the two loops never clobber each other).
+  const pulseEdgeRaf = useRef<number | null>(null)
+
   // Pull each node toward its community's anchor point on a sphere so clusters
   // form distinct spatial regions ("galaxies"). Anchors are recomputed from the
   // current nodes' cluster keys whenever the visible set changes.
@@ -298,9 +332,9 @@ export default function Galaxy3D({
       if (composer) {
         bloom = new UnrealBloomPass(
           new THREE.Vector2(Math.max(width, 1), Math.max(height, 1)),
-          0.8, // strength — moderate glow
-          0.6, // radius
-          0.15, // threshold — brighter nodes bloom
+          0.5, // strength — gentle glow, not noisy
+          0.55, // radius
+          0.2, // threshold — bright cores glow, dim clutter stays flat
         )
         composer.addPass(bloom)
       }
@@ -393,6 +427,125 @@ export default function Galaxy3D({
     return stop
   }, [selectedId, graphData, nodeColor])
 
+  // 'pulse' edge style: a comet/discharge that streaks along each edge on a loop —
+  // fly source→target, then the edge rests before the next pulse. All comets live
+  // in a SINGLE THREE.Points system (one draw call, N·K vertices) so it stays cheap
+  // on thousand-edge graphs — the old per-edge-mesh version only read well on tiny
+  // graphs. Idle/off-window points go black (invisible under additive blending).
+  //
+  // We drive it from our own rAF loop rather than react-force-graph's
+  // linkPositionUpdate, because that callback only fires while the layout engine is
+  // running (it stops after cooldown, which would freeze the animation). Reading
+  // the live node positions (mutated in place by the layout) keeps comets on their
+  // edges both during and after the sim settles. Rebuilds on style/data change.
+  useEffect(() => {
+    if (edgeStyle !== 'pulse') return
+    const fg = fgRef.current
+    if (!fg) return
+    let cleanup: (() => void) | null = null
+    const start = requestAnimationFrame(() => {
+      const scene = fg.scene?.()
+      if (!scene) return
+      const nodeById = new Map<string, GalaxyNode>()
+      for (const n of graphData.nodes) nodeById.set(n.id, n)
+      const endpointOf = (ref: string | GalaxyNode): GalaxyNode | undefined =>
+        typeof ref === 'object' ? ref : nodeById.get(ref)
+      // Resolve the drawable edges once; give each a golden-ratio phase so the
+      // discharges are scattered in time rather than firing in unison.
+      const edges: Array<{ s: GalaxyNode; t: GalaxyNode; phase: number }> = []
+      let idx = 0
+      for (const link of graphData.links) {
+        const s = endpointOf(link.source)
+        const t = endpointOf(link.target)
+        if (!s || !t) continue
+        edges.push({ s, t, phase: (idx++ * 0.618033988749895) % 1 })
+      }
+      const N = edges.length
+      if (N === 0) return
+      const K = COMET_TAIL_SAMPLES
+      const positions = new Float32Array(N * K * 3)
+      const colors = new Float32Array(N * K * 3)
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+      const tex = makeGlowTexture()
+      const material = new THREE.PointsMaterial({
+        map: tex,
+        size: COMET_SIZE,
+        vertexColors: true,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true,
+      })
+      const points = new THREE.Points(geometry, material)
+      points.name = 'galaxy-comets'
+      points.frustumCulled = false // heads move every frame; skip stale-bbox culling
+      scene.add(points)
+      const base = new THREE.Color(EDGE_GLOW)
+      const posAttr = geometry.getAttribute('position')
+      const colAttr = geometry.getAttribute('color')
+      const tick = (): void => {
+        const now = performance.now() / 1000
+        for (let e = 0; e < N; e++) {
+          const { s, t, phase } = edges[e]
+          const sx = s.x ?? 0
+          const sy = s.y ?? 0
+          const sz = s.z ?? 0
+          const dx = (t.x ?? 0) - sx
+          const dy = (t.y ?? 0) - sy
+          const dz = (t.z ?? 0) - sz
+          const len = Math.hypot(dx, dy, dz) || 1
+          // Convert the fixed world-space tail spacing into a fraction of THIS edge
+          // so the comet stays a constant, gap-free length on short and long edges.
+          const gapFrac = COMET_TAIL_GAP_WORLD / len
+          const cyc = (now / COMET_CYCLE_SEC + phase) % 1
+          const active = cyc < COMET_ACTIVE_FRAC
+          const head = active ? cyc / COMET_ACTIVE_FRAC : -1 // 0→1 along the edge
+          // Envelope: emerge from the source, brighten mid-flight, fade into target.
+          const env = active ? Math.sin(Math.PI * head) * COMET_BRIGHTNESS : 0
+          for (let k = 0; k < K; k++) {
+            const o = (e * K + k) * 3
+            const hp = head - k * gapFrac // this tail point's position
+            if (!active || hp < 0 || hp > 1) {
+              // Off-window: park at source and go black (invisible when additive).
+              positions[o] = sx
+              positions[o + 1] = sy
+              positions[o + 2] = sz
+              colors[o] = 0
+              colors[o + 1] = 0
+              colors[o + 2] = 0
+              continue
+            }
+            positions[o] = sx + dx * hp
+            positions[o + 1] = sy + dy * hp
+            positions[o + 2] = sz + dz * hp
+            const inten = env * (1 - k / K) // tail dims behind the head
+            colors[o] = base.r * inten
+            colors[o + 1] = base.g * inten
+            colors[o + 2] = base.b * inten
+          }
+        }
+        posAttr.needsUpdate = true
+        colAttr.needsUpdate = true
+        pulseEdgeRaf.current = requestAnimationFrame(tick)
+      }
+      pulseEdgeRaf.current = requestAnimationFrame(tick)
+      cleanup = () => {
+        scene.remove(points)
+        geometry.dispose()
+        material.dispose()
+        tex.dispose()
+      }
+    })
+    return () => {
+      cancelAnimationFrame(start)
+      if (pulseEdgeRaf.current) cancelAnimationFrame(pulseEdgeRaf.current)
+      pulseEdgeRaf.current = null
+      cleanup?.()
+    }
+  }, [edgeStyle, graphData])
+
   // Dolly toward the clicked node WITHOUT changing the viewing angle: keep the
   // current camera→node direction and just move closer, framing the node. (The
   // old version teleported onto a fixed origin→node ray, which read as a reset.)
@@ -436,6 +589,30 @@ export default function Galaxy3D({
     return 'rgba(120,130,160,0.05)'
   }
 
+  // In 'particles' / 'pulse' modes the raw edge lines drop to a faint scaffold and
+  // the animated effect carries the edge instead.
+  const linesFaint = edgeStyle !== 'lines'
+  const withinParticleBudget = graphData.links.length <= PARTICLE_LINK_BUDGET
+  const particleCount = !withinParticleBudget
+    ? 0
+    : edgeStyle === 'particles'
+      ? 5
+      : edgeStyle === 'pulse'
+        ? 0
+        : 2
+
+  // Directional particles inherit linkColor by default — but that's transparent in
+  // 'particles' mode, so we must supply an explicit glowing color (focus-aware).
+  const particleGlow = (l: {
+    source: string | GalaxyNode
+    target: string | GalaxyNode
+  }): string => {
+    if (!focusActive) return EDGE_GLOW
+    const s = typeof l.source === 'object' ? l.source.id : l.source
+    const t = typeof l.target === 'object' ? l.target.id : l.target
+    return focusIds?.has(s) && focusIds?.has(t) ? EDGE_GLOW : EDGE_GLOW_DIM
+  }
+
   return (
     <ForceGraph3D
       ref={fgRef}
@@ -450,11 +627,12 @@ export default function Galaxy3D({
       nodeColor={effNodeColor}
       nodeLabel={nodeLabel}
       nodeOpacity={0.95}
-      linkColor={effLinkColor}
-      linkOpacity={0.6}
-      linkDirectionalParticles={graphData.links.length <= PARTICLE_LINK_BUDGET ? 2 : 0}
-      linkDirectionalParticleSpeed={0.006}
-      linkDirectionalParticleWidth={1.4}
+      linkColor={linesFaint ? () => FAINT_LINK : effLinkColor}
+      linkOpacity={linesFaint ? FAINT_LINK_OPACITY : 0.6}
+      linkDirectionalParticles={particleCount}
+      linkDirectionalParticleSpeed={edgeStyle === 'particles' ? 0.012 : 0.006}
+      linkDirectionalParticleWidth={edgeStyle === 'particles' ? 2.8 : 1.4}
+      linkDirectionalParticleColor={edgeStyle === 'particles' ? particleGlow : undefined}
       enableNodeDrag={false}
       warmupTicks={20}
       cooldownTicks={120}
