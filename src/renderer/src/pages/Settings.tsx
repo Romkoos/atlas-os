@@ -3,7 +3,14 @@ import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { CLAUDE_MODELS } from '@shared/models'
-import { type AppSettings, LOG_LEVELS, settingsSchema, THEMES } from '@shared/settings'
+import {
+  type AppSettings,
+  GALAXY_EDGE_STYLES,
+  type GalaxyEdgeStyle,
+  LOG_LEVELS,
+  settingsSchema,
+  THEMES,
+} from '@shared/settings'
 import { useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -110,6 +117,63 @@ function TrackedProjectsCard() {
   )
 }
 
+const GALAXY_EDGE_LABELS: Record<GalaxyEdgeStyle, string> = {
+  lines: 'Lines — solid edges',
+  particles: 'Particles — glowing dots fly along edges',
+  pulse: 'Pulse — rings ripple outward from nodes',
+}
+
+// Rendering options for the 3D knowledge galaxy. Saves immediately on change so
+// the Graph view picks it up without a global Save.
+function GraphSettingsCard() {
+  const utils = trpc.useUtils()
+  const settingsQuery = trpc.settings.get.useQuery()
+  const setEdgeStyle = trpc.settings.set.useMutation({
+    onSuccess: () => {
+      void utils.settings.get.invalidate()
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const value = settingsQuery.data?.galaxyEdgeStyle ?? 'lines'
+
+  return (
+    <div className="panel mt-16">
+      <div className="panel-head">
+        <span className="ttl">knowledge graph</span>
+        <span className="meta">3D galaxy · edge style</span>
+      </div>
+      <div className="panel-body">
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 12,
+            color: 'var(--fg-3)',
+            marginBottom: 12,
+          }}
+        >
+          How edges are drawn in the 3D graph view.
+        </div>
+        <div className="label-block" style={{ maxWidth: 420 }}>
+          <label htmlFor="settings-galaxyEdgeStyle">edge style</label>
+          <TermSelect
+            id="settings-galaxyEdgeStyle"
+            value={value}
+            onValueChange={(next) =>
+              setEdgeStyle.mutate({ galaxyEdgeStyle: next as GalaxyEdgeStyle })
+            }
+            style={{ width: '100%' }}
+            options={GALAXY_EDGE_STYLES.map((style) => ({
+              value: style,
+              label: GALAXY_EDGE_LABELS[style],
+            }))}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Real runtime status sourced from health.ping (no fake pid/port/launchd).
 function RuntimeStatusCard({ model }: { model: string }) {
   const ping = trpc.health.ping.useQuery(undefined, { refetchInterval: 5000 })
@@ -177,6 +241,7 @@ export function Settings() {
       logLevel: 'info',
       trackedProjects: [],
       estimateDifficulty: false,
+      galaxyEdgeStyle: 'lines',
     },
   })
 
@@ -421,6 +486,8 @@ export function Settings() {
         </div>
 
         <TrackedProjectsCard />
+
+        <GraphSettingsCard />
 
         {/* HOTKEYS */}
         <div className="panel mt-16">
