@@ -13,7 +13,10 @@ import { z } from 'zod'
 
 // accept/reject finalize the improver's transactional workspace; the registry
 // only stores a ResumableRun, so hold these controls separately per session.
-const improverControls = new Map<string, { accept: () => Promise<void>; reject: () => Promise<void> }>()
+const improverControls = new Map<
+  string,
+  { accept: () => Promise<void>; reject: () => Promise<void> }
+>()
 
 export const skillImproverRouter = router({
   open: publicProcedure

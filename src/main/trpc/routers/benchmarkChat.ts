@@ -1,9 +1,9 @@
 // src/main/trpc/routers/benchmarkChat.ts
 import { db } from '@main/db/client'
 import { benchmarkAnalysis } from '@main/db/schema'
+import { buildChatSeed } from '@main/services/benchmarkChat/seed'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
-import { buildChatSeed } from '@main/services/benchmarkChat/seed'
 import { jobRegistry } from '@main/services/jobs/registry'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { getSettings } from '@main/store'

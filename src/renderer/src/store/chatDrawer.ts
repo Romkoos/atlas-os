@@ -107,7 +107,11 @@ export const useChatDrawer = create<ChatDrawerState>()(
       name: 'atlas-chat-drawer',
       version: 1,
       storage,
-      partialize: (s) => ({ open: s.open, sessions: s.sessions, activeSessionId: s.activeSessionId }),
+      partialize: (s) => ({
+        open: s.open,
+        sessions: s.sessions,
+        activeSessionId: s.activeSessionId,
+      }),
       merge: (persisted, current) => mergePersistedChatDrawer(persisted, current),
     },
   ),

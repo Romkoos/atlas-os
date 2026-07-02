@@ -16,6 +16,7 @@ export interface BaseChatRunState {
   lastSeq: number
   running: boolean
   start: (message: string) => void
+  startBlank: () => void
   reattach: () => void
   appendToken: (text: string) => void
   pushTool: (summary: string) => void
@@ -46,7 +47,14 @@ type Persisted = Pick<
 // Builds a persisted zustand store for one chat type. `running` (transient) and
 // `streaming` (partial) are deliberately NOT persisted — ChatHost decides on
 // mount whether to reattach a persisted running/awaiting session.
-export function createChatRunStore(key: string) {
+export interface ChatRunStoreOptions {
+  // Transform the accumulated streamed text before it is committed as an
+  // assistant transcript entry (e.g. strip a report sentinel). Defaults to identity.
+  sanitizeStreaming?: (text: string) => string
+}
+
+export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) {
+  const sanitize = opts.sanitizeStreaming ?? ((t: string) => t)
   const storage = createJSONStorage<Persisted>(() =>
     typeof localStorage !== 'undefined' ? localStorage : noopStorage,
   )
@@ -70,11 +78,24 @@ export function createChatRunStore(key: string) {
             lastSeq: 0,
             running: true,
           }),
+        // For chats whose kickoff is not a user-visible message (benchmark
+        // batchId, improver skillId): mint the session with an empty transcript.
+        startBlank: () =>
+          set({
+            sessionId: crypto.randomUUID(),
+            transcript: [],
+            streaming: '',
+            awaitingInput: false,
+            status: 'running',
+            lastSeq: 0,
+            running: true,
+          }),
         reattach: () => set({ running: true }),
-        appendToken: (text) => set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
+        appendToken: (text) =>
+          set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
         flushTurn: () =>
           set((s) => {
-            const text = s.streaming.trimEnd()
+            const text = sanitize(s.streaming).trimEnd()
             return text.trim()
               ? { transcript: [...s.transcript, { kind: 'assistant', text }], streaming: '' }
               : { streaming: '' }

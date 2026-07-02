@@ -71,9 +71,8 @@ describe('ChatSessionRegistry', () => {
     push({ type: 'token', text: 'y' }) // seq 2
     // biome-ignore lint/suspicious/noExplicitAny: collected envelopes
     const replayed: any[] = []
-    reg.open(
-      { sessionId: 's3', lastSeq: 1, resumable: true, buildRun: () => stubRun() },
-      (env) => replayed.push(env),
+    reg.open({ sessionId: 's3', lastSeq: 1, resumable: true, buildRun: () => stubRun() }, (env) =>
+      replayed.push(env),
     )
     expect(builds).toBe(1) // no rebuild
     expect(replayed).toEqual([{ seq: 2, event: { type: 'token', text: 'y' } }])

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 // unmounted (tab switch / drawer collapse). Close/stop is owned by the drawer.
 export function BenchmarkChatOverlay() {
   const status = useBenchmarkChatRun((s) => s.status)
-  const requestId = useBenchmarkChatRun((s) => s.requestId)
+  const sessionId = useBenchmarkChatRun((s) => s.sessionId)
   const transcript = useBenchmarkChatRun((s) => s.transcript)
   const streaming = useBenchmarkChatRun((s) => s.streaming)
   const awaitingInput = useBenchmarkChatRun((s) => s.awaitingInput)
@@ -27,9 +27,9 @@ export function BenchmarkChatOverlay() {
 
   const send = () => {
     const text = draft.trim()
-    if (!text || !requestId || !awaitingInput) return
+    if (!text || !sessionId || !awaitingInput) return
     pushUserReply(text)
-    reply.mutate({ requestId, text })
+    reply.mutate({ sessionId, text })
     setDraft('')
   }
 
@@ -50,7 +50,7 @@ export function BenchmarkChatOverlay() {
           rows={2}
           value={draft}
           placeholder={awaitingInput ? 'Ask about the results…' : 'Model is working…'}
-          disabled={!awaitingInput || status !== 'running'}
+          disabled={!awaitingInput}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -59,12 +59,7 @@ export function BenchmarkChatOverlay() {
             }
           }}
         />
-        <button
-          type="button"
-          className="btn primary"
-          disabled={!awaitingInput || status !== 'running'}
-          onClick={send}
-        >
+        <button type="button" className="btn primary" disabled={!awaitingInput} onClick={send}>
           SEND
         </button>
       </div>

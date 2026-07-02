@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 // subscription lives in GeneralChatHost). Close/stop is owned by the drawer.
 export function GeneralChatOverlay() {
   const status = useGeneralChatRun((s) => s.status)
-  const requestId = useGeneralChatRun((s) => s.requestId)
+  const sessionId = useGeneralChatRun((s) => s.sessionId)
   const transcript = useGeneralChatRun((s) => s.transcript)
   const streaming = useGeneralChatRun((s) => s.streaming)
   const awaitingInput = useGeneralChatRun((s) => s.awaitingInput)
@@ -34,9 +34,9 @@ export function GeneralChatOverlay() {
 
   const send = () => {
     const text = draft.trim()
-    if (!text || !requestId || !awaitingInput) return
+    if (!text || !sessionId || !awaitingInput) return
     pushUserReply(text)
-    reply.mutate({ requestId, text })
+    reply.mutate({ sessionId, text })
     setDraft('')
   }
 
@@ -86,7 +86,7 @@ export function GeneralChatOverlay() {
               rows={2}
               value={draft}
               placeholder={awaitingInput ? 'Reply…' : 'Assistant is thinking…'}
-              disabled={!awaitingInput || status !== 'running'}
+              disabled={!awaitingInput}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -95,12 +95,7 @@ export function GeneralChatOverlay() {
                 }
               }}
             />
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!awaitingInput || status !== 'running'}
-              onClick={send}
-            >
+            <button type="button" className="btn primary" disabled={!awaitingInput} onClick={send}>
               send
             </button>
           </div>

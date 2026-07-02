@@ -1,7 +1,7 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
-import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
+import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { groupByPrefix, type SkillMeta, splitFrontmatter } from '@shared/skills'
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -82,16 +82,17 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
   const utils = trpc.useUtils()
   const raw = trpc.skills.getRaw.useQuery({ id: skillId })
   const save = trpc.skills.save.useMutation()
-  const startImprover = useSkillImproverRun((s) => s.start)
+  const startImproverBlank = useSkillImproverRun((s) => s.startBlank)
   const improverRunning = useSkillImproverRun((s) => s.running)
-  const improverSkillId = useSkillImproverRun((s) => s.skillId)
+  const improverSkillId = useSkillImproverExtra((s) => s.skillId)
 
   function startImprove() {
     if (improverRunning) {
       toast.error('An improvement is already running')
       return
     }
-    startImprover(skillId)
+    useSkillImproverExtra.getState().setSkill(skillId)
+    startImproverBlank()
     useChatDrawer.getState().openSession({
       type: 'skillImprover',
       title: `improver · ${skillId}`,

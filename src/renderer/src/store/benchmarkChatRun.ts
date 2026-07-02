@@ -1,82 +1,42 @@
+import { createChatRunStore } from '@renderer/store/createChatRunStore'
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
-export interface ChatEntry {
-  kind: 'assistant' | 'tool' | 'user'
-  text: string
+// Benchmark-discussion run. Persisted + resumable via the generic factory; the
+// subscription is hosted at App level (ChatHost).
+export const useBenchmarkChatRun = createChatRunStore('atlas-chat-run-benchmark')
+
+const noopStorage: Storage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+  clear: () => undefined,
+  key: () => null,
+  length: 0,
 }
 
-// Lives OUTSIDE the Productivity page so the session survives tab switches; the
-// subscription is hosted at App level (BenchmarkChatHost).
-interface BenchmarkChatState {
-  running: boolean
-  requestId: string | null
+// Domain extra: the kickoff is the benchmark batchId (not a user message).
+// Persisted so app-restart resume can re-send it as the kickoff and the backend
+// rebuilds the discussion seed from stored analysis.
+interface BenchmarkChatContext {
   batchId: string | null
-  transcript: ChatEntry[]
-  streaming: string
-  awaitingInput: boolean
-  status: 'idle' | 'running' | 'done' | 'error' | 'aborted'
-
-  start: (batchId: string) => void
-  appendToken: (text: string) => void
-  pushTool: (summary: string) => void
-  pushUserReply: (text: string) => void
-  flushTurn: () => void
-  setAwaiting: (v: boolean) => void
-  finish: (status: 'done' | 'error' | 'aborted') => void
-  reset: () => void
+  setBatch: (id: string) => void
+  clearBatch: () => void
 }
-
-export const useBenchmarkChatRun = create<BenchmarkChatState>((set) => ({
-  running: false,
-  requestId: null,
-  batchId: null,
-  transcript: [],
-  streaming: '',
-  awaitingInput: false,
-  status: 'idle',
-
-  start: (batchId) =>
-    set({
-      running: true,
-      requestId: crypto.randomUUID(),
-      batchId,
-      transcript: [],
-      streaming: '',
-      awaitingInput: false,
-      status: 'running',
-    }),
-
-  appendToken: (text) => set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
-
-  flushTurn: () =>
-    set((s) => {
-      const text = s.streaming.trimEnd()
-      return text.trim()
-        ? { transcript: [...s.transcript, { kind: 'assistant', text }], streaming: '' }
-        : { streaming: '' }
-    }),
-
-  pushTool: (summary) =>
-    set((s) => ({ transcript: [...s.transcript, { kind: 'tool', text: summary }] })),
-
-  pushUserReply: (text) =>
-    set((s) => ({
-      transcript: [...s.transcript, { kind: 'user', text }],
-      awaitingInput: false,
-    })),
-
-  setAwaiting: (v) => set({ awaitingInput: v }),
-
-  finish: (status) => set({ running: false, awaitingInput: false, status }),
-
-  reset: () =>
-    set({
-      running: false,
-      requestId: null,
+export const useBenchmarkChatContext = create<BenchmarkChatContext>()(
+  persist(
+    (set) => ({
       batchId: null,
-      transcript: [],
-      streaming: '',
-      awaitingInput: false,
-      status: 'idle',
+      setBatch: (batchId) => set({ batchId }),
+      clearBatch: () => set({ batchId: null }),
     }),
-}))
+    {
+      name: 'atlas-chat-run-benchmark-ctx',
+      version: 1,
+      storage: createJSONStorage(() =>
+        typeof localStorage !== 'undefined' ? localStorage : noopStorage,
+      ),
+      partialize: (s) => ({ batchId: s.batchId }),
+    },
+  ),
+)

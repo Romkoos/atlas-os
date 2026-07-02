@@ -1,6 +1,6 @@
 import { ImproverReportView } from '@renderer/components/ImproverReportView'
 import { trpc } from '@renderer/lib/trpc'
-import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
+import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { useEffect, useRef, useState } from 'react'
 
 // Body of the skill-improver session, rendered inside UnifiedChatDrawer. Reads
@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 // tab ×; Accept/Reject/Send are improver-specific and stay here.
 export function SkillImproverOverlay() {
   const run = useSkillImproverRun()
+  const report = useSkillImproverExtra((s) => s.report)
   const reply = trpc.skillImprover.reply.useMutation()
   const accept = trpc.skillImprover.accept.useMutation()
   const reject = trpc.skillImprover.reject.useMutation()
@@ -19,13 +20,15 @@ export function SkillImproverOverlay() {
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [run.transcript, run.streaming, run.report])
+  }, [run.transcript, run.streaming, report])
+
+  const sessionId = run.sessionId
 
   function send() {
     const text = draft.trim()
-    if (!text || !run.requestId) return
+    if (!text || !sessionId) return
     run.pushUserReply(text)
-    reply.mutate({ requestId: run.requestId, text })
+    reply.mutate({ sessionId, text })
     setDraft('')
   }
 
@@ -40,28 +43,28 @@ export function SkillImproverOverlay() {
             </div>
           ))}
           {run.streaming ? <div className="improver-entry">{run.streaming}</div> : null}
-          {run.report ? (
+          {report ? (
             <div style={{ marginTop: 16 }}>
-              <ImproverReportView report={run.report} />
+              <ImproverReportView report={report} />
             </div>
           ) : null}
         </div>
 
-        {run.status === 'reviewing' ? (
+        {report ? (
           <div className="improver-foot">
             <button
               type="button"
               className="btn"
-              disabled={accept.isPending || reject.isPending || !run.requestId}
-              onClick={() => run.requestId && accept.mutate({ requestId: run.requestId })}
+              disabled={accept.isPending || reject.isPending || !sessionId}
+              onClick={() => sessionId && accept.mutate({ sessionId })}
             >
               Accept
             </button>
             <button
               type="button"
               className="btn"
-              disabled={accept.isPending || reject.isPending || !run.requestId}
-              onClick={() => run.requestId && reject.mutate({ requestId: run.requestId })}
+              disabled={accept.isPending || reject.isPending || !sessionId}
+              onClick={() => sessionId && reject.mutate({ sessionId })}
             >
               Reject
             </button>

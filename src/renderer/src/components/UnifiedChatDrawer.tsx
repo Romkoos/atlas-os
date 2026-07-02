@@ -3,11 +3,11 @@ import { GeneralChatOverlay } from '@renderer/components/GeneralChatOverlay'
 import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
 import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
 import { trpc } from '@renderer/lib/trpc'
-import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
+import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
-import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
-import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
+import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
+import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { MessageSquare, Plus, X } from 'lucide-react'
 import { useEffect } from 'react'
 
@@ -31,19 +31,22 @@ export function UnifiedChatDrawer() {
   const endSession = (type: ChatSessionType) => {
     if (type === 'benchmark') {
       const st = useBenchmarkChatRun.getState()
-      if (st.requestId && st.running) benchCancel.mutate({ requestId: st.requestId })
+      if (st.sessionId && st.running) benchCancel.mutate({ sessionId: st.sessionId })
       st.reset()
+      useBenchmarkChatContext.getState().clearBatch()
     } else if (type === 'roadmap') {
       const st = useRoadmapChatRun.getState()
-      if (st.requestId && st.running) roadmapCancel.mutate({ requestId: st.requestId })
+      if (st.sessionId && st.running) roadmapCancel.mutate({ sessionId: st.sessionId })
       st.reset()
+      useRoadmapSaved.getState().clearSaved()
     } else if (type === 'skillImprover') {
       const st = useSkillImproverRun.getState()
-      if (st.requestId && st.running) skillCancel.mutate({ requestId: st.requestId })
+      if (st.sessionId && st.running) skillCancel.mutate({ sessionId: st.sessionId })
       st.reset()
+      useSkillImproverExtra.getState().clear()
     } else {
       const st = useGeneralChatRun.getState()
-      if (st.requestId && st.running) generalCancel.mutate({ requestId: st.requestId })
+      if (st.sessionId && st.running) generalCancel.mutate({ sessionId: st.sessionId })
       st.reset()
     }
     closeSession(type) // id === type
@@ -57,7 +60,7 @@ export function UnifiedChatDrawer() {
     const st = useGeneralChatRun.getState()
     const streamingNow = st.running && !st.awaitingInput
     if (st.status !== 'idle' && !streamingNow) {
-      if (st.requestId) generalCancel.mutate({ requestId: st.requestId })
+      if (st.sessionId) generalCancel.mutate({ sessionId: st.sessionId })
       st.reset()
     }
     openSession({ type: 'generalChat' })
