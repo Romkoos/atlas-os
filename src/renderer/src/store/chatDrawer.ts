@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover'
+export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover' | 'generalChat'
 
 export interface ChatSession {
   id: string
@@ -12,6 +12,7 @@ const DEFAULT_TITLES: Record<ChatSessionType, string> = {
   benchmark: 'discuss results',
   roadmap: 'idea incubator',
   skillImprover: 'improver',
+  generalChat: 'chat',
 }
 
 // UI-only state for the unified chat drawer. Deliberately domain-agnostic: it

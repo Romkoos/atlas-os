@@ -101,3 +101,13 @@ describe('useChatDrawer skillImprover + title refresh', () => {
     expect(useChatDrawer.getState().sessions[0].title).toBe('custom')
   })
 })
+
+describe('useChatDrawer generalChat', () => {
+  it('opens a generalChat tab with the default "chat" title', () => {
+    useChatDrawer.getState().openSession({ type: 'generalChat' })
+    const s = useChatDrawer.getState()
+    expect(s.sessions.map((x) => x.id)).toEqual(['generalChat'])
+    expect(s.sessions[0].title).toBe('chat')
+    expect(s.activeSessionId).toBe('generalChat')
+  })
+})
