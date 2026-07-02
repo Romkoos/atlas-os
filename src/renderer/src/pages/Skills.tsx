@@ -376,7 +376,7 @@ export function Skills() {
           )}
         </div>
 
-        {/* RIGHT: editor + live preview, or improver overlay */}
+        {/* RIGHT: editor + live preview */}
         {selectedId ? (
           <SelectedRight selectedId={selectedId} />
         ) : (
