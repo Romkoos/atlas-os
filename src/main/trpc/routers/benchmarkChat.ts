@@ -1,86 +1,98 @@
 // src/main/trpc/routers/benchmarkChat.ts
 import { db } from '@main/db/client'
 import { benchmarkAnalysis } from '@main/db/schema'
-import { logger } from '@main/logger'
-import { type BenchmarkChatRun, startBenchmarkChat } from '@main/services/benchmarkChat/run'
+import { chatRegistry } from '@main/services/chat/registry'
+import { startResumableChat } from '@main/services/chat/resumableRun'
 import { buildChatSeed } from '@main/services/benchmarkChat/seed'
 import { jobRegistry } from '@main/services/jobs/registry'
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import type { BenchmarkChatEvent } from '@shared/ipc-events'
+import type { BenchmarkChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { DEFAULT_MODEL_ID } from '@shared/models'
 import { observable } from '@trpc/server/observable'
 import { eq } from 'drizzle-orm'
 import { app } from 'electron'
 import { z } from 'zod'
 
-const runs = new Map<string, BenchmarkChatRun>()
+const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
+
+// Rebuild the discussion seed from stored benchmark data. Returns undefined
+// when the batch has no analysis row (surface an error instead of a blank chat).
+function seedForBatch(batchId: string): string | undefined {
+  const analysis = db()
+    .select()
+    .from(benchmarkAnalysis)
+    .where(eq(benchmarkAnalysis.batchId, batchId))
+    .get()
+  return analysis ? buildChatSeed(analysis.summary, analysis.dataJson) : undefined
+}
 
 export const benchmarkChatRouter = router({
-  start: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), batchId: z.string().min(1) }))
+  open: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string().uuid(),
+        lastSeq: z.number().int().nonnegative(),
+        // kickoff is the batchId for a brand-new discussion; absent on resume.
+        kickoff: z.string().min(1).optional(),
+      }),
+    )
     .subscription(({ input }) =>
-      observable<BenchmarkChatEvent>((emit) => {
-        const analysis = db()
-          .select()
-          .from(benchmarkAnalysis)
-          .where(eq(benchmarkAnalysis.batchId, input.batchId))
-          .get()
-        if (!analysis) {
-          emit.next({ type: 'error', message: 'No analysis found for this batch' })
-          emit.complete()
-          return
-        }
+      observable<SeqEnvelope<BenchmarkChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
-        const seed = buildChatSeed(analysis.summary, analysis.dataJson)
-        const job = jobRegistry.register({
-          kind: 'benchmark.chat',
-          label: 'Benchmark chat',
-          model,
-          abort: () => runs.get(input.requestId)?.cancel(),
-        })
-        const run = startBenchmarkChat({
-          requestId: input.requestId,
-          seed,
-          model,
-          repoRoot: app.getAppPath(),
-          emit: (event) => {
-            if (event.type === 'error' || event.type === 'aborted') {
-              logger.info('Benchmark chat ended', { type: event.type })
-            }
-            if (event.type === 'done') job.finish('done')
-            if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-            emit.next(event)
+        const repoRoot = app.getAppPath()
+        return chatRegistry.open(
+          {
+            sessionId: input.sessionId,
+            lastSeq: input.lastSeq,
+            kickoff: input.kickoff,
+            resumable: true,
+            buildRun: ({ resume, kickoff, push }) => {
+              const job = jobRegistry.register({
+                kind: 'benchmark.chat',
+                label: 'Benchmark chat',
+                model,
+                abort: () => chatRegistry.cancel(input.sessionId),
+              })
+              let seed: string | undefined
+              if (kickoff) {
+                seed = seedForBatch(kickoff)
+                if (!seed) {
+                  push({ type: 'error', message: 'No analysis found for this batch' })
+                  job.finish('error')
+                  return { reply: () => {}, cancel: () => {}, done: Promise.resolve() }
+                }
+              }
+              return startResumableChat({
+                sessionId: input.sessionId,
+                model,
+                cwd: repoRoot,
+                allowedTools: CHAT_TOOLS,
+                settingSources: ['user', 'project'],
+                env: subscriptionEnv(),
+                seed,
+                resume,
+                emit: (event) => {
+                  if (event.type === 'done') job.finish('done')
+                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
+                  push(event)
+                },
+              })
+            },
           },
-        })
-        runs.set(input.requestId, run)
-        return () => {
-          const r = runs.get(input.requestId)
-          if (r) {
-            r.cancel()
-            runs.delete(input.requestId)
-          }
-          job.finish('error')
-        }
+          (env) => emit.next(env as SeqEnvelope<BenchmarkChatEvent>),
+        )
       }),
     ),
 
   reply: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), text: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid(), text: z.string().min(1) }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.reply(input.text)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.reply(input.sessionId, input.text) })),
 
   cancel: publicProcedure
-    .input(z.object({ requestId: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid() }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.cancel()
-      runs.delete(input.requestId)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.cancel(input.sessionId) })),
 })
