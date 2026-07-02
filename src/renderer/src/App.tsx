@@ -1,5 +1,6 @@
 import { BenchmarkChatHost } from '@renderer/components/BenchmarkChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
+import { GeneralChatHost } from '@renderer/components/GeneralChatHost'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
@@ -76,6 +77,7 @@ export function App() {
       <SkillImproverHost />
       <BenchmarkChatHost />
       <RoadmapChatHost />
+      <GeneralChatHost />
       <UnifiedChatDrawer />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
