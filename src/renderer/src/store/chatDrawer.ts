@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ChatSessionType = 'benchmark' | 'roadmap'
+export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover'
 
 export interface ChatSession {
   id: string
@@ -11,6 +11,7 @@ export interface ChatSession {
 const DEFAULT_TITLES: Record<ChatSessionType, string> = {
   benchmark: 'discuss results',
   roadmap: 'idea incubator',
+  skillImprover: 'improver',
 }
 
 // UI-only state for the unified chat drawer. Deliberately domain-agnostic: it
@@ -36,7 +37,15 @@ export const useChatDrawer = create<ChatDrawerState>((set) => ({
   openSession: ({ type, title }) =>
     set((s) => {
       const existing = s.sessions.find((x) => x.type === type)
-      if (existing) return { open: true, activeSessionId: existing.id }
+      if (existing) {
+        return {
+          open: true,
+          activeSessionId: existing.id,
+          sessions: s.sessions.map((x) =>
+            x.id === existing.id ? { ...x, title: title ?? x.title } : x,
+          ),
+        }
+      }
       const session: ChatSession = { id: type, type, title: title ?? DEFAULT_TITLES[type] }
       return { open: true, sessions: [...s.sessions, session], activeSessionId: session.id }
     }),

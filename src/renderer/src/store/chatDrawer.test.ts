@@ -67,3 +67,37 @@ describe('useChatDrawer misc actions', () => {
     expect(useChatDrawer.getState().open).toBe(false)
   })
 })
+
+describe('useChatDrawer skillImprover + title refresh', () => {
+  it('opens a third session type with a custom title', () => {
+    useChatDrawer.getState().openSession({ type: 'benchmark' })
+    useChatDrawer.getState().openSession({ type: 'roadmap' })
+    useChatDrawer.getState().openSession({ type: 'skillImprover', title: 'improver · my-skill' })
+    const s = useChatDrawer.getState()
+    expect(s.sessions.map((x) => x.id)).toEqual(['benchmark', 'roadmap', 'skillImprover'])
+    expect(s.sessions.find((x) => x.type === 'skillImprover')?.title).toBe('improver · my-skill')
+    expect(s.activeSessionId).toBe('skillImprover')
+  })
+
+  it('defaults the skillImprover title to "improver" when none is passed', () => {
+    useChatDrawer.getState().openSession({ type: 'skillImprover' })
+    expect(useChatDrawer.getState().sessions[0].title).toBe('improver')
+  })
+
+  it('refreshes the title when re-opening an existing session with a new title', () => {
+    useChatDrawer.getState().openSession({ type: 'skillImprover', title: 'improver · a' })
+    useChatDrawer.getState().openSession({ type: 'skillImprover', title: 'improver · b' })
+    const s = useChatDrawer.getState()
+    expect(s.sessions).toHaveLength(1)
+    expect(s.sessions[0].title).toBe('improver · b')
+  })
+
+  it('keeps the existing title when re-opening without a title', () => {
+    useChatDrawer.getState().openSession({ type: 'benchmark' })
+    useChatDrawer.setState((st) => ({
+      sessions: st.sessions.map((x) => ({ ...x, title: 'custom' })),
+    }))
+    useChatDrawer.getState().openSession({ type: 'benchmark' })
+    expect(useChatDrawer.getState().sessions[0].title).toBe('custom')
+  })
+})
