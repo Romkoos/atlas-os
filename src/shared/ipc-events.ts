@@ -1,6 +1,22 @@
 import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
 
+// Common events shared by every drawer chat's transport layer.
+export type BaseChatEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool'; name: string; summary: string }
+  | { type: 'awaiting-input' }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+  | { type: 'aborted' }
+
+// Every chat event forwarded to the renderer is wrapped with a per-session
+// monotonic sequence number so a reattaching client can replay only the gap.
+export interface SeqEnvelope<E> {
+  seq: number
+  event: E
+}
+
 // Events streamed from main → renderer during an agent run (tRPC subscription).
 export type AgentEvent =
   | { type: 'token'; text: string }
@@ -32,34 +48,15 @@ export type ImproverEvent =
 
 // Events streamed from main → renderer during a benchmark-discussion chat
 // (tRPC subscription). Mirrors the improver shape minus accept/reject/report.
-export type BenchmarkChatEvent =
-  | { type: 'token'; text: string }
-  | { type: 'tool'; name: string; summary: string }
-  | { type: 'awaiting-input' }
-  | { type: 'done' }
-  | { type: 'error'; message: string }
-  | { type: 'aborted' }
+export type BenchmarkChatEvent = BaseChatEvent
 
 // Events streamed from main → renderer during a general free-form chat.
-export type GeneralChatEvent =
-  | { type: 'token'; text: string }
-  | { type: 'tool'; name: string; summary: string }
-  | { type: 'awaiting-input' }
-  | { type: 'done' }
-  | { type: 'error'; message: string }
-  | { type: 'aborted' }
+export type GeneralChatEvent = BaseChatEvent
 
 // Events streamed from main → renderer during a roadmap brainstorming chat
 // (tRPC subscription). `saved` fires when the agent's finished idea has been
 // parsed from the stream and persisted; it carries the created item.
-export type RoadmapChatEvent =
-  | { type: 'token'; text: string }
-  | { type: 'tool'; name: string; summary: string }
-  | { type: 'awaiting-input' }
-  | { type: 'saved'; item: RoadmapItem }
-  | { type: 'done' }
-  | { type: 'error'; message: string }
-  | { type: 'aborted' }
+export type RoadmapChatEvent = BaseChatEvent | { type: 'saved'; item: RoadmapItem }
 
 // Events streamed from main → renderer during a graphify deep-map run (tRPC
 // subscription). `done` carries how many graphify nodes/edges were merged.
