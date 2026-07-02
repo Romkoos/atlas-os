@@ -31,8 +31,6 @@ export interface ChatHostProps {
 export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: ChatHostProps) {
   const running = useRun((s) => s.running)
   const sessionId = useRun((s) => s.sessionId)
-  const lastSeq = useRun((s) => s.lastSeq)
-  const status = useRun((s) => s.status)
 
   // Reattach-on-mount: a persisted running/awaiting session re-subscribes.
   const reattachedRef = useRef(false)
@@ -45,15 +43,17 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
     }
   }, [useRun])
 
-  // kickoff is only sent while the transcript is fresh (new session, seq 0).
-  const isFreshStart = status === 'running' && lastSeq === 0
-  const subInput = useMemo<OpenInput | typeof skipToken>(
-    () =>
-      running && sessionId
-        ? { sessionId, lastSeq, kickoff: isFreshStart ? kickoff : undefined }
-        : skipToken,
-    [running, sessionId, lastSeq, kickoff, isFreshStart],
-  )
+  // The subscription input must be STABLE for the life of a session — lastSeq
+  // increments on every token, so read it (and kickoff-eligibility) from a store
+  // snapshot at (re)subscribe time rather than tracking them reactively.
+  // Recomputes only when the session identity or running state changes.
+  const subInput = useMemo<OpenInput | typeof skipToken>(() => {
+    if (!running || !sessionId) return skipToken
+    const s = useRun.getState()
+    // kickoff is only sent while the transcript is fresh (new session, seq 0).
+    const isFreshStart = s.status === 'running' && s.lastSeq === 0
+    return { sessionId, lastSeq: s.lastSeq, kickoff: isFreshStart ? kickoff : undefined }
+  }, [running, sessionId, kickoff, useRun])
 
   useOpenSubscription(subInput, {
     onData: ({ seq, event }) => {
