@@ -1,9 +1,11 @@
 import { BenchmarkChatOverlay } from '@renderer/components/BenchmarkChatOverlay'
 import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
+import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
 import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
+import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { MessageSquare, X } from 'lucide-react'
 import { useEffect } from 'react'
 
@@ -21,21 +23,27 @@ export function UnifiedChatDrawer() {
 
   const benchCancel = trpc.benchmarkChat.cancel.useMutation()
   const roadmapCancel = trpc.roadmapChat.cancel.useMutation()
+  const skillCancel = trpc.skillImprover.cancel.useMutation()
 
   const endSession = (type: ChatSessionType) => {
     if (type === 'benchmark') {
       const st = useBenchmarkChatRun.getState()
       if (st.requestId && st.running) benchCancel.mutate({ requestId: st.requestId })
       st.reset()
-    } else {
+    } else if (type === 'roadmap') {
       const st = useRoadmapChatRun.getState()
       if (st.requestId && st.running) roadmapCancel.mutate({ requestId: st.requestId })
+      st.reset()
+    } else {
+      const st = useSkillImproverRun.getState()
+      if (st.requestId && st.running) skillCancel.mutate({ requestId: st.requestId })
       st.reset()
     }
     closeSession(type) // id === type
   }
 
   const active = sessions.find((s) => s.id === activeSessionId)
+  const wide = active?.type === 'skillImprover'
 
   // Escape collapses the drawer (sessions keep running in the background).
   useEffect(() => {
@@ -59,7 +67,10 @@ export function UnifiedChatDrawer() {
         {sessions.length > 0 ? <span className="chat-fab-badge">{sessions.length}</span> : null}
       </button>
 
-      <aside className={`chat-drawer${open ? ' open' : ''}`} aria-hidden={!open}>
+      <aside
+        className={`chat-drawer${open ? ' open' : ''}${wide ? ' wide' : ''}`}
+        aria-hidden={!open}
+      >
         <div className="chat-drawer-tabs">
           <div className="chat-drawer-tablist">
             {sessions.map((s) => (
@@ -90,6 +101,7 @@ export function UnifiedChatDrawer() {
         <div className="chat-drawer-body">
           {active?.type === 'benchmark' ? <BenchmarkChatOverlay /> : null}
           {active?.type === 'roadmap' ? <RoadmapChatOverlay /> : null}
+          {active?.type === 'skillImprover' ? <SkillImproverOverlay /> : null}
         </div>
       </aside>
     </>
