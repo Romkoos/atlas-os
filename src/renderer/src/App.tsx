@@ -8,6 +8,7 @@ import { RoadmapChatHost } from '@renderer/components/RoadmapChatHost'
 import { SkillImproverHost } from '@renderer/components/SkillImproverHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { Toaster } from '@renderer/components/ui/sonner'
+import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
 import { Knowledge } from '@renderer/pages/Knowledge'
@@ -75,6 +76,7 @@ export function App() {
       <SkillImproverHost />
       <BenchmarkChatHost />
       <RoadmapChatHost />
+      <UnifiedChatDrawer />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )
