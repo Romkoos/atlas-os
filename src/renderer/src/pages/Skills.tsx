@@ -1,6 +1,6 @@
-import { ImproverReportView } from '@renderer/components/ImproverReportView'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
+import { useChatDrawer } from '@renderer/store/chatDrawer'
 import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { groupByPrefix, type SkillMeta, splitFrontmatter } from '@shared/skills'
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
@@ -91,6 +91,10 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
       return
     }
     startImprover(skillId)
+    useChatDrawer.getState().openSession({
+      type: 'skillImprover',
+      title: `improver · ${skillId}`,
+    })
   }
 
   const [buffer, setBuffer] = useState('')
@@ -257,123 +261,10 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
   )
 }
 
-function ImproverOverlay({ skillId }: { skillId: string }) {
-  const run = useSkillImproverRun()
-  const reply = trpc.skillImprover.reply.useMutation()
-  const accept = trpc.skillImprover.accept.useMutation()
-  const reject = trpc.skillImprover.reject.useMutation()
-  const cancel = trpc.skillImprover.cancel.useMutation()
-  const [draft, setDraft] = useState('')
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  // Keep the transcript pinned to the latest output.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-pin whenever streamed content changes
-  useEffect(() => {
-    const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [run.transcript, run.streaming, run.report])
-
-  function send() {
-    const text = draft.trim()
-    if (!text || !run.requestId) return
-    run.pushUserReply(text)
-    reply.mutate({ requestId: run.requestId, text })
-    setDraft('')
-  }
-
-  return (
-    <div className="split-pane">
-      <div className="pane-head">
-        <span className="ttl">improver · {skillId}</span>
-        <span className="meta">
-          {run.status === 'reviewing' ? 'awaiting your decision' : run.status}
-        </span>
-      </div>
-      <div className="improver">
-        <div className="improver-transcript" ref={scrollRef}>
-          {run.transcript.map((e, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: transcript is append-only
-            <div key={i} className={`improver-entry ${e.kind}`}>
-              {e.kind === 'tool' ? `⚙ ${e.text}` : e.text}
-            </div>
-          ))}
-          {run.streaming ? <div className="improver-entry">{run.streaming}</div> : null}
-          {run.report ? (
-            <div style={{ marginTop: 16 }}>
-              <ImproverReportView report={run.report} />
-            </div>
-          ) : null}
-        </div>
-
-        {run.status === 'reviewing' ? (
-          <div className="improver-foot">
-            <button
-              type="button"
-              className="btn"
-              disabled={accept.isPending || reject.isPending || !run.requestId}
-              onClick={() => run.requestId && accept.mutate({ requestId: run.requestId })}
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={accept.isPending || reject.isPending || !run.requestId}
-              onClick={() => run.requestId && reject.mutate({ requestId: run.requestId })}
-            >
-              Reject
-            </button>
-          </div>
-        ) : run.running ? (
-          <div className="improver-foot">
-            <input
-              className="input"
-              placeholder={run.awaitingInput ? 'Type your reply…' : 'thinking…'}
-              disabled={!run.awaitingInput}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  send()
-                }
-              }}
-            />
-            <button type="button" className="btn" disabled={!run.awaitingInput} onClick={send}>
-              Send
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => run.requestId && cancel.mutate({ requestId: run.requestId })}
-            >
-              Stop
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-// Chooses between the editor and the improver overlay for the selected skill.
+// The editor is always shown for the selected skill; the improver session now
+// lives in the UnifiedChatDrawer. The editor auto-refreshes after accept/reject
+// because SkillImproverHost invalidates skills.getRaw on done/aborted.
 function SelectedRight({ selectedId }: { selectedId: string }) {
-  const status = useSkillImproverRun((s) => s.status)
-  const runSkillId = useSkillImproverRun((s) => s.skillId)
-  const reset = useSkillImproverRun((s) => s.reset)
-
-  const isActive = runSkillId === selectedId && (status === 'running' || status === 'reviewing')
-  const isTerminal =
-    runSkillId === selectedId && (status === 'done' || status === 'error' || status === 'aborted')
-
-  // Once a session for the selected skill has ended, clear it so the editor
-  // returns (showing the now-updated or reverted content). Done in an effect, not
-  // during render, to avoid setState-during-render.
-  useEffect(() => {
-    if (isTerminal) reset()
-  }, [isTerminal, reset])
-
-  if (isActive) return <ImproverOverlay skillId={selectedId} />
   return <SkillEditorPane key={selectedId} skillId={selectedId} />
 }
 
