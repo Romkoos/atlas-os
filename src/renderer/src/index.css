@@ -1436,6 +1436,19 @@
   .chat-drawer-collapse:hover {
     color: var(--fg);
   }
+  .chat-drawer-new {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    padding: 4px;
+    color: var(--fg-3);
+    cursor: pointer;
+  }
+  .chat-drawer-new:hover {
+    color: var(--fg);
+  }
   .chat-drawer-body {
     flex: 1;
     display: flex;

@@ -1,12 +1,14 @@
 import { BenchmarkChatOverlay } from '@renderer/components/BenchmarkChatOverlay'
+import { GeneralChatOverlay } from '@renderer/components/GeneralChatOverlay'
 import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
 import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
+import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
 import { useSkillImproverRun } from '@renderer/store/skillImproverRun'
-import { MessageSquare, X } from 'lucide-react'
+import { MessageSquare, Plus, X } from 'lucide-react'
 import { useEffect } from 'react'
 
 // The single UI surface for every chat session. Sessions themselves live in the
@@ -18,12 +20,13 @@ export function UnifiedChatDrawer() {
   const activeSessionId = useChatDrawer((s) => s.activeSessionId)
   const setActive = useChatDrawer((s) => s.setActive)
   const setOpen = useChatDrawer((s) => s.setOpen)
-  const toggle = useChatDrawer((s) => s.toggle)
+  const openSession = useChatDrawer((s) => s.openSession)
   const closeSession = useChatDrawer((s) => s.closeSession)
 
   const benchCancel = trpc.benchmarkChat.cancel.useMutation()
   const roadmapCancel = trpc.roadmapChat.cancel.useMutation()
   const skillCancel = trpc.skillImprover.cancel.useMutation()
+  const generalCancel = trpc.generalChat.cancel.useMutation()
 
   const endSession = (type: ChatSessionType) => {
     if (type === 'benchmark') {
@@ -34,12 +37,30 @@ export function UnifiedChatDrawer() {
       const st = useRoadmapChatRun.getState()
       if (st.requestId && st.running) roadmapCancel.mutate({ requestId: st.requestId })
       st.reset()
-    } else {
+    } else if (type === 'skillImprover') {
       const st = useSkillImproverRun.getState()
       if (st.requestId && st.running) skillCancel.mutate({ requestId: st.requestId })
       st.reset()
+    } else {
+      const st = useGeneralChatRun.getState()
+      if (st.requestId && st.running) generalCancel.mutate({ requestId: st.requestId })
+      st.reset()
     }
     closeSession(type) // id === type
+  }
+
+  // FAB-when-empty and the "+" button both land here. Start a fresh chat unless
+  // the model is actively streaming (running && !awaitingInput) — then just
+  // focus so we never interrupt an in-flight response. Resetting also cancels
+  // the open server run.
+  const openGeneralChat = () => {
+    const st = useGeneralChatRun.getState()
+    const streamingNow = st.running && !st.awaitingInput
+    if (st.status !== 'idle' && !streamingNow) {
+      if (st.requestId) generalCancel.mutate({ requestId: st.requestId })
+      st.reset()
+    }
+    openSession({ type: 'generalChat' })
   }
 
   const active = sessions.find((s) => s.id === activeSessionId)
@@ -61,7 +82,7 @@ export function UnifiedChatDrawer() {
         type="button"
         className={`chat-fab${open ? ' chat-fab-hidden' : ''}`}
         aria-label="Open chat"
-        onClick={toggle}
+        onClick={() => (sessions.length === 0 ? openGeneralChat() : setOpen(true))}
       >
         <MessageSquare size={18} />
         {sessions.length > 0 ? <span className="chat-fab-badge">{sessions.length}</span> : null}
@@ -91,6 +112,14 @@ export function UnifiedChatDrawer() {
           </div>
           <button
             type="button"
+            className="chat-drawer-new"
+            aria-label="New chat"
+            onClick={openGeneralChat}
+          >
+            <Plus size={14} />
+          </button>
+          <button
+            type="button"
             className="chat-drawer-collapse"
             aria-label="Collapse chat"
             onClick={() => setOpen(false)}
@@ -102,6 +131,7 @@ export function UnifiedChatDrawer() {
           {active?.type === 'benchmark' ? <BenchmarkChatOverlay /> : null}
           {active?.type === 'roadmap' ? <RoadmapChatOverlay /> : null}
           {active?.type === 'skillImprover' ? <SkillImproverOverlay /> : null}
+          {active?.type === 'generalChat' ? <GeneralChatOverlay /> : null}
         </div>
       </aside>
     </>
