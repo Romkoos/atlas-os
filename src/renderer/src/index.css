@@ -2360,6 +2360,191 @@ textarea.input:focus,
   color: var(--fg-3);
 }
 
+/* Node details panel (code-graph selection) */
+.kb-nd {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-2);
+  padding-top: 14px;
+}
+.kb-nd .dim {
+  color: var(--fg-3);
+}
+.kb-nd-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 20px;
+  word-break: break-word;
+}
+.kb-nd-title strong {
+  color: var(--fg);
+}
+.kb-nd-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.kb-nd-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.kb-nd-badge {
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #333);
+  color: var(--fg-3);
+  font-size: 11px;
+}
+.kb-nd-badge.origin-graphify {
+  border-color: #d2a6ff66;
+  color: #d2a6ff;
+}
+.kb-nd-badge.origin-indexer {
+  border-color: #59c2ff55;
+  color: #59c2ff;
+}
+.kb-nd-section {
+  border-top: 1px solid var(--border, #333);
+  margin-top: 10px;
+}
+.kb-nd-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--fg-2);
+  cursor: pointer;
+  padding: 8px 0;
+  font: inherit;
+  text-align: left;
+}
+.kb-nd-caret {
+  color: var(--fg-3);
+  width: 10px;
+}
+.kb-nd-count {
+  color: var(--fg-3);
+  background: var(--bg-2, #1a1a1a);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.kb-nd-body {
+  padding: 0 0 8px 16px;
+}
+.kb-nd-body ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.kb-nd-body li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.kb-nd-body .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--amber);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  word-break: break-word;
+}
+.kb-nd-body .link:hover {
+  text-decoration: underline;
+}
+.kb-nd-path {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.kb-nd-path code {
+  color: var(--fg-3);
+  word-break: break-all;
+}
+.kb-nd-meta {
+  margin: 8px 0 0;
+}
+.kb-nd-meta div {
+  display: flex;
+  gap: 6px;
+}
+.kb-nd-meta dt {
+  color: var(--fg-3);
+}
+.kb-nd-meta dd {
+  margin: 0;
+  word-break: break-all;
+}
+.kb-nd-relgroup {
+  margin-top: 8px;
+}
+.kb-nd-rellabel {
+  color: var(--fg-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kb-nd-tag {
+  font-size: 10px;
+  color: #d2a6ff;
+  border: 1px solid #d2a6ff44;
+  border-radius: 6px;
+  padding: 0 4px;
+}
+.kb-nd-clusterhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.kb-nd-trunc {
+  color: var(--fg-3);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.kb-nd-code {
+  position: relative;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--bg-2, #141414);
+  border: 1px solid var(--border, #333);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fg-2);
+  white-space: pre;
+}
+.kb-nd-lang {
+  position: sticky;
+  top: 0;
+  float: right;
+  color: var(--fg-3);
+  font-size: 10px;
+}
+.kb-nd-md {
+  max-height: 360px;
+  overflow: auto;
+}
+
 /* Top-bar process indicator. The popover is hover-revealed; anchored to the
    indicator so it hangs below the title bar. */
 .jobs {

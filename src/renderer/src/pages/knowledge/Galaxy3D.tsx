@@ -26,22 +26,54 @@ interface Galaxy3DProps {
   linkColor?: (l: any) => string
   onNodeClick?: (n: any) => void
   onNodeHover?: (n: any | null) => void
+  // Selection-aware focus: when a node is selected, focusIds holds the ids that
+  // stay lit (the node + its cluster + direct neighbors). Everything else is
+  // dimmed toward the background so the focused sub-graph stands out.
+  selectedId?: string | null
+  focusIds?: Set<string> | null
 }
 
 const NODE_REL_SIZE = 5
 const radiusOf = (nodeVal: number): number => Math.sqrt(Math.max(1, nodeVal)) * NODE_REL_SIZE
+const BACKGROUND = '#000000'
 
 // Directional link particles are pretty but cost a sprite per particle per link;
 // only enable them on smaller graphs so thousand-edge views stay smooth.
 const PARTICLE_LINK_BUDGET = 400
 
-// A faint field of distant stars placed on a large spherical shell well beyond
-// the graph, to sell the "deep space" backdrop. Cheap: one draw call.
-function makeStarfield(): THREE.Points {
-  const count = 1600
+// A single soft radial-gradient texture, reused by the nebula sprites and the
+// selection halo. White so sprite.material.color can tint it per instance.
+function makeGlowTexture(): THREE.Texture {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    g.addColorStop(0, 'rgba(255,255,255,1)')
+    g.addColorStop(0.25, 'rgba(255,255,255,0.55)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+  }
+  return new THREE.CanvasTexture(canvas)
+}
+
+// One spherical shell of stars. Multiple shells at different radii give real
+// parallax: near stars sweep across the view faster than far ones as the camera
+// orbits. Cheap — one draw call per shell.
+function makeStarLayer(
+  count: number,
+  rMin: number,
+  rMax: number,
+  size: number,
+  opacity: number,
+  color: number,
+): THREE.Points {
   const positions = new Float32Array(count * 3)
   for (let i = 0; i < count; i++) {
-    const r = 3500 + Math.random() * 3500
+    const r = rMin + Math.random() * (rMax - rMin)
     const theta = Math.random() * Math.PI * 2
     const phi = Math.acos(2 * Math.random() - 1)
     positions[i * 3] = r * Math.sin(phi) * Math.cos(theta)
@@ -51,16 +83,76 @@ function makeStarfield(): THREE.Points {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   const material = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 2.4,
+    color,
+    size,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.75,
+    opacity,
     depthWrite: false,
   })
   const points = new THREE.Points(geometry, material)
   points.name = 'galaxy-starfield'
   return points
+}
+
+// Faint tinted nebula clouds far out, for depth and atmosphere. Additive so they
+// only ever brighten the black backdrop; very low opacity so they never compete
+// with the graph itself.
+function makeNebula(tex: THREE.Texture): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'galaxy-nebula'
+  const tints = [0x2b1a55, 0x123a5e, 0x0e3d3a, 0x3a1440, 0x1a2a5e]
+  for (let i = 0; i < 5; i++) {
+    const material = new THREE.SpriteMaterial({
+      map: tex,
+      color: tints[i % tints.length],
+      transparent: true,
+      opacity: 0.1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    const sprite = new THREE.Sprite(material)
+    const r = 1600 + Math.random() * 1400
+    const theta = Math.random() * Math.PI * 2
+    const phi = Math.acos(2 * Math.random() - 1)
+    sprite.position.set(
+      r * Math.sin(phi) * Math.cos(theta),
+      r * Math.sin(phi) * Math.sin(theta),
+      r * Math.cos(phi),
+    )
+    const s = 1400 + Math.random() * 1200
+    sprite.scale.set(s, s, 1)
+    group.add(sprite)
+  }
+  return group
+}
+
+// The pulsing halo drawn on the selected node. depthTest off + high renderOrder
+// so it always reads on top of its node regardless of camera distance.
+function makeHalo(tex: THREE.Texture): THREE.Sprite {
+  const material = new THREE.SpriteMaterial({
+    map: tex,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  })
+  const sprite = new THREE.Sprite(material)
+  sprite.name = 'galaxy-halo'
+  sprite.visible = false
+  sprite.renderOrder = 999
+  return sprite
+}
+
+// Dim a node color toward the background (near-black) so it recedes into the
+// "focus fog". Also drops it below the bloom threshold, so dimmed nodes stop
+// glowing — reinforcing the focus.
+function dimNodeColor(css: string): string {
+  const c = new THREE.Color(css)
+  c.multiplyScalar(0.14)
+  return `#${c.getHexString()}`
 }
 
 export default function Galaxy3D({
@@ -74,10 +166,21 @@ export default function Galaxy3D({
   linkColor,
   onNodeClick,
   onNodeHover,
+  selectedId,
+  focusIds,
 }: Galaxy3DProps) {
   // react-force-graph-3d exposes no ref type.
   // biome-ignore lint/suspicious/noExplicitAny: ForceGraph ref has no exported type
   const fgRef = useRef<any>(null)
+  // Shared with the selection effect so it can toggle auto-rotate and drive the
+  // halo without re-running the one-time scene setup.
+  // biome-ignore lint/suspicious/noExplicitAny: three controls has no exported type
+  const controlsRef = useRef<any>(null)
+  const haloRef = useRef<THREE.Sprite | null>(null)
+  const pulseRaf = useRef<number | null>(null)
+  // The idle auto-rotate timer must not resume rotation while a node is focused.
+  const selectedRef = useRef<string | null>(selectedId ?? null)
+  selectedRef.current = selectedId ?? null
 
   // Pull each node toward its community's anchor point on a sphere so clusters
   // form distinct spatial regions ("galaxies"). Anchors are recomputed from the
@@ -117,57 +220,77 @@ export default function Galaxy3D({
   // Frame the camera on the settled graph ourselves. The library's zoomToFit
   // aims at a hardcoded origin and no-ops when its bbox is unavailable, so on
   // small/degenerate per-project graphs (single node, link-less clouds) the
-  // camera stayed at its big-graph default and the canvas rendered black. We
-  // compute the centroid + extent from node positions and place the camera at a
-  // safe distance with a floor, which frames one node or hundreds alike.
+  // camera stayed at its big-graph default and the canvas rendered black.
+  //
+  // We aim at the bounding-box CENTER, not the mean of positions: an uneven
+  // cluster distribution pulls the mean off the visual center, leaving the
+  // cloud sitting high or low — and because auto-rotate orbits the aim point,
+  // it stays off-center. The bbox midpoint is the true geometric center, so the
+  // sphere lands dead-center. Distance fits the extent in BOTH axes (horizontal
+  // FOV is narrower when the canvas is tall/narrow, e.g. with the panel open).
   const frameGraph = (): void => {
     const fg = fgRef.current
     if (!fg) return
     const nodes = graphData.nodes
     if (nodes.length === 0) return
-    let cx = 0
-    let cy = 0
-    let cz = 0
+    let minX = Infinity
+    let minY = Infinity
+    let minZ = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    let maxZ = -Infinity
     for (const n of nodes) {
-      cx += n.x ?? 0
-      cy += n.y ?? 0
-      cz += n.z ?? 0
+      const x = n.x ?? 0
+      const y = n.y ?? 0
+      const z = n.z ?? 0
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      if (z < minZ) minZ = z
+      if (z > maxZ) maxZ = z
     }
-    cx /= nodes.length
-    cy /= nodes.length
-    cz /= nodes.length
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    const cz = (minZ + maxZ) / 2
     let maxR = 0
     for (const n of nodes) {
       const r = Math.hypot((n.x ?? 0) - cx, (n.y ?? 0) - cy, (n.z ?? 0) - cz)
       if (r > maxR) maxR = r
     }
-    const fov = ((fg.camera?.()?.fov ?? 50) * Math.PI) / 180
+    const cam = fg.camera?.()
+    const fov = ((cam?.fov ?? 50) * Math.PI) / 180
+    const aspect = cam?.aspect ?? Math.max(width, 1) / Math.max(height, 1)
     const radius = Math.max(maxR + NODE_REL_SIZE * 3, 15)
-    const distance = Math.max(radius / Math.tan(fov / 2), 30)
+    const vDist = radius / Math.tan(fov / 2)
+    const hDist = radius / (Math.tan(fov / 2) * aspect)
+    const distance = Math.max(vDist, hDist, 30)
     fg.cameraPosition({ x: cx, y: cy, z: cz + distance }, { x: cx, y: cy, z: cz }, 600)
   }
 
-  // Visual effects: bloom glow, a starfield backdrop, and idle auto-rotation.
-  // Deferred a frame (like the force setup) so the renderer/scene/controls exist,
-  // and fully torn down on cleanup so a StrictMode double-mount doesn't stack
-  // duplicate bloom passes or star fields. Mount-only.
+  // Visual effects: bloom glow, a layered parallax starfield, nebula clouds, a
+  // reusable selection halo, and idle auto-rotation. Deferred a frame (like the
+  // force setup) so the renderer/scene/controls exist, and fully torn down on
+  // cleanup so a StrictMode double-mount doesn't stack duplicates. Mount-only.
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-time scene setup
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
     let bloom: UnrealBloomPass | null = null
-    let stars: THREE.Points | null = null
-    // biome-ignore lint/suspicious/noExplicitAny: three controls has no exported type here
-    let controls: any = null
+    const stars: THREE.Points[] = []
+    let nebula: THREE.Group | null = null
+    let glowTex: THREE.Texture | null = null
+    let halo: THREE.Sprite | null = null
     let idleTimer: ReturnType<typeof setTimeout> | null = null
     const onInteractionStart = (): void => {
       if (idleTimer) clearTimeout(idleTimer)
-      if (controls) controls.autoRotate = false
+      if (controlsRef.current) controlsRef.current.autoRotate = false
     }
     const onInteractionEnd = (): void => {
       if (idleTimer) clearTimeout(idleTimer)
       idleTimer = setTimeout(() => {
-        if (controls) controls.autoRotate = true
+        // Never resume rotation while a node is focused.
+        if (controlsRef.current && !selectedRef.current) controlsRef.current.autoRotate = true
       }, 2500)
     }
     const raf = requestAnimationFrame(() => {
@@ -183,12 +306,22 @@ export default function Galaxy3D({
       }
       const scene = fg.scene?.()
       if (scene) {
-        stars = makeStarfield()
-        scene.add(stars)
+        glowTex = makeGlowTexture()
+        // Three parallax shells: dim near, brighter far, faint cool tint.
+        stars.push(makeStarLayer(700, 1500, 2600, 3.2, 0.55, 0xbfd0ff))
+        stars.push(makeStarLayer(900, 2800, 4200, 2.4, 0.7, 0xffffff))
+        stars.push(makeStarLayer(1200, 4500, 7000, 1.8, 0.85, 0xdfe6ff))
+        for (const layer of stars) scene.add(layer)
+        nebula = makeNebula(glowTex)
+        scene.add(nebula)
+        halo = makeHalo(glowTex)
+        haloRef.current = halo
+        scene.add(halo)
       }
-      controls = fg.controls?.()
+      const controls = fg.controls?.()
+      controlsRef.current = controls
       if (controls) {
-        controls.autoRotate = true
+        controls.autoRotate = !selectedRef.current
         controls.autoRotateSpeed = 0.4
         controls.addEventListener?.('start', onInteractionStart)
         controls.addEventListener?.('end', onInteractionEnd)
@@ -196,37 +329,111 @@ export default function Galaxy3D({
     })
     return () => {
       cancelAnimationFrame(raf)
+      if (pulseRaf.current) cancelAnimationFrame(pulseRaf.current)
+      pulseRaf.current = null
       if (idleTimer) clearTimeout(idleTimer)
       if (bloom) {
         fg.postProcessingComposer?.()?.removePass?.(bloom)
         bloom.dispose?.()
       }
-      if (stars) {
-        fg.scene?.()?.remove(stars)
-        stars.geometry.dispose()
-        ;(stars.material as THREE.Material).dispose()
+      const scene = fg.scene?.()
+      for (const layer of stars) {
+        scene?.remove(layer)
+        layer.geometry.dispose()
+        ;(layer.material as THREE.Material).dispose()
       }
+      if (nebula) {
+        scene?.remove(nebula)
+        for (const child of nebula.children) {
+          ;((child as THREE.Sprite).material as THREE.Material).dispose()
+        }
+      }
+      if (halo) {
+        scene?.remove(halo)
+        ;(halo.material as THREE.Material).dispose()
+      }
+      haloRef.current = null
+      glowTex?.dispose()
+      const controls = controlsRef.current
       if (controls) {
         controls.autoRotate = false
         controls.removeEventListener?.('start', onInteractionStart)
         controls.removeEventListener?.('end', onInteractionEnd)
       }
+      controlsRef.current = null
     }
   }, [])
 
+  // Drive the selection halo: park it on the selected node, tint it to the node's
+  // color, and pulse its scale/opacity. Also pause auto-rotate while focused.
+  useEffect(() => {
+    if (controlsRef.current) controlsRef.current.autoRotate = !selectedId
+    const halo = haloRef.current
+    const stop = () => {
+      if (pulseRaf.current) cancelAnimationFrame(pulseRaf.current)
+      pulseRaf.current = null
+      if (halo) halo.visible = false
+    }
+    if (!halo) return stop
+    const node = selectedId ? graphData.nodes.find((n) => n.id === selectedId) : null
+    if (!node || node.x == null) return stop
+    halo.position.set(node.x, node.y ?? 0, node.z ?? 0)
+    halo.material.color.set(new THREE.Color(nodeColor(node)))
+    halo.visible = true
+    const start = performance.now()
+    const tick = (): void => {
+      const t = (performance.now() - start) / 1000
+      const s = 24 + Math.sin(t * 2.5) * 6
+      halo.scale.set(s, s, 1)
+      halo.material.opacity = 0.55 + Math.sin(t * 2.5) * 0.2
+      pulseRaf.current = requestAnimationFrame(tick)
+    }
+    if (pulseRaf.current) cancelAnimationFrame(pulseRaf.current)
+    pulseRaf.current = requestAnimationFrame(tick)
+    return stop
+  }, [selectedId, graphData, nodeColor])
+
+  // Dolly toward the clicked node WITHOUT changing the viewing angle: keep the
+  // current camera→node direction and just move closer, framing the node. (The
+  // old version teleported onto a fixed origin→node ray, which read as a reset.)
   const handleClick = (node: GalaxyNode): void => {
     const fg = fgRef.current
-    if (fg && node.x != null && node.y != null) {
-      const dist = 120
-      const hyp = Math.hypot(node.x, node.y, node.z ?? 0) || 1
-      const ratio = 1 + dist / hyp
+    const cam = fg?.camera?.()?.position
+    if (fg && cam && node.x != null && node.y != null) {
+      const nz = node.z ?? 0
+      let dx = cam.x - node.x
+      let dy = cam.y - node.y
+      let dz = cam.z - nz
+      const len = Math.hypot(dx, dy, dz) || 1
+      dx /= len
+      dy /= len
+      dz /= len
+      const distance = 90 // target distance from the node; angle is preserved
       fg.cameraPosition(
-        { x: node.x * ratio, y: node.y * ratio, z: (node.z ?? 0) * ratio },
-        node,
+        { x: node.x + dx * distance, y: node.y + dy * distance, z: nz + dz * distance },
+        { x: node.x, y: node.y, z: nz },
         800,
       )
     }
     onNodeClick?.(node)
+  }
+
+  const focusActive = Boolean(selectedId && focusIds)
+  const effNodeColor = (n: GalaxyNode): string => {
+    const base = nodeColor(n)
+    if (!focusActive) return base
+    return focusIds?.has(n.id) ? base : dimNodeColor(base)
+  }
+  const baseLink = linkColor ?? (() => 'rgba(160,170,205,0.5)')
+  const effLinkColor = (l: {
+    source: string | GalaxyNode
+    target: string | GalaxyNode
+  }): string => {
+    if (!focusActive) return baseLink(l)
+    const s = typeof l.source === 'object' ? l.source.id : l.source
+    const t = typeof l.target === 'object' ? l.target.id : l.target
+    if (focusIds?.has(s) && focusIds?.has(t)) return baseLink(l)
+    return 'rgba(120,130,160,0.05)'
   }
 
   return (
@@ -235,15 +442,15 @@ export default function Galaxy3D({
       width={width}
       height={height}
       graphData={graphData}
-      backgroundColor="#010103"
+      backgroundColor={BACKGROUND}
       controlType="orbit"
       nodeId="id"
       nodeRelSize={NODE_REL_SIZE}
       nodeVal={nodeVal}
-      nodeColor={nodeColor}
+      nodeColor={effNodeColor}
       nodeLabel={nodeLabel}
       nodeOpacity={0.95}
-      linkColor={linkColor ?? (() => 'rgba(160,170,205,0.5)')}
+      linkColor={effLinkColor}
       linkOpacity={0.6}
       linkDirectionalParticles={graphData.links.length <= PARTICLE_LINK_BUDGET ? 2 : 0}
       linkDirectionalParticleSpeed={0.006}

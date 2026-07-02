@@ -5,6 +5,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import ForceGraph2D from 'react-force-graph-2d'
 import { Graph3DBoundary } from './Graph3DBoundary'
 import { colorForKind } from './graph-colors'
+import { NodeDetails } from './NodeDetails'
+import { ambiguousLabels, displayLabel } from './node-label'
 import { type ViewMode, ViewToggle } from './ViewToggle'
 
 type FgNode = CodeGraphNode & { x?: number; y?: number }
@@ -136,6 +138,23 @@ export function CodeGraphTab({ project }: { project: string }) {
     { enabled: Boolean(selected) },
   )
 
+  // Ids that stay lit in the 3D view when a node is selected: the node itself,
+  // its direct neighbors (from queryNeighbors), and every node in the same
+  // community. Everything else dims into the focus fog.
+  const focusIds = useMemo(() => {
+    if (!selected) return null
+    const ids = new Set<string>([selected.id])
+    for (const n of neighbors.data?.nodes ?? []) ids.add(n.id)
+    if (selected.community != null) {
+      for (const n of data.nodes) if (n.community === selected.community) ids.add(n.id)
+    }
+    return ids
+  }, [selected, neighbors.data, data.nodes])
+
+  // Bare filenames shared by 2+ nodes (index.ts, types.ts, …) get their parent
+  // folder prefixed so they're distinguishable in tooltips and the panel.
+  const ambiguous = useMemo(() => ambiguousLabels(data.nodes), [data.nodes])
+
   const list = projects.data ?? []
 
   return (
@@ -202,7 +221,7 @@ export function CodeGraphTab({ project }: { project: string }) {
               graphData={data}
               backgroundColor="transparent"
               nodeId="id"
-              nodeLabel={(n) => `${(n as FgNode).label} [${(n as FgNode).kind}]`}
+              nodeLabel={(n) => `${displayLabel(n as FgNode, ambiguous)} [${(n as FgNode).kind}]`}
               nodeColor={(n) => colorForKind((n as FgNode).kind)}
               onNodeClick={(n) => setSelected(n as FgNode)}
               linkColor={(l) =>
@@ -220,12 +239,16 @@ export function CodeGraphTab({ project }: { project: string }) {
                   height={size.h}
                   nodeColor={(n) => colorForKind((n as FgNode).kind)}
                   nodeVal={() => 1}
-                  nodeLabel={(n) => `${(n as FgNode).label} [${(n as FgNode).kind}]`}
+                  nodeLabel={(n) =>
+                    `${displayLabel(n as FgNode, ambiguous)} [${(n as FgNode).kind}]`
+                  }
                   clusterKey={(n) => (n as FgNode).community ?? -1}
                   linkColor={(l) =>
                     (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
                   }
                   onNodeClick={(n) => setSelected(n as FgNode)}
+                  selectedId={selected?.id ?? null}
+                  focusIds={focusIds}
                 />
               </Suspense>
             </Graph3DBoundary>
@@ -233,33 +256,16 @@ export function CodeGraphTab({ project }: { project: string }) {
         </div>
 
         {selected && (
-          <aside className="kb-graph-panel">
-            <button type="button" className="kb-graph-close" onClick={() => setSelected(null)}>
-              ✕
-            </button>
-            <div className="kb-graph-detail">
-              <strong>{selected.label}</strong>
-              <div>{selected.kind}</div>
-              {selected.relPath && <code>{selected.relPath}</code>}
-              <hr />
-              <div>neighbors:</div>
-              <ul>
-                {(neighbors.data?.nodes ?? [])
-                  .filter((n) => n.id !== selected.id)
-                  .map((n) => (
-                    <li key={n.id}>
-                      <button
-                        type="button"
-                        className="link"
-                        onClick={() => setSelected({ ...(n as FgNode) })}
-                      >
-                        {n.label} <span className="dim">[{n.kind}]</span>
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          </aside>
+          <NodeDetails
+            node={selected}
+            nodes={data.nodes}
+            links={data.links}
+            neighbors={neighbors.data}
+            ambiguous={ambiguous}
+            unified={view === 'unified'}
+            onSelect={(n) => setSelected({ ...(n as FgNode) })}
+            onClose={() => setSelected(null)}
+          />
         )}
       </div>
 
