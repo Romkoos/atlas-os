@@ -84,6 +84,7 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
   const save = trpc.skills.save.useMutation()
   const startImprover = useSkillImproverRun((s) => s.start)
   const improverRunning = useSkillImproverRun((s) => s.running)
+  const improverSkillId = useSkillImproverRun((s) => s.skillId)
 
   function startImprove() {
     if (improverRunning) {
@@ -122,8 +123,10 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
   }, [buffer, editorOpen])
 
   const dirty = buffer !== savedContent
+  const improverBusy = improverRunning && improverSkillId === skillId
 
   function doSave() {
+    if (improverBusy) return
     if (!dirty || save.isPending) return
     save.mutate(
       { id: skillId, content: buffer },
@@ -170,12 +173,12 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
               <button
                 type="button"
                 className="btn"
-                disabled={!dirty || save.isPending}
+                disabled={!dirty || save.isPending || improverBusy}
                 onClick={doSave}
               >
                 Save ⌘S
               </button>
-              <button type="button" className="btn" onClick={startImprove}>
+              <button type="button" className="btn" disabled={improverBusy} onClick={startImprove}>
                 <Sparkles style={{ width: 11, height: 11 }} /> Improve
               </button>
             </span>
@@ -216,6 +219,7 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
                 value={buffer}
                 onChange={(e) => setBuffer(e.target.value)}
                 onKeyDown={onKeyDown}
+                readOnly={improverBusy}
               />
             )}
           </div>
