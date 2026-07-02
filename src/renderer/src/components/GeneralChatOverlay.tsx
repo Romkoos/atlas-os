@@ -61,7 +61,7 @@ export function GeneralChatOverlay() {
             autoFocus
           />
           <div className="rm-chat-hint">
-            The assistant has read-only access to this repo. ⌘↵ to send.
+            The assistant has read-only access to this repo. ⌘↵ to start.
           </div>
           <div className="rm-chat-intro-foot">
             <button type="button" className="btn primary" onClick={begin} disabled={!draft.trim()}>

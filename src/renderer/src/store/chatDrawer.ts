@@ -27,7 +27,6 @@ interface ChatDrawerState {
   closeSession: (id: string) => void
   setActive: (id: string) => void
   setOpen: (open: boolean) => void
-  toggle: () => void
 }
 
 export const useChatDrawer = create<ChatDrawerState>((set) => ({
@@ -61,5 +60,4 @@ export const useChatDrawer = create<ChatDrawerState>((set) => ({
 
   setActive: (id) => set({ activeSessionId: id }),
   setOpen: (open) => set({ open }),
-  toggle: () => set((s) => ({ open: !s.open })),
 }))

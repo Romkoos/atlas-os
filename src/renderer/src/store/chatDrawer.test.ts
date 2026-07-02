@@ -60,8 +60,8 @@ describe('useChatDrawer.closeSession', () => {
 })
 
 describe('useChatDrawer misc actions', () => {
-  it('toggle flips open and setOpen sets it explicitly', () => {
-    useChatDrawer.getState().toggle()
+  it('setOpen sets open explicitly', () => {
+    useChatDrawer.getState().setOpen(true)
     expect(useChatDrawer.getState().open).toBe(true)
     useChatDrawer.getState().setOpen(false)
     expect(useChatDrawer.getState().open).toBe(false)
