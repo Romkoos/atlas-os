@@ -3,7 +3,17 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { isSemver, type Plugin, type UpdateInfo, type UpdateResult } from '@shared/plugins'
+import {
+  isSemver,
+  type MarketplacePlugin,
+  type McpHealth,
+  type McpHealthStatus,
+  type OpResult,
+  type Plugin,
+  type PluginDetails,
+  type UpdateInfo,
+  type UpdateResult,
+} from '@shared/plugins'
 
 const execFileAsync = promisify(execFile)
 
@@ -170,6 +180,112 @@ export function readCatalog(
   return out
 }
 
+// Browse source for the Marketplace tab: every plugin advertised by every
+// configured marketplace, with its description. Reads known_marketplaces.json +
+// each marketplace's marketplace.json. Tolerant of missing/odd files (those
+// marketplaces just yield no entries). `installed` is left false here — the
+// impure `browseMarketplace()` joins it against the user's installed plugins.
+export function readMarketplacePlugins(dir: string): MarketplacePlugin[] {
+  const out: MarketplacePlugin[] = []
+  const knownPath = join(dir, 'known_marketplaces.json')
+  if (!existsSync(knownPath)) return out
+  let known: Record<string, unknown>
+  try {
+    known = JSON.parse(readFileSync(knownPath, 'utf8'))
+  } catch {
+    return out
+  }
+  for (const [mk, infoRaw] of Object.entries(known)) {
+    const info = infoRaw as Record<string, unknown>
+    const loc = typeof info.installLocation === 'string' ? info.installLocation : null
+    if (!loc) continue
+    const mkPath = join(loc, '.claude-plugin', 'marketplace.json')
+    if (!existsSync(mkPath)) continue
+    let manifest: Record<string, unknown>
+    try {
+      manifest = JSON.parse(readFileSync(mkPath, 'utf8'))
+    } catch {
+      continue
+    }
+    const plugins = Array.isArray(manifest.plugins) ? manifest.plugins : []
+    for (const p of plugins) {
+      if (!p || typeof p !== 'object') continue
+      const pe = p as Record<string, unknown>
+      const name = typeof pe.name === 'string' ? pe.name : null
+      if (!name) continue
+      const version =
+        typeof pe.version === 'string'
+          ? pe.version
+          : (readPluginManifestVersion(loc, pe.source) ?? null)
+      out.push({
+        id: `${name}@${mk}`,
+        name,
+        marketplace: mk,
+        description: typeof pe.description === 'string' ? pe.description : '',
+        version,
+        installed: false,
+      })
+    }
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+// Classify one `claude mcp list` status tail (e.g. "✔ Connected",
+// "! Needs authentication", "⏸ Pending approval", "✗ Failed to connect").
+function mcpStatusOf(tail: string): McpHealthStatus {
+  const t = tail.toLowerCase()
+  if (tail.includes('✔') || /connected/.test(t)) return 'ok'
+  if (tail.includes('⏸') || /pending/.test(t)) return 'pending'
+  if (tail.includes('!') || /auth/.test(t)) return 'auth'
+  if (
+    tail.includes('✗') ||
+    tail.includes('✘') ||
+    tail.includes('×') ||
+    /fail|error|disconnect/.test(t)
+  )
+    return 'error'
+  return 'unknown'
+}
+
+// Parse `claude mcp list` text output into per-server health rows.
+// Each server line looks like:  `<name>: <target>[ (HTTP)] - <icon> <text>`
+// The status tail is after the LAST ` - `; the name is before the FIRST `: `.
+// Non-server lines (the "Checking…" header, blanks, "No MCP servers…") are
+// skipped. Malformed input degrades to [] / dropped lines rather than throwing.
+export function parseMcpHealth(raw: string): McpHealth[] {
+  const out: McpHealth[] = []
+  for (const line of raw.split('\n')) {
+    const s = line.trim()
+    if (!s) continue
+    const sep = s.lastIndexOf(' - ')
+    if (sep < 0) continue // header / summary line without a status tail
+    const head = s.slice(0, sep).trim()
+    const tail = s.slice(sep + 3).trim()
+    const colon = head.indexOf(': ')
+    if (colon < 0) continue
+    const name = head.slice(0, colon).trim()
+    if (!name) continue
+    let target = head.slice(colon + 2).trim()
+    let transport: string | null = null
+    const tm = /\s*\(([^)]+)\)\s*$/.exec(target)
+    if (tm) {
+      transport = tm[1]
+      target = target.slice(0, tm.index).trim()
+    }
+    const isPlugin = name.startsWith('plugin:')
+    out.push({
+      name,
+      kind: isPlugin ? 'plugin' : 'standalone',
+      plugin: isPlugin ? (name.split(':')[1] ?? null) : null,
+      transport,
+      target,
+      status: mcpStatusOf(tail),
+      detail: tail.replace(/^[^A-Za-z0-9]+/, '').trim() || tail,
+    })
+  }
+  return out
+}
+
 // Read installed_plugins.json → `{ id -> { sha, version } }` for user scope.
 function readInstalled(dir: string): Record<string, { sha?: string; version: string }> {
   const out: Record<string, { sha?: string; version: string }> = {}
@@ -268,5 +384,93 @@ export async function updatePlugin(id: string): Promise<UpdateResult> {
     return { id, ok: true, message: stdout.trim() || 'updated' }
   } catch (err) {
     return { id, ok: false, message: friendlyError(err, 'update failed').message }
+  }
+}
+
+// Marketplace catalog joined with the user's installed plugins so the UI can
+// show an "installed" badge / disable the install button. Reads catalogs off
+// disk (fast) and lists installed plugins via the CLI.
+export async function browseMarketplace(): Promise<MarketplacePlugin[]> {
+  const catalog = readMarketplacePlugins(pluginsDir())
+  let installedIds: Set<string>
+  try {
+    installedIds = new Set((await listPlugins()).map((p) => p.id))
+  } catch {
+    // If the CLI can't list installed plugins we still show the catalog; the
+    // install button simply won't know something is already installed.
+    installedIds = new Set()
+  }
+  return catalog.map((p) => ({ ...p, installed: installedIds.has(p.id) }))
+}
+
+export async function installPlugin(id: string): Promise<OpResult> {
+  try {
+    const { stdout } = await execFileAsync('claude', ['plugin', 'install', id, '--scope', 'user'], {
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    return { ok: true, message: stdout.trim() || `installed ${id}` }
+  } catch (err) {
+    return { ok: false, message: friendlyError(err, 'install failed').message }
+  }
+}
+
+export async function uninstallPlugin(id: string): Promise<OpResult> {
+  try {
+    const { stdout } = await execFileAsync(
+      'claude',
+      ['plugin', 'uninstall', id, '--scope', 'user', '--yes'],
+      { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 },
+    )
+    return { ok: true, message: stdout.trim() || `uninstalled ${id}` }
+  } catch (err) {
+    return { ok: false, message: friendlyError(err, 'uninstall failed').message }
+  }
+}
+
+export async function addMarketplace(source: string): Promise<OpResult> {
+  try {
+    const { stdout } = await execFileAsync(
+      'claude',
+      ['plugin', 'marketplace', 'add', source, '--scope', 'user'],
+      { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
+    )
+    return { ok: true, message: stdout.trim() || `added ${source}` }
+  } catch (err) {
+    return { ok: false, message: friendlyError(err, 'marketplace add failed').message }
+  }
+}
+
+// Lazy per-card component inventory (skills / MCP servers / commands + token
+// cost) via `claude plugin details`. Shown verbatim, so failures return their
+// text rather than throwing.
+export async function pluginDetails(id: string): Promise<PluginDetails> {
+  try {
+    const { stdout } = await execFileAsync('claude', ['plugin', 'details', id], {
+      timeout: 30_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    return { id, ok: true, output: stdout.trim() || 'no details reported' }
+  } catch (err) {
+    return { id, ok: false, output: friendlyError(err, 'details failed').message }
+  }
+}
+
+// Ping every configured MCP server. `claude mcp list` performs the health check
+// itself and prints one line per server; we parse those into structured rows.
+export async function mcpHealth(): Promise<McpHealth[]> {
+  try {
+    const { stdout } = await execFileAsync('claude', ['mcp', 'list'], {
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    return parseMcpHealth(stdout)
+  } catch (err) {
+    // A non-zero exit still often carries the listing on stdout (some servers
+    // failing the health check). Parse whatever we got; only ENOENT is fatal.
+    const e = err as NodeJS.ErrnoException & { stdout?: string }
+    if (e.code === 'ENOENT') throw friendlyError(err, 'mcp list failed')
+    if (typeof e.stdout === 'string' && e.stdout.trim()) return parseMcpHealth(e.stdout)
+    throw friendlyError(err, 'mcp list failed')
   }
 }

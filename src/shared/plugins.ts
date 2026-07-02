@@ -49,3 +49,49 @@ export const updateResultSchema = z.object({
   message: z.string(),
 })
 export type UpdateResult = z.infer<typeof updateResultSchema>
+
+// A plugin advertised by a configured marketplace, for the Marketplace tab.
+// `id` is the canonical `name@marketplace` handle `claude plugin install` takes.
+// `installed` is joined from the user's installed plugins.
+export const marketplacePluginSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  marketplace: z.string(),
+  description: z.string(),
+  version: z.string().nullable(),
+  installed: z.boolean(),
+})
+export type MarketplacePlugin = z.infer<typeof marketplacePluginSchema>
+
+// Generic outcome of a fire-once CLI op (install / uninstall / marketplace add).
+// Never throws to the UI — failures surface as `{ ok: false, message }`.
+export const opResultSchema = z.object({
+  ok: z.boolean(),
+  message: z.string(),
+})
+export type OpResult = z.infer<typeof opResultSchema>
+
+// Raw `claude plugin details <id>` output, shown verbatim when a card expands.
+export const pluginDetailsSchema = z.object({
+  id: z.string(),
+  ok: z.boolean(),
+  output: z.string(),
+})
+export type PluginDetails = z.infer<typeof pluginDetailsSchema>
+
+// One MCP server as reported (and health-checked) by `claude mcp list`.
+// `kind` distinguishes plugin-provided servers (name `plugin:<plugin>:<server>`)
+// from standalone ones. `status` is the pinged health at snapshot time.
+export const mcpHealthStatus = z.enum(['ok', 'auth', 'error', 'pending', 'unknown'])
+export type McpHealthStatus = z.infer<typeof mcpHealthStatus>
+
+export const mcpHealthSchema = z.object({
+  name: z.string(),
+  kind: z.enum(['plugin', 'standalone']),
+  plugin: z.string().nullable(),
+  transport: z.string().nullable(),
+  target: z.string(),
+  status: mcpHealthStatus,
+  detail: z.string(),
+})
+export type McpHealth = z.infer<typeof mcpHealthSchema>
