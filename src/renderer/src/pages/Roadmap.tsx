@@ -1,8 +1,7 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
-import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
-import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
+import { useChatDrawer } from '@renderer/store/chatDrawer'
 import {
   CATEGORY_LABELS,
   PRIORITY_LABELS,
@@ -335,14 +334,6 @@ export function Roadmap() {
   const utils = trpc.useUtils()
   const list = trpc.roadmap.list.useQuery()
   const [editing, setEditing] = useState<RoadmapItem | null | undefined>(undefined)
-  const [chatOpen, setChatOpen] = useState(false)
-  const chatStatus = useRoadmapChatRun((s) => s.status)
-
-  // Re-open the incubator when returning to the page mid-session (the session
-  // itself lives at App level and keeps running while the tab is away).
-  useEffect(() => {
-    if (chatStatus !== 'idle') setChatOpen(true)
-  }, [chatStatus])
 
   const update = trpc.roadmap.update.useMutation({
     onMutate: async (vars) => {
@@ -391,7 +382,11 @@ export function Roadmap() {
         title="ROADMAP"
         description="Candidate features for Atlas OS. Track, prioritize, and evolve the build manifest."
         action={
-          <button type="button" className="btn primary" onClick={() => setChatOpen(true)}>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => useChatDrawer.getState().openSession({ type: 'roadmap' })}
+          >
             <Plus size={12} /> new idea
           </button>
         }
@@ -468,8 +463,6 @@ export function Roadmap() {
         onClose={() => setEditing(undefined)}
         onSaved={() => utils.roadmap.list.invalidate()}
       />
-
-      {chatOpen ? <RoadmapChatOverlay onClose={() => setChatOpen(false)} /> : null}
     </>
   )
 }
