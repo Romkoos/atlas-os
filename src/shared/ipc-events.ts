@@ -40,6 +40,15 @@ export type BenchmarkChatEvent =
   | { type: 'error'; message: string }
   | { type: 'aborted' }
 
+// Events streamed from main → renderer during a general free-form chat.
+export type GeneralChatEvent =
+  | { type: 'token'; text: string }
+  | { type: 'tool'; name: string; summary: string }
+  | { type: 'awaiting-input' }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+  | { type: 'aborted' }
+
 // Events streamed from main → renderer during a roadmap brainstorming chat
 // (tRPC subscription). `saved` fires when the agent's finished idea has been
 // parsed from the stream and persisted; it carries the created item.
