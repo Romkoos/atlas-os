@@ -2,7 +2,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { diffUpdate, parsePluginList, readCatalog, semverGt } from './cli'
+import {
+  diffUpdate,
+  parseMcpHealth,
+  parsePluginList,
+  readCatalog,
+  readMarketplacePlugins,
+  semverGt,
+} from './cli'
 
 describe('parsePluginList', () => {
   const sample = JSON.stringify([
@@ -162,5 +169,134 @@ describe('readCatalog', () => {
   it('yields undefined version when no signal exists anywhere', () => {
     marketplace('x', [{ name: 'bare', source: './' }])
     expect(readCatalog(dir).x.bare).toEqual({ sha: undefined, version: undefined })
+  })
+})
+
+describe('readMarketplacePlugins', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'plugins-'))
+  })
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  function marketplace(
+    name: string,
+    plugins: unknown[],
+    manifests: Record<string, string> = {},
+  ): void {
+    const loc = join(dir, 'marketplaces', name)
+    mkdirSync(join(loc, '.claude-plugin'), { recursive: true })
+    writeFileSync(join(loc, '.claude-plugin', 'marketplace.json'), JSON.stringify({ plugins }))
+    for (const [rel, version] of Object.entries(manifests)) {
+      mkdirSync(join(loc, rel, '.claude-plugin'), { recursive: true })
+      writeFileSync(join(loc, rel, '.claude-plugin', 'plugin.json'), JSON.stringify({ version }))
+    }
+    const knownPath = join(dir, 'known_marketplaces.json')
+    const known: Record<string, unknown> = existsSync(knownPath)
+      ? JSON.parse(readFileSync(knownPath, 'utf8'))
+      : {}
+    known[name] = { installLocation: loc }
+    writeFileSync(knownPath, JSON.stringify(known))
+  }
+
+  it('returns [] when no marketplaces file exists', () => {
+    expect(readMarketplacePlugins(dir)).toEqual([])
+  })
+
+  it('captures name, marketplace, description and builds the install id', () => {
+    marketplace('mg', [
+      { name: 'stratarts', source: './stratarts', description: '27 strategy skills' },
+    ])
+    expect(readMarketplacePlugins(dir)).toEqual([
+      {
+        id: 'stratarts@mg',
+        name: 'stratarts',
+        marketplace: 'mg',
+        description: '27 strategy skills',
+        version: null,
+        installed: false,
+      },
+    ])
+  })
+
+  it('falls back to plugin.json version and defaults missing description to ""', () => {
+    marketplace('fe', [{ name: 'fe-claude-infra', source: './' }], { '.': '1.0.5' })
+    const [p] = readMarketplacePlugins(dir)
+    expect(p.version).toBe('1.0.5')
+    expect(p.description).toBe('')
+  })
+
+  it('sorts by id and tolerates a broken manifest', () => {
+    marketplace('a', [{ name: 'zeta' }, { name: 'alpha' }])
+    // broken marketplace: registered but no marketplace.json → contributes nothing
+    const loc = join(dir, 'marketplaces', 'broken')
+    mkdirSync(loc, { recursive: true })
+    const known = JSON.parse(readFileSync(join(dir, 'known_marketplaces.json'), 'utf8'))
+    known.broken = { installLocation: loc }
+    writeFileSync(join(dir, 'known_marketplaces.json'), JSON.stringify(known))
+    expect(readMarketplacePlugins(dir).map((p) => p.id)).toEqual(['alpha@a', 'zeta@a'])
+  })
+})
+
+describe('parseMcpHealth', () => {
+  const sample = [
+    'Checking MCP server health…',
+    '',
+    'claude.ai Gmail: https://gmailmcp.googleapis.com/mcp/v1 - ! Needs authentication',
+    'plugin:playwright:playwright: npx @playwright/mcp@latest - ✔ Connected',
+    'plugin:atlassian:atlassian: https://mcp.atlassian.com/v1/mcp/authv2 (HTTP) - ✔ Connected',
+    'pencil: /Applications/Pencil.app/mcp-server --agent x - ✔ Connected',
+    'broken-one: npx broken - ✗ Failed to connect',
+    'pend: https://x/mcp - ⏸ Pending approval',
+  ].join('\n')
+
+  it('skips the header/blank lines and parses one row per server', () => {
+    const rows = parseMcpHealth(sample)
+    expect(rows.map((r) => r.name)).toEqual([
+      'claude.ai Gmail',
+      'plugin:playwright:playwright',
+      'plugin:atlassian:atlassian',
+      'pencil',
+      'broken-one',
+      'pend',
+    ])
+  })
+
+  it('maps status icons to statuses', () => {
+    const byName = Object.fromEntries(parseMcpHealth(sample).map((r) => [r.name, r.status]))
+    expect(byName['claude.ai Gmail']).toBe('auth')
+    expect(byName['plugin:playwright:playwright']).toBe('ok')
+    expect(byName['broken-one']).toBe('error')
+    expect(byName.pend).toBe('pending')
+  })
+
+  it('classifies plugin vs standalone and extracts the plugin name', () => {
+    const rows = parseMcpHealth(sample)
+    const atlassian = rows.find((r) => r.name === 'plugin:atlassian:atlassian')
+    expect(atlassian?.kind).toBe('plugin')
+    expect(atlassian?.plugin).toBe('atlassian')
+    const pencil = rows.find((r) => r.name === 'pencil')
+    expect(pencil?.kind).toBe('standalone')
+    expect(pencil?.plugin).toBeNull()
+  })
+
+  it('splits a trailing (HTTP) transport off the target', () => {
+    const atlassian = parseMcpHealth(sample).find((r) => r.name === 'plugin:atlassian:atlassian')
+    expect(atlassian?.transport).toBe('HTTP')
+    expect(atlassian?.target).toBe('https://mcp.atlassian.com/v1/mcp/authv2')
+  })
+
+  it('keeps a URL target with a colon intact (no false name split)', () => {
+    const gmail = parseMcpHealth(sample).find((r) => r.name === 'claude.ai Gmail')
+    expect(gmail?.target).toBe('https://gmailmcp.googleapis.com/mcp/v1')
+    expect(gmail?.detail).toBe('Needs authentication')
+  })
+
+  it('degrades to [] on empty / garbage input', () => {
+    expect(parseMcpHealth('')).toEqual([])
+    expect(parseMcpHealth('No MCP servers configured. Use `claude mcp add`')).toEqual([])
   })
 })
