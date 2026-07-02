@@ -1,95 +1,107 @@
 import { db } from '@main/db/client'
 import { logger } from '@main/logger'
+import { chatRegistry } from '@main/services/chat/registry'
+import { startResumableChat } from '@main/services/chat/resumableRun'
 import { getSubgraphContext } from '@main/services/graph/context'
 import { loadGraph } from '@main/services/graph/store'
 import { jobRegistry } from '@main/services/jobs/registry'
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { createRoadmapItem, listRoadmap } from '@main/services/roadmap/store'
-import { type RoadmapChatRun, startRoadmapChat } from '@main/services/roadmapChat/run'
 import { buildRoadmapChatSeed } from '@main/services/roadmapChat/seed'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import type { RoadmapChatEvent } from '@shared/ipc-events'
+import type { RoadmapChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { DEFAULT_MODEL_ID } from '@shared/models'
+import { parseRoadmapProposal } from '@shared/roadmap'
 import { observable } from '@trpc/server/observable'
 import { app } from 'electron'
 import { z } from 'zod'
 
-const runs = new Map<string, RoadmapChatRun>()
+const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
 
 export const roadmapChatRouter = router({
-  start: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), idea: z.string().min(1) }))
+  open: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string().uuid(),
+        lastSeq: z.number().int().nonnegative(),
+        kickoff: z.string().min(1).optional(),
+      }),
+    )
     .subscription(({ input }) =>
-      observable<RoadmapChatEvent>((emit) => {
+      observable<SeqEnvelope<RoadmapChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
         const repoRoot = app.getAppPath()
-        // Demo integration: append graph context for the app's own repo when indexed.
-        // getSubgraphContext returns '' for an unindexed repo, so this is a safe no-op.
-        const graphContext = getSubgraphContext(loadGraph(db(), repoRoot), {
-          query: input.idea,
-          depth: 1,
-          budget: 1000,
-        })
-        const baseSeed = buildRoadmapChatSeed(input.idea, listRoadmap())
-        const seed = graphContext ? `${baseSeed}\n\n${graphContext}` : baseSeed
-        const job = jobRegistry.register({
-          kind: 'roadmap.chat',
-          label: 'Roadmap idea chat',
-          model,
-          abort: () => runs.get(input.requestId)?.cancel(),
-        })
-
-        const run = startRoadmapChat({
-          requestId: input.requestId,
-          seed,
-          model,
-          repoRoot,
-          onProposal: (proposal) => {
-            try {
-              const item = createRoadmapItem(proposal)
-              logger.info('Roadmap idea saved from chat', { id: item.id, title: item.title })
-              emit.next({ type: 'saved', item })
-            } catch (error) {
-              const message = error instanceof Error ? error.message : 'Failed to save idea'
-              logger.error('Roadmap idea save failed', message)
-              emit.next({ type: 'error', message })
-            }
+        return chatRegistry.open(
+          {
+            sessionId: input.sessionId,
+            lastSeq: input.lastSeq,
+            kickoff: input.kickoff,
+            resumable: true,
+            buildRun: ({ resume, kickoff, push }) => {
+              const job = jobRegistry.register({
+                kind: 'roadmap.chat',
+                label: 'Roadmap idea chat',
+                model,
+                abort: () => chatRegistry.cancel(input.sessionId),
+              })
+              let saved = false
+              const checkProposal = (accumulated: string) => {
+                if (saved) return
+                const proposal = parseRoadmapProposal(accumulated)
+                if (!proposal) return
+                saved = true
+                try {
+                  const item = createRoadmapItem(proposal)
+                  logger.info('Roadmap idea saved from chat', { id: item.id, title: item.title })
+                  push({ type: 'saved', item })
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : 'Failed to save idea'
+                  logger.error('Roadmap idea save failed', message)
+                  push({ type: 'error', message })
+                }
+              }
+              let seed: string | undefined
+              if (kickoff) {
+                const graphContext = getSubgraphContext(loadGraph(db(), repoRoot), {
+                  query: kickoff,
+                  depth: 1,
+                  budget: 1000,
+                })
+                const baseSeed = buildRoadmapChatSeed(kickoff, listRoadmap())
+                seed = graphContext ? `${baseSeed}\n\n${graphContext}` : baseSeed
+              }
+              return startResumableChat({
+                sessionId: input.sessionId,
+                model,
+                cwd: repoRoot,
+                allowedTools: CHAT_TOOLS,
+                settingSources: ['user', 'project'],
+                env: subscriptionEnv(),
+                seed,
+                resume,
+                emit: (event) => {
+                  if (event.type === 'done') job.finish('done')
+                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
+                  push(event)
+                },
+                onAssistantText: (_delta, accumulated) => checkProposal(accumulated),
+                onTurnComplete: (accumulated) => checkProposal(accumulated),
+              })
+            },
           },
-          emit: (event) => {
-            if (event.type === 'done') job.finish('done')
-            if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-            emit.next(event)
-          },
-        })
-        runs.set(input.requestId, run)
-
-        return () => {
-          const r = runs.get(input.requestId)
-          if (r) {
-            r.cancel()
-            runs.delete(input.requestId)
-          }
-          job.finish('error')
-        }
+          (env) => emit.next(env as SeqEnvelope<RoadmapChatEvent>),
+        )
       }),
     ),
 
   reply: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), text: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid(), text: z.string().min(1) }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.reply(input.text)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.reply(input.sessionId, input.text) })),
 
   cancel: publicProcedure
-    .input(z.object({ requestId: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid() }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.cancel()
-      runs.delete(input.requestId)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.cancel(input.sessionId) })),
 })

@@ -1,5 +1,5 @@
 import { trpc } from '@renderer/lib/trpc'
-import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
+import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { CheckCircle2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -9,11 +9,11 @@ import { useEffect, useRef, useState } from 'react'
 // the drawer.
 export function RoadmapChatOverlay() {
   const status = useRoadmapChatRun((s) => s.status)
-  const requestId = useRoadmapChatRun((s) => s.requestId)
+  const sessionId = useRoadmapChatRun((s) => s.sessionId)
   const transcript = useRoadmapChatRun((s) => s.transcript)
   const streaming = useRoadmapChatRun((s) => s.streaming)
   const awaitingInput = useRoadmapChatRun((s) => s.awaitingInput)
-  const savedItem = useRoadmapChatRun((s) => s.savedItem)
+  const savedItem = useRoadmapSaved((s) => s.savedItem)
   const startSession = useRoadmapChatRun((s) => s.start)
   const pushUserReply = useRoadmapChatRun((s) => s.pushUserReply)
 
@@ -31,15 +31,16 @@ export function RoadmapChatOverlay() {
   const beginBrainstorm = () => {
     const idea = draft.trim()
     if (!idea) return
+    useRoadmapSaved.getState().clearSaved()
     startSession(idea)
     setDraft('')
   }
 
   const send = () => {
     const text = draft.trim()
-    if (!text || !requestId || !awaitingInput) return
+    if (!text || !sessionId || !awaitingInput) return
     pushUserReply(text)
-    reply.mutate({ requestId, text })
+    reply.mutate({ sessionId, text })
     setDraft('')
   }
 
@@ -101,7 +102,7 @@ export function RoadmapChatOverlay() {
               rows={2}
               value={draft}
               placeholder={awaitingInput ? 'Reply…' : 'Agent is thinking…'}
-              disabled={!awaitingInput || status !== 'running'}
+              disabled={!awaitingInput}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -110,12 +111,7 @@ export function RoadmapChatOverlay() {
                 }
               }}
             />
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!awaitingInput || status !== 'running'}
-              onClick={send}
-            >
+            <button type="button" className="btn primary" disabled={!awaitingInput} onClick={send}>
               send
             </button>
           </div>

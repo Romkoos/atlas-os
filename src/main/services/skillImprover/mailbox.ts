@@ -17,8 +17,8 @@ function userMessage(text: string): SDKUserMessage {
 // A single-consumer async queue used as the SDK's streaming-input `prompt`.
 // Yields the initial message immediately, then yields each pushed reply as it
 // arrives (awaiting when empty), and ends the iteration when close() is called.
-export function createMailbox(initial: string): Mailbox {
-  const queue: SDKUserMessage[] = [userMessage(initial)]
+export function createMailbox(initial?: string): Mailbox {
+  const queue: SDKUserMessage[] = initial === undefined ? [] : [userMessage(initial)]
   let closed = false
   // Resolver for a consumer currently parked on an empty queue.
   let wake: (() => void) | null = null

@@ -1,71 +1,73 @@
-import { type GeneralChatRun, startGeneralChat } from '@main/services/generalChat/run'
+import { chatRegistry } from '@main/services/chat/registry'
+import { startResumableChat } from '@main/services/chat/resumableRun'
 import { buildGeneralChatSeed } from '@main/services/generalChat/seed'
 import { jobRegistry } from '@main/services/jobs/registry'
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import type { GeneralChatEvent } from '@shared/ipc-events'
+import type { BaseChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { DEFAULT_MODEL_ID } from '@shared/models'
 import { observable } from '@trpc/server/observable'
 import { app } from 'electron'
 import { z } from 'zod'
 
-const runs = new Map<string, GeneralChatRun>()
+const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
 
 export const generalChatRouter = router({
-  start: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), message: z.string().min(1) }))
+  open: publicProcedure
+    .input(
+      z.object({
+        sessionId: z.string().uuid(),
+        lastSeq: z.number().int().nonnegative(),
+        kickoff: z.string().min(1).optional(),
+      }),
+    )
     .subscription(({ input }) =>
-      observable<GeneralChatEvent>((emit) => {
+      observable<SeqEnvelope<BaseChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
         const repoRoot = app.getAppPath()
-        const seed = buildGeneralChatSeed(input.message)
-        const job = jobRegistry.register({
-          kind: 'general.chat',
-          label: 'General chat',
-          model,
-          abort: () => runs.get(input.requestId)?.cancel(),
-        })
-
-        const run = startGeneralChat({
-          requestId: input.requestId,
-          seed,
-          model,
-          repoRoot,
-          emit: (event) => {
-            if (event.type === 'done') job.finish('done')
-            if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-            emit.next(event)
+        return chatRegistry.open(
+          {
+            sessionId: input.sessionId,
+            lastSeq: input.lastSeq,
+            kickoff: input.kickoff,
+            resumable: true,
+            buildRun: ({ resume, kickoff, push }) => {
+              const job = jobRegistry.register({
+                kind: 'general.chat',
+                label: 'General chat',
+                model,
+                abort: () => chatRegistry.cancel(input.sessionId),
+              })
+              return startResumableChat({
+                sessionId: input.sessionId,
+                model,
+                cwd: repoRoot,
+                allowedTools: CHAT_TOOLS,
+                settingSources: ['user', 'project'],
+                env: subscriptionEnv(),
+                seed: kickoff ? buildGeneralChatSeed(kickoff) : undefined,
+                resume,
+                emit: (event) => {
+                  if (event.type === 'done') job.finish('done')
+                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
+                  push(event)
+                },
+              })
+            },
           },
-        })
-        runs.set(input.requestId, run)
-
-        return () => {
-          const r = runs.get(input.requestId)
-          if (r) {
-            r.cancel()
-            runs.delete(input.requestId)
-          }
-          job.finish('error')
-        }
+          (env) => emit.next(env as SeqEnvelope<BaseChatEvent>),
+        )
       }),
     ),
 
   reply: publicProcedure
-    .input(z.object({ requestId: z.string().min(1), text: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid(), text: z.string().min(1) }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.reply(input.text)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.reply(input.sessionId, input.text) })),
 
   cancel: publicProcedure
-    .input(z.object({ requestId: z.string().min(1) }))
+    .input(z.object({ sessionId: z.string().uuid() }))
     .output(z.object({ ok: z.boolean() }))
-    .mutation(({ input }) => {
-      const run = runs.get(input.requestId)
-      run?.cancel()
-      runs.delete(input.requestId)
-      return { ok: Boolean(run) }
-    }),
+    .mutation(({ input }) => ({ ok: chatRegistry.cancel(input.sessionId) })),
 })

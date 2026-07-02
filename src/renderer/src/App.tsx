@@ -1,15 +1,13 @@
-import { BenchmarkChatHost } from '@renderer/components/BenchmarkChatHost'
+import { ChatHost } from '@renderer/components/ChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
-import { GeneralChatHost } from '@renderer/components/GeneralChatHost'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { NewsRunHost } from '@renderer/components/NewsRunHost'
-import { RoadmapChatHost } from '@renderer/components/RoadmapChatHost'
-import { SkillImproverHost } from '@renderer/components/SkillImproverHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
 import { Toaster } from '@renderer/components/ui/sonner'
+import { trpc } from '@renderer/lib/trpc'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
 import { Knowledge } from '@renderer/pages/Knowledge'
@@ -21,7 +19,13 @@ import { Settings } from '@renderer/pages/Settings'
 import { Skills } from '@renderer/pages/Skills'
 import { Stats } from '@renderer/pages/Stats'
 import { useResolvedTheme } from '@renderer/providers/ThemeProvider'
+import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
+import { useGeneralChatRun } from '@renderer/store/generalChatRun'
+import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
+import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
+import type { RoadmapItem } from '@shared/roadmap'
+import type { ImproverReport } from '@shared/skillImprover'
 import { type ComponentType, useEffect } from 'react'
 
 const PAGES: Record<Section, ComponentType> = {
@@ -61,6 +65,13 @@ export function App() {
 
   const Page = PAGES[section]
 
+  // Kickoffs: general/roadmap use the first user message; benchmark/improver use
+  // a domain id (batchId/skillId) carried in a companion store.
+  const generalKickoff = useGeneralChatRun((s) => s.transcript[0]?.text)
+  const roadmapKickoff = useRoadmapChatRun((s) => s.transcript[0]?.text)
+  const benchmarkKickoff = useBenchmarkChatContext((s) => s.batchId) ?? undefined
+  const improverKickoff = useSkillImproverExtra((s) => s.skillId) ?? undefined
+
   return (
     <ErrorBoundary>
       <div className="win">
@@ -74,10 +85,34 @@ export function App() {
       </div>
       <NewsRunHost />
       <TrendingRunHost />
-      <SkillImproverHost />
-      <BenchmarkChatHost />
-      <RoadmapChatHost />
-      <GeneralChatHost />
+      <ChatHost
+        useRun={useGeneralChatRun}
+        useOpenSubscription={trpc.generalChat.open.useSubscription}
+        kickoff={generalKickoff}
+      />
+      <ChatHost
+        useRun={useRoadmapChatRun}
+        useOpenSubscription={trpc.roadmapChat.open.useSubscription}
+        kickoff={roadmapKickoff}
+        onEvent={(event) => {
+          const e = event as { type: string; item?: RoadmapItem }
+          if (e.type === 'saved' && e.item) useRoadmapSaved.getState().setSaved(e.item)
+        }}
+      />
+      <ChatHost
+        useRun={useBenchmarkChatRun}
+        useOpenSubscription={trpc.benchmarkChat.open.useSubscription}
+        kickoff={benchmarkKickoff}
+      />
+      <ChatHost
+        useRun={useSkillImproverRun}
+        useOpenSubscription={trpc.skillImprover.open.useSubscription}
+        kickoff={improverKickoff}
+        onEvent={(event) => {
+          const e = event as { type: string; report?: ImproverReport }
+          if (e.type === 'report' && e.report) useSkillImproverExtra.getState().setReport(e.report)
+        }}
+      />
       <UnifiedChatDrawer />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>

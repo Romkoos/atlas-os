@@ -9,7 +9,7 @@ import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
-import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
+import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
 import { useUiStore } from '@renderer/store/ui'
 import { groupByPrefix } from '@shared/skills'
@@ -2108,7 +2108,8 @@ function BenchmarkTab() {
                   className="btn"
                   style={{ marginTop: 12 }}
                   onClick={() => {
-                    useBenchmarkChatRun.getState().start(analysis.data?.batchId ?? '')
+                    useBenchmarkChatContext.getState().setBatch(analysis.data?.batchId ?? '')
+                    useBenchmarkChatRun.getState().startBlank()
                     useChatDrawer.getState().openSession({ type: 'benchmark' })
                   }}
                 >
