@@ -1351,6 +1351,10 @@
     transform: translateX(100%);
     visibility: hidden;
     pointer-events: none;
+    /* The panel is fixed at top:0 and overlaps the .win-bar title bar, which is
+       a -webkit-app-region: drag region. Without no-drag the OS drag region
+       swallows clicks in the drawer's top strip (tabs / tab × / collapse ×). */
+    -webkit-app-region: no-drag;
     transition:
       transform 0.24s ease,
       width 0.24s ease,
