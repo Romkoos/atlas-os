@@ -1,6 +1,7 @@
 import { agentRouter } from '@main/trpc/routers/agent'
 import { benchmarkRouter } from '@main/trpc/routers/benchmark'
 import { benchmarkChatRouter } from '@main/trpc/routers/benchmarkChat'
+import { generalChatRouter } from '@main/trpc/routers/generalChat'
 import { graphRouter } from '@main/trpc/routers/graph'
 import { healthRouter } from '@main/trpc/routers/health'
 import { jobsRouter } from '@main/trpc/routers/jobs'
@@ -35,6 +36,7 @@ export const appRouter = router({
   plugins: pluginsRouter,
   roadmap: roadmapRouter,
   roadmapChat: roadmapChatRouter,
+  generalChat: generalChatRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -1,5 +1,6 @@
 import { BenchmarkChatHost } from '@renderer/components/BenchmarkChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
+import { GeneralChatHost } from '@renderer/components/GeneralChatHost'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
@@ -7,6 +8,7 @@ import { NewsRunHost } from '@renderer/components/NewsRunHost'
 import { RoadmapChatHost } from '@renderer/components/RoadmapChatHost'
 import { SkillImproverHost } from '@renderer/components/SkillImproverHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
+import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
@@ -75,6 +77,8 @@ export function App() {
       <SkillImproverHost />
       <BenchmarkChatHost />
       <RoadmapChatHost />
+      <GeneralChatHost />
+      <UnifiedChatDrawer />
       <Toaster theme={theme} richColors closeButton />
     </ErrorBoundary>
   )

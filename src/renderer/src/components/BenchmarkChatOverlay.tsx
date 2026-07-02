@@ -3,8 +3,9 @@ import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { useEffect, useRef, useState } from 'react'
 
-// Floating discussion panel over the benchmark tab. Reads the App-level store,
-// so the session continues even when this overlay is unmounted (tab switch).
+// Body of the benchmark-discussion session, rendered inside UnifiedChatDrawer.
+// Reads the App-level store, so the session continues even when this body is
+// unmounted (tab switch / drawer collapse). Close/stop is owned by the drawer.
 export function BenchmarkChatOverlay() {
   const status = useBenchmarkChatRun((s) => s.status)
   const requestId = useBenchmarkChatRun((s) => s.requestId)
@@ -12,10 +13,8 @@ export function BenchmarkChatOverlay() {
   const streaming = useBenchmarkChatRun((s) => s.streaming)
   const awaitingInput = useBenchmarkChatRun((s) => s.awaitingInput)
   const pushUserReply = useBenchmarkChatRun((s) => s.pushUserReply)
-  const reset = useBenchmarkChatRun((s) => s.reset)
 
   const reply = trpc.benchmarkChat.reply.useMutation()
-  const cancel = trpc.benchmarkChat.cancel.useMutation()
   const [draft, setDraft] = useState('')
   const logRef = useRef<HTMLDivElement>(null)
 
@@ -34,19 +33,8 @@ export function BenchmarkChatOverlay() {
     setDraft('')
   }
 
-  const closeChat = () => {
-    if (requestId && status === 'running') cancel.mutate({ requestId })
-    reset()
-  }
-
   return (
-    <div className="bench-chat">
-      <div className="bench-chat-head">
-        <span className="ttl">discuss results</span>
-        <button type="button" className="btn" onClick={closeChat}>
-          {status === 'running' ? 'STOP' : 'CLOSE'}
-        </button>
-      </div>
+    <div className="bench-chat-body">
       <div className="bench-chat-log" ref={logRef}>
         {transcript.map((e, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: transcript is append-only; no stable id

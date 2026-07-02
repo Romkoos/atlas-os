@@ -1,23 +1,20 @@
 import { trpc } from '@renderer/lib/trpc'
-import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
-import { CheckCircle2 } from 'lucide-react'
+import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useEffect, useRef, useState } from 'react'
 
-// Body of the roadmap brainstorming session, rendered inside UnifiedChatDrawer.
-// Reads the App-level store, so the session survives tab switches / drawer
-// collapse (the subscription lives in RoadmapChatHost). Close/stop is owned by
-// the drawer.
-export function RoadmapChatOverlay() {
-  const status = useRoadmapChatRun((s) => s.status)
-  const requestId = useRoadmapChatRun((s) => s.requestId)
-  const transcript = useRoadmapChatRun((s) => s.transcript)
-  const streaming = useRoadmapChatRun((s) => s.streaming)
-  const awaitingInput = useRoadmapChatRun((s) => s.awaitingInput)
-  const savedItem = useRoadmapChatRun((s) => s.savedItem)
-  const startSession = useRoadmapChatRun((s) => s.start)
-  const pushUserReply = useRoadmapChatRun((s) => s.pushUserReply)
+// Body of the general chat session, rendered inside UnifiedChatDrawer. Reads the
+// App-level store, so the session survives tab switches / drawer collapse (the
+// subscription lives in GeneralChatHost). Close/stop is owned by the drawer.
+export function GeneralChatOverlay() {
+  const status = useGeneralChatRun((s) => s.status)
+  const requestId = useGeneralChatRun((s) => s.requestId)
+  const transcript = useGeneralChatRun((s) => s.transcript)
+  const streaming = useGeneralChatRun((s) => s.streaming)
+  const awaitingInput = useGeneralChatRun((s) => s.awaitingInput)
+  const startSession = useGeneralChatRun((s) => s.start)
+  const pushUserReply = useGeneralChatRun((s) => s.pushUserReply)
 
-  const reply = trpc.roadmapChat.reply.useMutation()
+  const reply = trpc.generalChat.reply.useMutation()
   const [draft, setDraft] = useState('')
   const logRef = useRef<HTMLDivElement>(null)
 
@@ -26,12 +23,12 @@ export function RoadmapChatOverlay() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new output
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [transcript, streaming, savedItem])
+  }, [transcript, streaming])
 
-  const beginBrainstorm = () => {
-    const idea = draft.trim()
-    if (!idea) return
-    startSession(idea)
+  const begin = () => {
+    const text = draft.trim()
+    if (!text) return
+    startSession(text)
     setDraft('')
   }
 
@@ -47,34 +44,28 @@ export function RoadmapChatOverlay() {
     <div className="rm-chat-body">
       {!started ? (
         <div className="rm-chat-intro">
-          <span className="rm-field-label">Describe your idea</span>
+          <span className="rm-field-label">New chat</span>
           <textarea
             className="input"
             rows={5}
             value={draft}
-            placeholder="e.g. a panel that shows which skills I use most and suggests ones to retire…"
+            placeholder="Ask anything…"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault()
-                beginBrainstorm()
+                begin()
               }
             }}
-            // biome-ignore lint/a11y/noAutofocus: focus the idea field when the incubator opens
+            // biome-ignore lint/a11y/noAutofocus: focus the message field when a new chat opens
             autoFocus
           />
           <div className="rm-chat-hint">
-            The agent will brainstorm it with you (in your language) and save a finished, English
-            card to the right category. ⌘↵ to start.
+            The assistant has read-only access to this repo. ⌘↵ to start.
           </div>
           <div className="rm-chat-intro-foot">
-            <button
-              type="button"
-              className="btn primary"
-              onClick={beginBrainstorm}
-              disabled={!draft.trim()}
-            >
-              start brainstorming
+            <button type="button" className="btn primary" onClick={begin} disabled={!draft.trim()}>
+              start chat
             </button>
           </div>
         </div>
@@ -88,19 +79,13 @@ export function RoadmapChatOverlay() {
               </div>
             ))}
             {streaming ? <div className="rm-chat-entry assistant">{streaming}</div> : null}
-            {savedItem ? (
-              <div className="rm-chat-saved">
-                <CheckCircle2 size={14} />
-                saved to {savedItem.category}: {savedItem.title}
-              </div>
-            ) : null}
           </div>
           <div className="rm-chat-foot">
             <textarea
               className="input"
               rows={2}
               value={draft}
-              placeholder={awaitingInput ? 'Reply…' : 'Agent is thinking…'}
+              placeholder={awaitingInput ? 'Reply…' : 'Assistant is thinking…'}
               disabled={!awaitingInput || status !== 'running'}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
