@@ -30,3 +30,23 @@ describe('createMailbox', () => {
     expect(first.parent_tool_use_id).toBeNull()
   })
 })
+
+describe('createMailbox empty start', () => {
+  it('yields nothing until push when no initial is given', async () => {
+    const mailbox = createMailbox()
+    const iter = mailbox.stream[Symbol.asyncIterator]()
+    const pending = iter.next()
+    mailbox.push('first reply')
+    const first = await pending
+    expect(first.done).toBe(false)
+    expect(first.value.message.content).toBe('first reply')
+  })
+
+  it('ends immediately when closed before any push', async () => {
+    const mailbox = createMailbox()
+    const iter = mailbox.stream[Symbol.asyncIterator]()
+    const pending = iter.next()
+    mailbox.close()
+    expect((await pending).done).toBe(true)
+  })
+})
