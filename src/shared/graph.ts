@@ -45,6 +45,16 @@ export const codeGraphSchema = z.object({
 })
 export type CodeGraph = z.infer<typeof codeGraphSchema>
 
+// A bounded source preview for a node's backing file (code/doc/skill/knowledge).
+// `content` is truncated to a line cap; `totalLines` reports the real length.
+export const nodePreviewSchema = z.object({
+  language: z.string().nullable(),
+  content: z.string(),
+  totalLines: z.number(),
+  truncated: z.boolean(),
+})
+export type NodePreview = z.infer<typeof nodePreviewSchema>
+
 export const graphClusterSchema = z.object({
   community: z.number(),
   size: z.number(),
