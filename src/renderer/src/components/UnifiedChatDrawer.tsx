@@ -5,6 +5,7 @@ import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
 import { useRoadmapChatRun } from '@renderer/store/roadmapChatRun'
 import { MessageSquare, X } from 'lucide-react'
+import { useEffect } from 'react'
 
 // The single UI surface for every chat session. Sessions themselves live in the
 // domain stores and their subscriptions in the App-level hosts, so collapsing
@@ -36,9 +37,24 @@ export function UnifiedChatDrawer() {
 
   const active = sessions.find((s) => s.id === activeSessionId)
 
+  // Escape collapses the drawer (sessions keep running in the background).
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, setOpen])
+
   return (
     <>
-      <button type="button" className="chat-fab" aria-label="Open chat" onClick={toggle}>
+      <button
+        type="button"
+        className={`chat-fab${open ? ' chat-fab-hidden' : ''}`}
+        aria-label="Open chat"
+        onClick={toggle}
+      >
         <MessageSquare size={18} />
         {sessions.length > 0 ? <span className="chat-fab-badge">{sessions.length}</span> : null}
       </button>
