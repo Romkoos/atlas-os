@@ -2,14 +2,16 @@ import { BenchmarkChatOverlay } from '@renderer/components/BenchmarkChatOverlay'
 import { GeneralChatOverlay } from '@renderer/components/GeneralChatOverlay'
 import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
 import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
+import { WorkerChatOverlay } from '@renderer/components/WorkerChatOverlay'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
-import { MessageSquare, Plus, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useWorkerChatRun } from '@renderer/store/workerChatRun'
+import { MessageSquare, Plus, Wrench, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 // The single UI surface for every chat session. Sessions themselves live in the
 // domain stores and their subscriptions in the App-level hosts, so collapsing
@@ -27,6 +29,9 @@ export function UnifiedChatDrawer() {
   const roadmapCancel = trpc.roadmapChat.cancel.useMutation()
   const skillCancel = trpc.skillImprover.cancel.useMutation()
   const generalCancel = trpc.generalChat.cancel.useMutation()
+  const workerCancel = trpc.workerChat.cancel.useMutation()
+
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const endSession = (type: ChatSessionType) => {
     if (type === 'benchmark') {
@@ -44,6 +49,10 @@ export function UnifiedChatDrawer() {
       if (st.sessionId && st.running) skillCancel.mutate({ sessionId: st.sessionId })
       st.reset()
       useSkillImproverExtra.getState().clear()
+    } else if (type === 'worker') {
+      const st = useWorkerChatRun.getState()
+      if (st.sessionId && st.running) workerCancel.mutate({ sessionId: st.sessionId })
+      st.reset()
     } else {
       const st = useGeneralChatRun.getState()
       if (st.sessionId && st.running) generalCancel.mutate({ sessionId: st.sessionId })
@@ -52,18 +61,20 @@ export function UnifiedChatDrawer() {
     closeSession(type) // id === type
   }
 
-  // FAB-when-empty and the "+" button both land here. Start a fresh chat unless
-  // the model is actively streaming (running && !awaitingInput) — then just
-  // focus so we never interrupt an in-flight response. Resetting also cancels
-  // the open server run.
-  const openGeneralChat = () => {
-    const st = useGeneralChatRun.getState()
+  // The FAB (when empty) and the "+" button open a small two-icon picker; each
+  // icon lands here. Start a fresh chat of `type` unless it is actively
+  // streaming (running && !awaitingInput) — then just focus so we never
+  // interrupt an in-flight response. Resetting also cancels the open server run.
+  const openChat = (type: 'generalChat' | 'worker') => {
+    const st = type === 'worker' ? useWorkerChatRun.getState() : useGeneralChatRun.getState()
+    const cancel = type === 'worker' ? workerCancel : generalCancel
     const streamingNow = st.running && !st.awaitingInput
     if (st.status !== 'idle' && !streamingNow) {
-      if (st.sessionId) generalCancel.mutate({ sessionId: st.sessionId })
+      if (st.sessionId) cancel.mutate({ sessionId: st.sessionId })
       st.reset()
     }
-    openSession({ type: 'generalChat' })
+    openSession({ type })
+    setPickerOpen(false)
   }
 
   const active = sessions.find((s) => s.id === activeSessionId)
@@ -79,13 +90,34 @@ export function UnifiedChatDrawer() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, setOpen])
 
+  // Two-icon choice (regular chat vs full-access worker), shared by the FAB
+  // picker (drawer closed) and the header "+" dropdown (drawer open).
+  const pickerButtons = (
+    <>
+      <button type="button" className="chat-picker-btn" onClick={() => openChat('generalChat')}>
+        <MessageSquare size={16} />
+        <span>Chat</span>
+      </button>
+      <button type="button" className="chat-picker-btn" onClick={() => openChat('worker')}>
+        <Wrench size={16} />
+        <span>Worker</span>
+      </button>
+    </>
+  )
+
   return (
     <>
+      {pickerOpen && !open ? (
+        <div className="chat-picker" role="menu">
+          {pickerButtons}
+        </div>
+      ) : null}
+
       <button
         type="button"
         className={`chat-fab${open ? ' chat-fab-hidden' : ''}`}
         aria-label="Open chat"
-        onClick={() => (sessions.length === 0 ? openGeneralChat() : setOpen(true))}
+        onClick={() => (sessions.length === 0 ? setPickerOpen((o) => !o) : setOpen(true))}
       >
         <MessageSquare size={18} />
         {sessions.length > 0 ? <span className="chat-fab-badge">{sessions.length}</span> : null}
@@ -113,14 +145,21 @@ export function UnifiedChatDrawer() {
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            className="chat-drawer-new"
-            aria-label="New chat"
-            onClick={openGeneralChat}
-          >
-            <Plus size={14} />
-          </button>
+          <div className="chat-new-wrap">
+            <button
+              type="button"
+              className="chat-drawer-new"
+              aria-label="New chat"
+              onClick={() => setPickerOpen((o) => !o)}
+            >
+              <Plus size={14} />
+            </button>
+            {pickerOpen && open ? (
+              <div className="chat-picker chat-picker-inline" role="menu">
+                {pickerButtons}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className="chat-drawer-collapse"
@@ -135,6 +174,7 @@ export function UnifiedChatDrawer() {
           {active?.type === 'roadmap' ? <RoadmapChatOverlay /> : null}
           {active?.type === 'skillImprover' ? <SkillImproverOverlay /> : null}
           {active?.type === 'generalChat' ? <GeneralChatOverlay /> : null}
+          {active?.type === 'worker' ? <WorkerChatOverlay /> : null}
         </div>
       </aside>
     </>

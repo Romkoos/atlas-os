@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover' | 'generalChat'
+export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover' | 'generalChat' | 'worker'
 
 export interface ChatSession {
   id: string
@@ -14,9 +14,16 @@ const DEFAULT_TITLES: Record<ChatSessionType, string> = {
   roadmap: 'idea incubator',
   skillImprover: 'improver',
   generalChat: 'chat',
+  worker: 'worker',
 }
 
-const VALID_TYPES: ChatSessionType[] = ['benchmark', 'roadmap', 'skillImprover', 'generalChat']
+const VALID_TYPES: ChatSessionType[] = [
+  'benchmark',
+  'roadmap',
+  'skillImprover',
+  'generalChat',
+  'worker',
+]
 
 // UI-only state for the unified chat drawer. Deliberately domain-agnostic: it
 // tracks which chat tabs are visible, not the chat sessions themselves (those
@@ -105,7 +112,7 @@ export const useChatDrawer = create<ChatDrawerState>()(
     }),
     {
       name: 'atlas-chat-drawer',
-      version: 1,
+      version: 2,
       storage,
       partialize: (s) => ({
         open: s.open,

@@ -4,7 +4,8 @@ import type { ImproverReport } from '@shared/skillImprover'
 // Common events shared by every drawer chat's transport layer.
 export type BaseChatEvent =
   | { type: 'token'; text: string }
-  | { type: 'tool'; name: string; summary: string }
+  | { type: 'tool'; name: string; summary: string; toolId: string }
+  | { type: 'tool-result'; toolId: string; resultText: string; isError: boolean }
   | { type: 'awaiting-input' }
   | { type: 'done' }
   | { type: 'error'; message: string }
