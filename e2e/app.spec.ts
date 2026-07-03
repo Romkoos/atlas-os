@@ -64,6 +64,24 @@ test('Roadmap page renders seeded items', async () => {
   await app.close()
 })
 
+test('Roadmap Board view shows status columns', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  await window.getByRole('button', { name: '02 ROADMAP' }).click()
+  await window.getByRole('button', { name: 'Board', exact: true }).click()
+
+  // The four status column headers render STATUS_LABELS DOM text (CSS
+  // uppercases them visually); exact match avoids colliding with "hide done".
+  await expect(window.getByText('To do', { exact: true })).toBeVisible({ timeout: 15000 })
+  await expect(window.getByText('Planned', { exact: true })).toBeVisible()
+  await expect(window.getByText('In progress', { exact: true })).toBeVisible()
+  await expect(window.getByText('Done', { exact: true })).toBeVisible()
+
+  await app.close()
+})
+
 test('Roadmap "new idea" opens the incubator chat', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
