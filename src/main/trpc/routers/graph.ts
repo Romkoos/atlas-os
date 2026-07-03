@@ -98,7 +98,7 @@ export const graphRouter = router({
       }),
     })),
 
-  deepMap: publicProcedure
+  build: publicProcedure
     .input(z.object({ requestId: z.string().min(1), projectPath: z.string().min(1) }))
     .subscription(({ input }) =>
       observable<GraphDeepMapEvent>((emit) => {
@@ -110,7 +110,7 @@ export const graphRouter = router({
         const model = getSettings().model ?? DEFAULT_MODEL_ID
         const job = jobRegistry.register({
           kind: 'graph.deepMap',
-          label: `Graphify deep map: ${input.projectPath}`,
+          label: `Build map: ${input.projectPath}`,
           model,
           abort: () => deepRuns.get(input.requestId)?.cancel(),
         })

@@ -1,25 +1,19 @@
 import { trpc } from '@renderer/lib/trpc'
-import type { CodeGraphNode, CodeNodeKind } from '@shared/graph'
+import { useUiStore } from '@renderer/store/ui'
+import type { CodeGraphNode } from '@shared/graph'
 import { forceCollide, forceX, forceY } from 'd3-force'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { Graph3DBoundary } from './Graph3DBoundary'
-import { colorForKind } from './graph-colors'
+import { colorForKind, colorForNode, DEFINED_IN_EDGE_COLOR } from './graph-colors'
 import { NodeDetails } from './NodeDetails'
 import { ambiguousLabels, displayLabel } from './node-label'
+import { communityKey, filterBySources, SOURCE_KEYS } from './source-filter'
 import { type ViewMode, ViewToggle } from './ViewToggle'
 
 type FgNode = CodeGraphNode & { x?: number; y?: number }
-type FgLink = { source: string; target: string; inferred: boolean }
+type FgLink = { source: string; target: string; inferred: boolean; kind: string }
 type View = 'isolated' | 'unified'
-
-const KIND_LABELS: ReadonlyArray<{ id: CodeNodeKind; label: string }> = [
-  { id: 'code', label: 'code' },
-  { id: 'doc', label: 'docs' },
-  { id: 'skill', label: 'skills' },
-  { id: 'knowledge', label: 'knowledge' },
-  { id: 'session', label: 'sessions' },
-]
 
 const Galaxy3D = lazy(() => import('./Galaxy3D'))
 
@@ -29,8 +23,14 @@ export function CodeGraphTab({ project }: { project: string }) {
   const [view, setView] = useState<View>('isolated')
   const [showInferred, setShowInferred] = useState(true)
   const [selected, setSelected] = useState<FgNode | null>(null)
-  const [status, setStatus] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('3d')
+  const graphSources = useUiStore((s) => s.graphSources)
+  const setGraphSources = useUiStore((s) => s.setGraphSources)
+  const enabled = useMemo(() => new Set(graphSources), [graphSources])
+  const toggleSource = (key: string) =>
+    setGraphSources(
+      graphSources.includes(key) ? graphSources.filter((k) => k !== key) : [...graphSources, key],
+    )
 
   // Default to the project matching the page's active project name, else the first.
   const activePath = useMemo(() => {
@@ -43,54 +43,45 @@ export function CodeGraphTab({ project }: { project: string }) {
   const graph = trpc.graph.getGraph.useQuery({ scope }, { enabled: Boolean(activePath) })
   const utils = trpc.useUtils()
 
-  const build = trpc.graph.buildGraph.useMutation({
-    onMutate: () => setStatus('building…'),
-    onSuccess: (r) => {
-      setStatus(`built: ${r.nodes} nodes, ${r.edges} edges, ${r.clusters} clusters`)
-      utils.graph.getGraph.invalidate()
-      utils.graph.listProjects.invalidate()
-    },
-    onError: (e) => setStatus(`error: ${e.message}`),
-  })
+  const [buildStatus, setBuildStatus] = useState('')
+  const [buildReqId, setBuildReqId] = useState<string | null>(null)
+  const cancelBuild = trpc.graph.cancelDeepMap.useMutation()
 
-  const [deepStatus, setDeepStatus] = useState('')
-  const [deepReqId, setDeepReqId] = useState<string | null>(null)
-  const cancelDeep = trpc.graph.cancelDeepMap.useMutation()
-
-  trpc.graph.deepMap.useSubscription(
-    { requestId: deepReqId ?? '', projectPath: activePath ?? '' },
+  trpc.graph.build.useSubscription(
+    { requestId: buildReqId ?? '', projectPath: activePath ?? '' },
     {
-      enabled: Boolean(deepReqId && activePath),
+      enabled: Boolean(buildReqId && activePath),
       onData: (e) => {
-        if (e.type === 'tool') setDeepStatus(`graphify: ${e.summary}`)
-        else if (e.type === 'progress') setDeepStatus(e.message)
+        if (e.type === 'tool') setBuildStatus(`graphify: ${e.summary}`)
+        else if (e.type === 'progress') setBuildStatus(e.message)
         else if (e.type === 'done') {
-          setDeepStatus(`deep map: +${e.nodesAdded} nodes, +${e.edgesAdded} edges`)
-          setDeepReqId(null)
+          setBuildStatus(`built: +${e.nodesAdded} nodes, +${e.edgesAdded} edges`)
+          setBuildReqId(null)
           utils.graph.getGraph.invalidate()
+          utils.graph.listProjects.invalidate()
         } else if (e.type === 'error') {
-          setDeepStatus(`error: ${e.message}`)
-          setDeepReqId(null)
+          setBuildStatus(`error: ${e.message}`)
+          setBuildReqId(null)
         } else if (e.type === 'aborted') {
-          setDeepStatus('deep map aborted')
-          setDeepReqId(null)
+          setBuildStatus('build aborted')
+          setBuildReqId(null)
         }
       },
       onError: (err) => {
-        setDeepStatus(`error: ${err.message}`)
-        setDeepReqId(null)
+        setBuildStatus(`error: ${err.message}`)
+        setBuildReqId(null)
       },
     },
   )
 
-  const startDeepMap = () => {
+  const startBuild = () => {
     if (!activePath) return
-    setDeepStatus('starting graphify…')
-    setDeepReqId(`deep-${activePath}-${Date.now()}`)
+    setBuildStatus('starting build…')
+    setBuildReqId(`build-${activePath}-${Date.now()}`)
   }
-  const stopDeepMap = () => {
-    if (deepReqId) cancelDeep.mutate({ requestId: deepReqId })
-    setDeepReqId(null)
+  const stopBuild = () => {
+    if (buildReqId) cancelBuild.mutate({ requestId: buildReqId })
+    setBuildReqId(null)
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: ForceGraph ref has no exported type
@@ -113,13 +104,14 @@ export function CodeGraphTab({ project }: { project: string }) {
   const data = useMemo(() => {
     const raw = graph.data
     if (!raw) return { nodes: [] as FgNode[], links: [] as FgLink[] }
-    const nodes: FgNode[] = raw.nodes.map((n) => ({ ...n }))
+    const scoped = filterBySources(raw, enabled)
+    const nodes: FgNode[] = scoped.nodes.map((n) => ({ ...n }))
     const ids = new Set(nodes.map((n) => n.id))
-    const links: FgLink[] = raw.edges
+    const links: FgLink[] = scoped.edges
       .filter((e) => (showInferred || !e.inferred) && ids.has(e.source) && ids.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target, inferred: e.inferred }))
+      .map((e) => ({ source: e.source, target: e.target, inferred: e.inferred, kind: e.kind }))
     return { nodes, links }
-  }, [graph.data, showInferred])
+  }, [graph.data, showInferred, enabled])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reheat on visible-set change
   useEffect(() => {
@@ -146,7 +138,7 @@ export function CodeGraphTab({ project }: { project: string }) {
     const ids = new Set<string>([selected.id])
     for (const n of neighbors.data?.nodes ?? []) ids.add(n.id)
     if (selected.community != null) {
-      for (const n of data.nodes) if (n.community === selected.community) ids.add(n.id)
+      for (const n of data.nodes) if (communityKey(n) === communityKey(selected)) ids.add(n.id)
     }
     return ids
   }, [selected, neighbors.data, data.nodes])
@@ -188,25 +180,32 @@ export function CodeGraphTab({ project }: { project: string }) {
           show inferred
         </label>
         <ViewToggle value={viewMode} onChange={setViewMode} />
-        <button
-          type="button"
-          className="btn"
-          disabled={!activePath || build.isPending}
-          onClick={() => activePath && build.mutate({ projectPath: activePath })}
-        >
-          Build
-        </button>
-        <span className="kb-graph-status">{status}</span>
-        {deepReqId ? (
-          <button type="button" className="btn" onClick={stopDeepMap}>
-            Cancel deep map
+        {buildReqId ? (
+          <button type="button" className="btn" onClick={stopBuild}>
+            Cancel
           </button>
         ) : (
-          <button type="button" className="btn" disabled={!activePath} onClick={startDeepMap}>
-            Deep map via graphify
+          <button type="button" className="btn" disabled={!activePath} onClick={startBuild}>
+            Build
           </button>
         )}
-        <span className="kb-graph-status">{deepStatus}</span>
+        <span className="kb-graph-status">{buildStatus}</span>
+      </div>
+
+      <div className="kb-graph-legend kb-graph-sources">
+        {SOURCE_KEYS.map((key) => {
+          const on = enabled.has(key)
+          const swatch =
+            key === 'graphify'
+              ? colorForNode({ origin: 'graphify', kind: 'code' })
+              : colorForKind(key as FgNode['kind'])
+          return (
+            <label key={key} className="kb-graph-legend-item" style={{ opacity: on ? 1 : 0.4 }}>
+              <input type="checkbox" checked={on} onChange={() => toggleSource(key)} />
+              <span className="dot" style={{ background: swatch }} /> {key}
+            </label>
+          )
+        })}
       </div>
 
       <div className="kb-graph-body">
@@ -222,12 +221,18 @@ export function CodeGraphTab({ project }: { project: string }) {
               backgroundColor="transparent"
               nodeId="id"
               nodeLabel={(n) => `${displayLabel(n as FgNode, ambiguous)} [${(n as FgNode).kind}]`}
-              nodeColor={(n) => colorForKind((n as FgNode).kind)}
+              nodeColor={(n) => colorForNode(n as FgNode)}
               onNodeClick={(n) => setSelected(n as FgNode)}
               linkColor={(l) =>
-                (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
+                (l as FgLink).kind === 'defined_in'
+                  ? DEFINED_IN_EDGE_COLOR
+                  : (l as FgLink).inferred
+                    ? 'rgba(210,166,255,0.4)'
+                    : 'rgba(120,120,120,0.3)'
               }
-              linkLineDash={(l) => ((l as FgLink).inferred ? [3, 3] : null)}
+              linkLineDash={(l) =>
+                (l as FgLink).kind === 'defined_in' || (l as FgLink).inferred ? [3, 3] : null
+              }
               onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
             />
           ) : (
@@ -237,14 +242,18 @@ export function CodeGraphTab({ project }: { project: string }) {
                   graphData={data}
                   width={size.w}
                   height={size.h}
-                  nodeColor={(n) => colorForKind((n as FgNode).kind)}
+                  nodeColor={(n) => colorForNode(n as FgNode)}
                   nodeVal={() => 1}
                   nodeLabel={(n) =>
                     `${displayLabel(n as FgNode, ambiguous)} [${(n as FgNode).kind}]`
                   }
-                  clusterKey={(n) => (n as FgNode).community ?? -1}
+                  clusterKey={(n) => communityKey(n as FgNode)}
                   linkColor={(l) =>
-                    (l as FgLink).inferred ? 'rgba(210,166,255,0.4)' : 'rgba(120,120,120,0.3)'
+                    (l as FgLink).kind === 'defined_in'
+                      ? DEFINED_IN_EDGE_COLOR
+                      : (l as FgLink).inferred
+                        ? 'rgba(210,166,255,0.4)'
+                        : 'rgba(120,120,120,0.3)'
                   }
                   onNodeClick={(n) => setSelected(n as FgNode)}
                   selectedId={selected?.id ?? null}
@@ -267,14 +276,6 @@ export function CodeGraphTab({ project }: { project: string }) {
             onClose={() => setSelected(null)}
           />
         )}
-      </div>
-
-      <div className="kb-graph-legend">
-        {KIND_LABELS.map((k) => (
-          <span key={k.id} className="kb-graph-legend-item">
-            <span className="dot" style={{ background: colorForKind(k.id) }} /> {k.label}
-          </span>
-        ))}
       </div>
     </div>
   )

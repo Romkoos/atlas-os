@@ -77,3 +77,32 @@ describe('useUiStore actions', () => {
     expect(useUiStore.getState().selectedProject).toBeNull()
   })
 })
+
+describe('graphSources', () => {
+  it('defaults to all sources except session', () => {
+    expect(useUiStore.getState().graphSources).toEqual([
+      'code',
+      'doc',
+      'knowledge',
+      'skill',
+      'graphify',
+    ])
+  })
+
+  it('setGraphSources replaces the enabled set', () => {
+    useUiStore.getState().setGraphSources(['code', 'graphify'])
+    expect(useUiStore.getState().graphSources).toEqual(['code', 'graphify'])
+  })
+
+  it('mergePersistedUi keeps a valid persisted array and defaults a bad one', () => {
+    const cur = useUiStore.getState()
+    expect(mergePersistedUi({ graphSources: ['doc'] }, cur).graphSources).toEqual(['doc'])
+    expect(mergePersistedUi({ graphSources: 'nope' }, cur).graphSources).toEqual([
+      'code',
+      'doc',
+      'knowledge',
+      'skill',
+      'graphify',
+    ])
+  })
+})

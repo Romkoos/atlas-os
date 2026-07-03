@@ -14,7 +14,9 @@ import {
 } from '@shared/graph'
 import type { GraphDeepMapEvent } from '@shared/ipc-events'
 
-import { loadGraph, saveGraphifyGraph } from './store'
+import { indexProject } from './indexer'
+import { exportMap } from './mapExport'
+import { loadGraph, saveGraphifyGraph, saveStructuralGraph } from './store'
 
 export interface GraphifyNode {
   id: string
@@ -57,52 +59,47 @@ function kindForFileType(fileType: string | undefined): CodeNodeKind {
   return 'code'
 }
 
-// Merge graphify's LLM graph onto the structural graph. Returns ONLY the
-// graphify-origin additions (new nodes + semantic edges) — the caller persists
-// these as the 'graphify' layer, leaving the 'indexer' layer untouched.
+// Merge graphify's LLM graph onto the structural graph as the 'graphify' layer.
+// Unlike a collapse, this keeps graphify's full node set (symbols + concepts) as
+// distinct graphify-origin nodes, connects them with their semantic edges, and
+// bridges each to the structural file node that defines it (defined_in). The
+// caller persists these as the 'graphify' layer; the 'indexer' layer is untouched.
 export function mergeGraphifyGraph(
   projectPath: string,
   structural: CodeGraph,
   gy: GraphifyJson,
 ): CodeGraph {
-  const relToExistingId = new Map<string, string>()
-  for (const n of structural.nodes) if (n.relPath) relToExistingId.set(n.relPath, n.id)
-
-  const gidToRel = new Map<string, string>()
-  for (const gn of gy.nodes) if (gn.id && gn.source_file) gidToRel.set(gn.id, gn.source_file)
+  const relToStructId = new Map<string, string>()
+  for (const n of structural.nodes) if (n.relPath) relToStructId.set(n.relPath, n.id)
 
   const newNodes = new Map<string, CodeGraphNode>()
-
-  const resolveNodeId = (gid: string | undefined): string | null => {
-    if (!gid) return null
-    const rel = gidToRel.get(gid)
-    if (rel && relToExistingId.has(rel)) return relToExistingId.get(rel) as string
-    // graphify knows a file the structural pass didn't index → create it.
-    const gn = gy.nodes.find((n) => n.id === gid)
-    if (!gn) return null // dangling reference: id not present in gy.nodes → skip, don't fabricate
+  const gidToNodeId = new Map<string, string>()
+  for (const gn of gy.nodes) {
+    if (!gn.id) continue
     const kind = kindForFileType(gn.file_type)
-    const key = rel ?? gid
-    const id = codeNodeId(projectPath, kind, key)
+    const id = codeNodeId(projectPath, kind, gn.id)
+    gidToNodeId.set(gn.id, id)
     if (!newNodes.has(id)) {
       newNodes.set(id, {
         id,
         projectPath,
         kind,
-        label: gn?.label ?? (rel ? basename(rel) : gid),
-        relPath: rel ?? null,
-        meta: { origin: 'graphify' },
-        community: typeof gn?.community === 'number' ? gn.community : null,
+        label: gn.label ?? (gn.source_file ? basename(gn.source_file) : gn.id),
+        relPath: gn.source_file ?? null,
+        meta: { origin: 'graphify', graphifyId: gn.id },
+        community: typeof gn.community === 'number' ? gn.community : null,
         origin: 'graphify',
       })
     }
-    return id
   }
 
   const edges: CodeGraphEdge[] = []
   const seen = new Set<string>()
+
+  // Semantic edges among graphify nodes (skip endpoints not in the node set).
   for (const l of gy.links) {
-    const s = resolveNodeId(l.source ?? l._src)
-    const t = resolveNodeId(l.target ?? l._tgt)
+    const s = gidToNodeId.get(l.source ?? l._src ?? '')
+    const t = gidToNodeId.get(l.target ?? l._tgt ?? '')
     if (!s || !t || s === t) continue
     const id = codeEdgeId(s, t, 'semantic')
     if (seen.has(id)) continue
@@ -117,6 +114,27 @@ export function mergeGraphifyGraph(
       inferred: audit !== 'EXTRACTED',
       origin: 'graphify',
       meta: { audit, relation: l.relation ?? null },
+    })
+  }
+
+  // defined_in bridges: graphify node → the structural file node it belongs to.
+  for (const gn of gy.nodes) {
+    if (!gn.id || !gn.source_file) continue
+    const structId = relToStructId.get(gn.source_file)
+    const gNodeId = gidToNodeId.get(gn.id)
+    if (!structId || !gNodeId || structId === gNodeId) continue
+    const id = codeEdgeId(gNodeId, structId, 'defined_in')
+    if (seen.has(id)) continue
+    seen.add(id)
+    edges.push({
+      id,
+      projectPath,
+      source: gNodeId,
+      target: structId,
+      kind: 'defined_in',
+      inferred: false,
+      origin: 'graphify',
+      meta: { relation: 'defined_in' },
     })
   }
 
@@ -142,8 +160,14 @@ export function runGraphifyDeepMap(opts: RunGraphifyOptions): GraphifyDeepMapRun
   let failed = false
 
   const done = (async (): Promise<void> => {
+    opts.emit({ type: 'progress', message: '1/4 indexing structure…' })
+    const structural = indexProject(db(), opts.projectPath)
+    saveStructuralGraph(db(), opts.projectPath, structural)
+    if (stopped) return
+    opts.emit({ type: 'progress', message: '2/4 running graphify (semantic + wiki)…' })
+
     const { query } = await import('@anthropic-ai/claude-agent-sdk')
-    const prompt = `/graphify ${opts.projectPath} --no-viz`
+    const prompt = `/graphify ${opts.projectPath} --wiki`
     const q = query({
       prompt,
       options: {
@@ -153,6 +177,12 @@ export function runGraphifyDeepMap(opts: RunGraphifyOptions): GraphifyDeepMapRun
         cwd: opts.projectPath,
         env: subscriptionEnv(),
         abortController: controller,
+        // Headless run: the graphify skill asks the user "which subfolder?" on
+        // repos over 200 files via AskUserQuestion — a tool with no one to answer
+        // it here. Block it so the skill proceeds on the full path instead of
+        // stalling or silently scoping down. graphify still gets Bash/Agent/
+        // Read/Write, which its pipeline needs.
+        disallowedTools: ['AskUserQuestion'],
       },
     })
 
@@ -174,19 +204,45 @@ export function runGraphifyDeepMap(opts: RunGraphifyOptions): GraphifyDeepMapRun
         }
       }
     }
-    if (stopped || failed) return
+    if (stopped) return
 
-    // Read + merge graph.json produced in projectPath/graphify-out/.
-    let raw: string
-    try {
-      raw = readFileSync(join(opts.projectPath, 'graphify-out', 'graph.json'), 'utf8')
-    } catch {
-      opts.emit({ type: 'error', message: 'graphify produced no graph.json' })
+    const graphifyOutDir = join(opts.projectPath, 'graphify-out')
+
+    // graphify failed or produced nothing → still export a structural-only map so
+    // the store + SessionStart hook aren't empty, then surface the error.
+    if (failed) {
+      exportMap(opts.projectPath, graphifyOutDir, loadGraph(db(), opts.projectPath))
       return
     }
-    const structural = loadGraph(db(), opts.projectPath)
-    const additions = mergeGraphifyGraph(opts.projectPath, structural, parseGraphifyJson(raw))
+
+    let raw: string
+    try {
+      raw = readFileSync(join(graphifyOutDir, 'graph.json'), 'utf8')
+    } catch {
+      opts.emit({ type: 'error', message: 'graphify produced no graph.json' })
+      exportMap(opts.projectPath, graphifyOutDir, loadGraph(db(), opts.projectPath))
+      return
+    }
+
+    try {
+      JSON.parse(raw)
+    } catch {
+      opts.emit({ type: 'error', message: 'graphify graph.json is not valid JSON' })
+      exportMap(opts.projectPath, graphifyOutDir, loadGraph(db(), opts.projectPath))
+      return
+    }
+
+    opts.emit({ type: 'progress', message: '3/4 merging semantic edges…' })
+    const additions = mergeGraphifyGraph(
+      opts.projectPath,
+      loadGraph(db(), opts.projectPath),
+      parseGraphifyJson(raw),
+    )
     saveGraphifyGraph(db(), opts.projectPath, additions)
+
+    opts.emit({ type: 'progress', message: '4/4 exporting map to store…' })
+    exportMap(opts.projectPath, graphifyOutDir, loadGraph(db(), opts.projectPath))
+
     opts.emit({
       type: 'done',
       nodesAdded: additions.nodes.length,

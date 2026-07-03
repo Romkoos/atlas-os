@@ -46,6 +46,30 @@ describe('assembleGraph', () => {
     expect(mk?.target).toBe(codeNodeId(P, 'knowledge', 'concepts/x.md'))
   })
 
+  it('creates knowledge cross-link edges from [[wikilinks]] between articles', () => {
+    const input = baseInput()
+    input.articles = [
+      { relPath: 'concepts/a.md', title: 'A', body: 'see [[concepts/b]] and [[c]] for context' },
+      { relPath: 'concepts/b.md', title: 'B', body: 'standalone, no links' },
+      { relPath: 'connections/c.md', title: 'C', body: 'links back to [[concepts/a]]' },
+    ]
+    const g = assembleGraph(input)
+    const ka = codeNodeId(P, 'knowledge', 'concepts/a.md')
+    const kb = codeNodeId(P, 'knowledge', 'concepts/b.md')
+    const kc = codeNodeId(P, 'knowledge', 'connections/c.md')
+    // full-path wikilink [[concepts/b]] → a→b, EXTRACTED (not inferred)
+    const ab = g.edges.find((e) => e.source === ka && e.target === kb && e.kind === 'doc_link')
+    expect(ab).toMatchObject({ inferred: false, origin: 'indexer' })
+    // bare-slug wikilink [[c]] resolves by basename → a→c
+    expect(g.edges.some((e) => e.source === ka && e.target === kc && e.kind === 'doc_link')).toBe(
+      true,
+    )
+    // back-link [[concepts/a]] in c → c→a
+    expect(g.edges.some((e) => e.source === kc && e.target === ka && e.kind === 'doc_link')).toBe(
+      true,
+    )
+  })
+
   it('drops edges whose endpoints are missing and self-loops', () => {
     const input = baseInput()
     input.imports.push({ from: 'src/a.ts', to: 'src/ghost.ts' }) // target not a code file

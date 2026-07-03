@@ -48,6 +48,35 @@ test('Knowledge graph tab renders a canvas', async () => {
   await app.close()
 })
 
+test('Code graph tab shows a single Build control', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+
+  // The code-graph tab is only present when projects exist; skip cleanly otherwise.
+  const codeGraphTab = window.getByRole('button', { name: './code-graph' })
+  await codeGraphTab.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
+  if (await codeGraphTab.isVisible().catch(() => false)) {
+    await codeGraphTab.click()
+
+    // The two separate controls (structural Build mutation + "Deep map via
+    // graphify" subscription) have been collapsed into a single full-cycle
+    // Build button driven by trpc.graph.build.
+    await expect(window.getByRole('button', { name: 'Build', exact: true })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'Deep map via graphify' })).toHaveCount(0)
+
+    // six source toggles, sessions off by default
+    for (const label of ['code', 'doc', 'session', 'knowledge', 'skill', 'graphify']) {
+      await expect(window.getByRole('checkbox', { name: label })).toBeVisible()
+    }
+    await expect(window.getByRole('checkbox', { name: 'session' })).not.toBeChecked()
+  }
+
+  await app.close()
+})
+
 test('Roadmap page renders seeded items', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
