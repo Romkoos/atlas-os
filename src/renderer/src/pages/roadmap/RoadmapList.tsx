@@ -130,20 +130,31 @@ function ItemRow({
 
 // ── List ─────────────────────────────────────────────────────────────────────
 interface RoadmapListProps {
+  // Rows to render (already hide-done-filtered by the orchestrator).
   items: RoadmapItem[]
+  // Full, unfiltered set — the KPI summary reflects true totals regardless of
+  // the hide-done view filter, so hiding done never zeroes the "done"/total tiles.
+  countItems: RoadmapItem[]
   onEdit: (item: RoadmapItem) => void
   onStatus: (id: string, status: RoadmapStatus) => void
   onDelete: (id: string) => void
   onCopy: (text: string) => void
 }
 
-export function RoadmapList({ items, onEdit, onStatus, onDelete, onCopy }: RoadmapListProps) {
+export function RoadmapList({
+  items,
+  countItems,
+  onEdit,
+  onStatus,
+  onDelete,
+  onCopy,
+}: RoadmapListProps) {
   const byCategory = ROADMAP_CATEGORIES.map((cat) => ({
     cat,
     items: items.filter((i) => i.category === cat),
   })).filter((g) => g.items.length > 0)
 
-  const count = (s: RoadmapStatus) => items.filter((i) => i.status === s).length
+  const count = (s: RoadmapStatus) => countItems.filter((i) => i.status === s).length
 
   // Global running index across category-ordered items — the "manifest" feel.
   let running = 0
@@ -155,7 +166,7 @@ export function RoadmapList({ items, onEdit, onStatus, onDelete, onCopy }: Roadm
           <div className="label">
             <span className="id">Σ</span>total
           </div>
-          <div className="val">{items.length}</div>
+          <div className="val">{countItems.length}</div>
         </div>
         <div className="kpi">
           <div className="label">to do</div>
