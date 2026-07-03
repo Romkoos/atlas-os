@@ -5,7 +5,11 @@ import { buildMenu } from '@main/menu'
 import { appPaths } from '@main/paths'
 import { applySecurity } from '@main/security'
 import { ingestAll } from '@main/services/productivity/ingest'
-import { backfillRoadmapClaudePrompts, seedRoadmapIfNeeded } from '@main/services/roadmap/store'
+import {
+  backfillRoadmapClaudePrompts,
+  migrateStatusIdeaToTodoIfNeeded,
+  seedRoadmapIfNeeded,
+} from '@main/services/roadmap/store'
 import { getSettings, initStore } from '@main/store'
 import { registerTrpcIpc } from '@main/trpc/ipc'
 import { createMainWindow } from '@main/window'
@@ -38,6 +42,7 @@ app
     runMigrations()
     seedRoadmapIfNeeded()
     backfillRoadmapClaudePrompts()
+    migrateStatusIdeaToTodoIfNeeded()
     logger.info('Database ready and migrations applied')
 
     applySecurity()
