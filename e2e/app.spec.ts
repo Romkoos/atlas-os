@@ -94,13 +94,13 @@ test('Roadmap "new idea" opens the incubator chat', async () => {
   await window.getByRole('button', { name: '02 ROADMAP' }).click()
   await window.getByRole('button', { name: /new idea/i }).click()
 
-  // The incubator overlay opens on its idea-entry step (no agent call yet).
-  await expect(window.getByRole('dialog', { name: 'Idea incubator' })).toBeVisible()
+  // "new idea" opens the unified chat drawer on a roadmap "idea incubator"
+  // session, at its idea-entry step (no agent call yet).
   await expect(window.getByRole('button', { name: /start brainstorming/i })).toBeVisible()
 
-  // Close it without starting a session.
-  await window.getByRole('button', { name: 'close', exact: true }).click()
-  await expect(window.getByRole('dialog', { name: 'Idea incubator' })).toHaveCount(0)
+  // End the session via the tab's close (×); the incubator step disappears.
+  await window.getByRole('button', { name: 'Close idea incubator' }).click()
+  await expect(window.getByRole('button', { name: /start brainstorming/i })).toHaveCount(0)
 
   await app.close()
 })
