@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 
 // Segmented status switch — order + display labels + state-color class.
 const SEGMENTS: { status: RoadmapStatus; label: string; cls: string }[] = [
-  { status: 'idea', label: 'Idea', cls: 'st-idea' },
+  { status: 'todo', label: 'To do', cls: 'st-todo' },
   { status: 'planned', label: 'Plan', cls: 'st-planned' },
   { status: 'in-progress', label: 'Active', cls: 'st-active' },
   { status: 'done', label: 'Done', cls: 'st-done' },
@@ -50,7 +50,7 @@ const EMPTY_DRAFT: Draft = {
   title: '',
   description: '',
   category: 'intelligence',
-  status: 'idea',
+  status: 'todo',
   priority: 'medium',
   claudePrompt: '',
 }
@@ -402,8 +402,8 @@ export function Roadmap() {
               <div className="val">{items.length}</div>
             </div>
             <div className="kpi">
-              <div className="label">idea</div>
-              <div className="val">{count('idea')}</div>
+              <div className="label">to do</div>
+              <div className="val">{count('todo')}</div>
             </div>
             <div className="kpi">
               <div className="label">planned</div>

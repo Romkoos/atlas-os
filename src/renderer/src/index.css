@@ -3164,7 +3164,7 @@ textarea.input:focus,
   color: var(--fg);
   background: var(--panel-2);
 }
-.rm-seg button.on.st-idea {
+.rm-seg button.on.st-todo {
   color: var(--fg-2);
 }
 .rm-seg button.on.st-planned {

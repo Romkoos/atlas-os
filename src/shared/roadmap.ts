@@ -11,7 +11,7 @@ export const ROADMAP_CATEGORIES = [
   'connectivity',
   'wow',
 ] as const
-export const ROADMAP_STATUSES = ['idea', 'planned', 'in-progress', 'done'] as const
+export const ROADMAP_STATUSES = ['todo', 'planned', 'in-progress', 'done'] as const
 export const ROADMAP_PRIORITIES = ['low', 'medium', 'high'] as const
 
 export type RoadmapCategory = (typeof ROADMAP_CATEGORIES)[number]
@@ -28,7 +28,7 @@ export const CATEGORY_LABELS: Record<RoadmapCategory, string> = {
 }
 
 export const STATUS_LABELS: Record<RoadmapStatus, string> = {
-  idea: 'Idea',
+  todo: 'To do',
   planned: 'Planned',
   'in-progress': 'In progress',
   done: 'Done',
@@ -61,7 +61,7 @@ export const roadmapCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().default(''),
   category: z.enum(ROADMAP_CATEGORIES),
-  status: z.enum(ROADMAP_STATUSES).default('idea'),
+  status: z.enum(ROADMAP_STATUSES).default('todo'),
   priority: z.enum(ROADMAP_PRIORITIES).default('medium'),
   claudePrompt: z.string().default(''),
 })
