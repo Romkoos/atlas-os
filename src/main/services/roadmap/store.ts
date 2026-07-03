@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { AppDatabase } from '@main/db/client'
 import { db } from '@main/db/client'
 import { roadmapItems } from '@main/db/schema'
 import { logger } from '@main/logger'
@@ -14,13 +15,14 @@ const CATEGORY_ORDER = ['intelligence', 'observability', 'macos', 'connectivity'
 interface RoadmapMeta {
   seeded: boolean
   claudePromptBackfilled: boolean
+  statusIdeaToTodoMigrated: boolean
 }
 let metaStore: Store<RoadmapMeta> | null = null
 function meta(): Store<RoadmapMeta> {
   if (!metaStore) {
     metaStore = new Store<RoadmapMeta>({
       name: 'roadmap-meta',
-      defaults: { seeded: false, claudePromptBackfilled: false },
+      defaults: { seeded: false, claudePromptBackfilled: false, statusIdeaToTodoMigrated: false },
     })
   }
   return metaStore
@@ -54,7 +56,7 @@ export function seedRoadmapIfNeeded(): void {
       title: s.title,
       description: s.description,
       category: s.category,
-      status: 'idea' as const,
+      status: 'todo' as const,
       priority: s.priority,
       claudePrompt: s.claudePrompt,
       position: i,
@@ -84,6 +86,25 @@ export function backfillRoadmapClaudePrompts(): void {
   }
   if (filled > 0) logger.info('Roadmap claudePrompt backfilled', { count: filled })
   meta().set('claudePromptBackfilled', true)
+}
+
+// Pure DB step: rewrite legacy status='idea' rows to 'todo'. Returns rows changed.
+export function runIdeaToTodoUpdate(database: AppDatabase): number {
+  const res = database
+    .update(roadmapItems)
+    .set({ status: 'todo' })
+    .where(eq(roadmapItems.status, 'idea'))
+    .run()
+  return res.changes
+}
+
+// One-time migration for the idea→todo rename. Guarded by a meta flag AND scoped
+// to idea rows, so it is safe to call on every startup.
+export function migrateStatusIdeaToTodoIfNeeded(): void {
+  if (meta().get('statusIdeaToTodoMigrated')) return
+  const changed = runIdeaToTodoUpdate(db())
+  if (changed > 0) logger.info('Roadmap status idea→todo migrated', { count: changed })
+  meta().set('statusIdeaToTodoMigrated', true)
 }
 
 export function listRoadmap(): RoadmapItem[] {
@@ -116,7 +137,7 @@ export function createRoadmapItem(input: RoadmapCreate): RoadmapItem {
     title: input.title,
     description: input.description ?? '',
     category: input.category,
-    status: input.status ?? 'idea',
+    status: input.status ?? 'todo',
     priority: input.priority ?? 'medium',
     claudePrompt: input.claudePrompt ?? '',
     position: nextPos,

@@ -195,7 +195,7 @@ export const roadmapItems = sqliteTable(
     title: text('title').notNull(),
     description: text('description').notNull().default(''),
     category: text('category').notNull(), // intelligence | observability | macos | connectivity | wow
-    status: text('status').notNull().default('idea'), // idea | planned | in-progress | done
+    status: text('status').notNull().default('todo'), // todo | planned | in-progress | done
     priority: text('priority').notNull().default('medium'), // low | medium | high
     // English implementation brief for Claude Code — what the idea is, briefly.
     claudePrompt: text('claude_prompt').notNull().default(''),

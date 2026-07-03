@@ -44,7 +44,7 @@ describe('parseRoadmapProposal', () => {
     expect(parsed).toMatchObject({
       title: 'X',
       category: 'wow',
-      status: 'idea',
+      status: 'todo',
       priority: 'medium',
       description: '',
       claudePrompt: '',

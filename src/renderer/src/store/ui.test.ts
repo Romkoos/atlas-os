@@ -47,6 +47,21 @@ describe('mergePersistedUi', () => {
     expect(SECTIONS).toContain('dashboard')
     expect(SECTIONS).not.toContain('benchmark' as never) // sanity: benchmark is a tab, not a section
   })
+
+  it('defaults roadmapHideDone to false when absent', () => {
+    const out = mergePersistedUi({ section: 'roadmap' }, base)
+    expect(out.roadmapHideDone).toBe(false)
+  })
+
+  it('coerces a non-boolean roadmapHideDone to false', () => {
+    const out = mergePersistedUi({ roadmapHideDone: 'yes' }, base)
+    expect(out.roadmapHideDone).toBe(false)
+  })
+
+  it('preserves a true roadmapHideDone', () => {
+    const out = mergePersistedUi({ roadmapHideDone: true }, base)
+    expect(out.roadmapHideDone).toBe(true)
+  })
 })
 
 describe('useUiStore actions', () => {

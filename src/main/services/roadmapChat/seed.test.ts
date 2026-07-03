@@ -8,7 +8,7 @@ const existing: RoadmapItem[] = [
     title: 'Menu-bar mini-HUD',
     description: 'tray widget',
     category: 'macos',
-    status: 'idea',
+    status: 'todo',
     priority: 'medium',
     claudePrompt: 'brief',
     position: 0,
