@@ -3555,3 +3555,12 @@ textarea.input:focus,
     padding-top: 16px;
   }
 }
+
+.rm-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rm-view-tabs {
+  margin: 0;
+}
