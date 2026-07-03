@@ -19,7 +19,7 @@ import {
   STATUS_LABELS,
 } from '@shared/roadmap'
 import { Copy } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useState } from 'react'
 import {
   CATEGORY_SHORT,
   type CategoryFilter,
@@ -56,15 +56,20 @@ function Card({
   overlay?: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    if (e.key === ' ') e.preventDefault()
+    onClick?.()
+  }
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit's attributes spread supplies role/tabIndex at runtime, opaque to static analysis
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is the PointerSensor's drag; click-to-open has no keyboard equivalent yet
     <div
       ref={overlay ? undefined : setNodeRef}
       className={`rm-card ${PRIO_CLASS[item.priority]}${isDragging ? ' dragging' : ''}${overlay ? ' overlay' : ''}`}
       {...(overlay ? {} : attributes)}
       {...(overlay ? {} : listeners)}
       onClick={onClick}
+      onKeyDown={overlay ? undefined : onKeyDown}
     >
       <div className="rm-card-title">{item.title}</div>
       <div className="rm-card-foot">
