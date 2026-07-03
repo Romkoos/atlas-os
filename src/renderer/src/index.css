@@ -3393,3 +3393,121 @@ textarea.input:focus,
 .rm-chat-foot .input {
   flex: 1;
 }
+
+/* ── Roadmap board (Kanban) ────────────────────────────────────────────────── */
+.rm-board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.rm-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.rm-col {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  min-height: 120px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rm-col.over {
+  border-color: var(--amber);
+  background: color-mix(in oklch, var(--amber) 6%, var(--bg-2));
+}
+.rm-col.collapsed {
+  min-height: 0;
+  opacity: 0.6;
+}
+.rm-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.rm-col-count {
+  color: var(--fg-4);
+  font-variant-numeric: tabular-nums;
+}
+.rm-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-height: 40px;
+}
+.rm-card {
+  border: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  background: var(--panel-2);
+  padding: 10px 11px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rm-card:hover {
+  border-color: var(--line);
+  background: var(--bg-2);
+}
+.rm-card.p-high {
+  border-left-color: var(--amber);
+}
+.rm-card.p-med {
+  border-left-color: var(--amber-dim);
+}
+.rm-card.p-low {
+  border-left-color: var(--line);
+}
+.rm-card.dragging {
+  opacity: 0.4;
+}
+.rm-card.overlay {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.rm-card-title {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--fg);
+  line-height: 1.4;
+}
+.rm-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rm-cat-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--fg-4);
+  border: 1px solid var(--line-dim);
+  padding: 1px 5px;
+}
+.rm-card-prio {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  margin-left: auto;
+}
+.rm-card-prio.p-high {
+  color: var(--amber);
+}
+.rm-card-prio.p-med {
+  color: var(--amber-dim);
+}
+.rm-card-copy {
+  width: 22px;
+  height: 22px;
+}
