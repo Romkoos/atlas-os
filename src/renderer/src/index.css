@@ -3257,7 +3257,7 @@ textarea.input:focus,
 .rm-modal {
   position: relative;
   z-index: 1;
-  width: min(600px, 100%);
+  width: min(880px, 92vw);
   max-height: 90vh;
   overflow-y: auto;
   background: var(--panel);
@@ -3510,4 +3510,48 @@ textarea.input:focus,
 .rm-card-copy {
   width: 22px;
   height: 22px;
+}
+
+/* ── Roadmap detail panel (two-column) ─────────────────────────────────────── */
+.rm-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.rm-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rm-detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-left: 1px solid var(--line-dim);
+  padding-left: 20px;
+}
+.rm-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rm-placeholder {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+  border: 1px dashed var(--line-dim);
+  padding: 14px;
+  text-align: center;
+}
+@media (max-width: 720px) {
+  .rm-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .rm-detail-side {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--line-dim);
+    padding-top: 16px;
+  }
 }
