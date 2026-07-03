@@ -79,6 +79,10 @@ test('Roadmap Board view shows status columns', async () => {
   await expect(window.getByText('In progress', { exact: true })).toBeVisible()
   await expect(window.getByText('Done', { exact: true })).toBeVisible()
 
+  // At least one seeded card renders on the board (guards against an
+  // empty-columns regression).
+  await expect(window.getByText('Agent Orchestrator (multi-agent workflows)')).toBeVisible()
+
   await app.close()
 })
 

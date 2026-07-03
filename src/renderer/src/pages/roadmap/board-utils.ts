@@ -38,6 +38,9 @@ export function groupByStatus(items: RoadmapItem[]): Record<RoadmapStatus, Roadm
   const groups = Object.fromEntries(
     ROADMAP_STATUSES.map((s) => [s, [] as RoadmapItem[]]),
   ) as unknown as Record<RoadmapStatus, RoadmapItem[]>
-  for (const item of items) groups[item.status].push(item)
+  for (const item of items) {
+    if (!groups[item.status]) continue
+    groups[item.status].push(item)
+  }
   return groups
 }

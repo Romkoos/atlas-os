@@ -44,33 +44,30 @@ const categoryFilterOptions = [
   ...ROADMAP_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] })),
 ]
 
-function Card({
+// Presentational markup shared by the draggable board card and its
+// DragOverlay clone. The overlay clone is purely visual — it must not
+// register its own `useDraggable`, or dnd-kit logs a duplicate-id warning
+// while the live card is being dragged.
+function CardBody({
   item,
   onClick,
   onCopy,
-  overlay = false,
+  className,
+  cardRef,
+  dragProps,
+  onKeyDown,
 }: {
   item: RoadmapItem
   onClick?: () => void
   onCopy?: () => void
-  overlay?: boolean
+  className: string
+  cardRef?: (node: HTMLElement | null) => void
+  dragProps?: Record<string, unknown>
+  onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
-  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    if (e.key === ' ') e.preventDefault()
-    onClick?.()
-  }
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit's attributes spread supplies role/tabIndex at runtime, opaque to static analysis
-    <div
-      ref={overlay ? undefined : setNodeRef}
-      className={`rm-card ${PRIO_CLASS[item.priority]}${isDragging ? ' dragging' : ''}${overlay ? ' overlay' : ''}`}
-      {...(overlay ? {} : attributes)}
-      {...(overlay ? {} : listeners)}
-      onClick={onClick}
-      onKeyDown={overlay ? undefined : onKeyDown}
-    >
+    <div ref={cardRef} className={className} {...dragProps} onClick={onClick} onKeyDown={onKeyDown}>
       <div className="rm-card-title">{item.title}</div>
       <div className="rm-card-foot">
         <span className="rm-cat-badge">{CATEGORY_SHORT[item.category]}</span>
@@ -96,6 +93,41 @@ function Card({
       </div>
     </div>
   )
+}
+
+function Card({
+  item,
+  onClick,
+  onCopy,
+}: {
+  item: RoadmapItem
+  onClick?: () => void
+  onCopy?: () => void
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    if (e.key === ' ') e.preventDefault()
+    onClick?.()
+  }
+  return (
+    <CardBody
+      item={item}
+      onClick={onClick}
+      onCopy={onCopy}
+      className={`rm-card ${PRIO_CLASS[item.priority]}${isDragging ? ' dragging' : ''}`}
+      cardRef={setNodeRef}
+      dragProps={{ ...attributes, ...listeners }}
+      onKeyDown={onKeyDown}
+    />
+  )
+}
+
+// The DragOverlay clone: no ref/attributes/listeners/keyboard handling, and
+// no `useDraggable` registration — it's a static snapshot of the card being
+// dragged, rendered by dnd-kit in a portal that follows the pointer.
+function CardOverlay({ item }: { item: RoadmapItem }) {
+  return <CardBody item={item} className={`rm-card ${PRIO_CLASS[item.priority]} overlay`} />
 }
 
 function Column({
@@ -189,7 +221,7 @@ export function RoadmapBoard({
             )
           })}
         </div>
-        <DragOverlay>{activeItem ? <Card item={activeItem} overlay /> : null}</DragOverlay>
+        <DragOverlay>{activeItem ? <CardOverlay item={activeItem} /> : null}</DragOverlay>
       </DndContext>
     </div>
   )

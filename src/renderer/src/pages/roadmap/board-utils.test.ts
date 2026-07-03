@@ -1,4 +1,4 @@
-import type { RoadmapItem } from '@shared/roadmap'
+import type { RoadmapItem, RoadmapStatus } from '@shared/roadmap'
 import { describe, expect, it } from 'vitest'
 import { filterByCategory, groupByStatus, hideDoneFilter, sortColumnItems } from './board-utils'
 
@@ -67,5 +67,20 @@ describe('groupByStatus', () => {
     expect(grouped.done).toHaveLength(1)
     expect(grouped.planned).toEqual([])
     expect(grouped['in-progress']).toEqual([])
+  })
+
+  it('silently drops items with an unknown status instead of throwing', () => {
+    const items = [
+      item({ id: 'a', status: 'todo' }),
+      item({ id: 'bogus', status: 'bogus' as RoadmapStatus }),
+    ]
+    expect(() => groupByStatus(items)).not.toThrow()
+    const grouped = groupByStatus(items)
+    expect(grouped.todo.map((i) => i.id)).toEqual(['a'])
+    expect(
+      Object.values(grouped)
+        .flat()
+        .map((i) => i.id),
+    ).toEqual(['a'])
   })
 })
