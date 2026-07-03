@@ -101,5 +101,26 @@ export function assembleGraph(input: AssembleInput): CodeGraph {
     }
   }
 
+  // knowledge cross-links: an article's `[[wikilink]]` targets another article.
+  // Targets are the relPath without `.md` (e.g. `[[concepts/foo]]` → concepts/foo.md)
+  // or a bare slug (the article's basename). Resolve to the target knowledge node
+  // and emit an EXTRACTED doc_link between the two articles. This is what connects
+  // the knowledge layer to itself — without it, articles only link to code/docs.
+  const knowledgeBySlug = new Map<string, string>()
+  for (const a of input.articles) {
+    const id = codeNodeId(P, 'knowledge', a.relPath)
+    const noExt = a.relPath.replace(/\.md$/, '')
+    knowledgeBySlug.set(noExt, id)
+    knowledgeBySlug.set(basename(noExt), id)
+  }
+  for (const a of input.articles) {
+    const from = codeNodeId(P, 'knowledge', a.relPath)
+    for (const m of a.body.matchAll(/\[\[([^\]]+)\]\]/g)) {
+      const key = m[1].split('|')[0].split('#')[0].trim()
+      const target = knowledgeBySlug.get(key) ?? knowledgeBySlug.get(basename(key))
+      if (target) addEdge(from, target, 'doc_link', false)
+    }
+  }
+
   return { nodes: [...nodes.values()], edges }
 }

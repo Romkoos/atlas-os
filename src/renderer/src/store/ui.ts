@@ -26,15 +26,21 @@ export const SECTIONS: readonly Section[] = [
   'settings',
 ]
 
+// Default graph sources: everything except sessions (session_touched edges are
+// ~74% of the structural graph and read as noise).
+export const DEFAULT_GRAPH_SOURCES: string[] = ['code', 'doc', 'knowledge', 'skill', 'graphify']
+
 interface UiState {
   section: Section
   selectedProject: string | null
   tabsBySection: Partial<Record<Section, string>>
   roadmapHideDone: boolean
+  graphSources: string[]
   setSection: (section: Section) => void
   setSelectedProject: (project: string | null) => void
   setTab: (section: Section, tab: string) => void
   setRoadmapHideDone: (v: boolean) => void
+  setGraphSources: (sources: string[]) => void
 }
 
 // Pure sanitizer for rehydrated state. A persisted blob can be partial, stale,
@@ -52,7 +58,11 @@ export function mergePersistedUi(persisted: unknown, current: UiState): UiState 
       ? (p.tabsBySection as Partial<Record<Section, string>>)
       : {}
   const roadmapHideDone = typeof p.roadmapHideDone === 'boolean' ? p.roadmapHideDone : false
-  return { ...current, section, selectedProject, tabsBySection, roadmapHideDone }
+  const graphSources =
+    Array.isArray(p.graphSources) && p.graphSources.every((s) => typeof s === 'string')
+      ? (p.graphSources as string[])
+      : DEFAULT_GRAPH_SOURCES
+  return { ...current, section, selectedProject, tabsBySection, roadmapHideDone, graphSources }
 }
 
 // Guarded storage: uses a no-op in-memory store when DOM localStorage is absent,
@@ -67,7 +77,10 @@ const noopStorage: Storage = {
 }
 
 const guardedStorage = createJSONStorage<
-  Pick<UiState, 'section' | 'selectedProject' | 'tabsBySection' | 'roadmapHideDone'>
+  Pick<
+    UiState,
+    'section' | 'selectedProject' | 'tabsBySection' | 'roadmapHideDone' | 'graphSources'
+  >
 >(() => (typeof localStorage !== 'undefined' ? localStorage : noopStorage))
 
 export const useUiStore = create<UiState>()(
@@ -77,11 +90,13 @@ export const useUiStore = create<UiState>()(
       selectedProject: null,
       tabsBySection: {},
       roadmapHideDone: false,
+      graphSources: DEFAULT_GRAPH_SOURCES,
       setSection: (section) => set({ section }),
       setSelectedProject: (selectedProject) => set({ selectedProject }),
       setTab: (section, tab) =>
         set((s) => ({ tabsBySection: { ...s.tabsBySection, [section]: tab } })),
       setRoadmapHideDone: (roadmapHideDone) => set({ roadmapHideDone }),
+      setGraphSources: (graphSources) => set({ graphSources }),
     }),
     {
       name: 'atlas-ui',
@@ -92,6 +107,7 @@ export const useUiStore = create<UiState>()(
         selectedProject: s.selectedProject,
         tabsBySection: s.tabsBySection,
         roadmapHideDone: s.roadmapHideDone,
+        graphSources: s.graphSources,
       }),
       merge: (persisted, current) => mergePersistedUi(persisted, current),
     },

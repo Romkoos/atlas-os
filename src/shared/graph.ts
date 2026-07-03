@@ -9,6 +9,7 @@ export const codeEdgeKindSchema = z.enum([
   'session_touched',
   'mentions_knowledge',
   'semantic',
+  'defined_in',
 ])
 export type CodeEdgeKind = z.infer<typeof codeEdgeKindSchema>
 

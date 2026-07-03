@@ -3,8 +3,9 @@ import type { CodeEdgeKind, CodeGraph, CodeGraphNode, CodeNodeKind } from '@shar
 import { type ReactNode, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { colorForCommunity, colorForKind } from './graph-colors'
+import { colorForCommunity, colorForNode } from './graph-colors'
 import { displayLabel } from './node-label'
+import { communityKey } from './source-filter'
 
 type Node = CodeGraphNode & { x?: number; y?: number }
 type Link = { source: string; target: string }
@@ -35,6 +36,8 @@ function relationLabel(kind: CodeEdgeKind, selectedIsSource: boolean): string {
       return selectedIsSource ? 'Mentions knowledge' : 'Mentioned by'
     case 'semantic':
       return 'Related (semantic)'
+    case 'defined_in':
+      return selectedIsSource ? 'Defined in' : 'Defines'
   }
 }
 
@@ -49,6 +52,8 @@ const REL_ORDER = [
   'Mentions knowledge',
   'Mentioned by',
   'Related (semantic)',
+  'Defined in',
+  'Defines',
 ]
 
 function edgeEndpoint(e: string | { id: string }): string {
@@ -79,8 +84,8 @@ function Section({
   )
 }
 
-function KindDot({ kind }: { kind: CodeNodeKind }) {
-  return <span className="kb-nd-dot" style={{ background: colorForKind(kind) }} />
+function KindDot({ kind, origin }: { kind: CodeNodeKind; origin: string }) {
+  return <span className="kb-nd-dot" style={{ background: colorForNode({ origin, kind }) }} />
 }
 
 export function NodeDetails({
@@ -133,7 +138,8 @@ export function NodeDetails({
   // Cluster context, computed from the already-loaded graph.
   const cluster = useMemo(() => {
     if (node.community == null) return null
-    const members = nodes.filter((n) => n.community === node.community)
+    const key = communityKey({ origin: node.origin, community: node.community })
+    const members = nodes.filter((n) => communityKey(n) === key)
     const byKind = new Map<CodeNodeKind, number>()
     for (const m of members) byKind.set(m.kind, (byKind.get(m.kind) ?? 0) + 1)
     const dominantKind = [...byKind.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? node.kind
@@ -142,7 +148,7 @@ export function NodeDetails({
       .sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))
       .slice(0, 6)
     return { community: node.community, size: members.length, dominantKind, top }
-  }, [nodes, node.community, node.id, node.kind, degree])
+  }, [nodes, node.community, node.id, node.kind, node.origin, degree])
 
   const metaEntries = node.meta
     ? Object.entries(node.meta).filter(([, v]) => v != null && v !== '')
@@ -155,7 +161,7 @@ export function NodeDetails({
       </button>
 
       <div className="kb-nd-title">
-        <KindDot kind={node.kind} />
+        <KindDot kind={node.kind} origin={node.origin} />
         <strong>{displayLabel(node, ambiguous)}</strong>
       </div>
       <div className="kb-nd-badges">
@@ -202,7 +208,7 @@ export function NodeDetails({
                 {g.items.map(({ n, inferred }) => (
                   <li key={n.id}>
                     <button type="button" className="link" onClick={() => onSelect(n)}>
-                      <KindDot kind={n.kind} />
+                      <KindDot kind={n.kind} origin={n.origin} />
                       {displayLabel(n, ambiguous)}
                     </button>
                     {inferred && <span className="kb-nd-tag">inferred</span>}
@@ -231,7 +237,7 @@ export function NodeDetails({
               {cluster.top.map((m) => (
                 <li key={m.id}>
                   <button type="button" className="link" onClick={() => onSelect(m)}>
-                    <KindDot kind={m.kind} />
+                    <KindDot kind={m.kind} origin={m.origin} />
                     {displayLabel(m, ambiguous)}
                   </button>
                 </li>
