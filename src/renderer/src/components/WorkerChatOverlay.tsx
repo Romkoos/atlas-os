@@ -62,7 +62,12 @@ export function WorkerChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript transcript={transcript} streaming={streaming} onPickOption={send} />
+      <ChatTranscript
+        transcript={transcript}
+        streaming={streaming}
+        awaitingInput={awaitingInput}
+        onPickOption={send}
+      />
       <ChatComposer
         disabled={!awaitingInput}
         placeholder={awaitingInput ? 'Reply…' : 'Worker is working…'}

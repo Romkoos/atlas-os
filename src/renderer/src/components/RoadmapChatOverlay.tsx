@@ -77,7 +77,12 @@ export function RoadmapChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript transcript={transcript} streaming={streaming} onPickOption={send} />
+      <ChatTranscript
+        transcript={transcript}
+        streaming={streaming}
+        awaitingInput={awaitingInput}
+        onPickOption={send}
+      />
       {savedItem ? (
         <div className="rm-chat-saved">
           <CheckCircle2 size={14} />

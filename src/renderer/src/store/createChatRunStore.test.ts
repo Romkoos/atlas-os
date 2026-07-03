@@ -34,7 +34,7 @@ describe('createChatRunStore', () => {
     it('pushTool adds a running tool entry and resolveTool completes it', () => {
       const useRun = createChatRunStore('test-tool-1')
       useRun.getState().start('hi')
-      useRun.getState().pushTool('t1', 'Read: store.ts')
+      useRun.getState().pushTool('t1', 'Read', 'Read: store.ts')
       let tool = useRun.getState().transcript.find((e) => e.kind === 'tool')
       expect(tool).toMatchObject({
         kind: 'tool',
@@ -51,7 +51,7 @@ describe('createChatRunStore', () => {
     it('resolveTool with isError marks the entry as error', () => {
       const useRun = createChatRunStore('test-tool-2')
       useRun.getState().start('hi')
-      useRun.getState().pushTool('t1', 'Bash: ls')
+      useRun.getState().pushTool('t1', 'Bash', 'Bash: ls')
       useRun.getState().resolveTool('t1', 'boom', true)
       expect(useRun.getState().transcript.find((e) => e.kind === 'tool')).toMatchObject({
         status: 'error',
@@ -62,7 +62,7 @@ describe('createChatRunStore', () => {
     it('finish marks a still-running tool as done', () => {
       const useRun = createChatRunStore('test-tool-3')
       useRun.getState().start('hi')
-      useRun.getState().pushTool('t1', 'Read: x')
+      useRun.getState().pushTool('t1', 'Read', 'Read: x')
       useRun.getState().finish('done')
       expect(useRun.getState().transcript.find((e) => e.kind === 'tool')).toMatchObject({
         status: 'done',

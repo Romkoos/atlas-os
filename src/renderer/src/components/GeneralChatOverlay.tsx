@@ -65,7 +65,12 @@ export function GeneralChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript transcript={transcript} streaming={streaming} onPickOption={send} />
+      <ChatTranscript
+        transcript={transcript}
+        streaming={streaming}
+        awaitingInput={awaitingInput}
+        onPickOption={send}
+      />
       <ChatComposer
         disabled={!awaitingInput}
         placeholder={awaitingInput ? 'Reply…' : 'Assistant is thinking…'}
