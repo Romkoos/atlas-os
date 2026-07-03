@@ -113,6 +113,7 @@ export function Roadmap() {
         ) : (
           <RoadmapList
             items={visibleItems}
+            countItems={items}
             onEdit={(item) => setEditing(item)}
             onStatus={(id, status) => update.mutate({ id, status })}
             onDelete={(id) => remove.mutate({ id })}
