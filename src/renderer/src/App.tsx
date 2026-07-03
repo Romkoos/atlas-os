@@ -24,6 +24,7 @@ import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
+import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
 import { type ComponentType, useEffect } from 'react'
@@ -68,6 +69,7 @@ export function App() {
   // Kickoffs: general/roadmap use the first user message; benchmark/improver use
   // a domain id (batchId/skillId) carried in a companion store.
   const generalKickoff = useGeneralChatRun((s) => s.transcript[0]?.text)
+  const workerKickoff = useWorkerChatRun((s) => s.transcript[0]?.text)
   const roadmapKickoff = useRoadmapChatRun((s) => s.transcript[0]?.text)
   const benchmarkKickoff = useBenchmarkChatContext((s) => s.batchId) ?? undefined
   const improverKickoff = useSkillImproverExtra((s) => s.skillId) ?? undefined
@@ -89,6 +91,11 @@ export function App() {
         useRun={useGeneralChatRun}
         useOpenSubscription={trpc.generalChat.open.useSubscription}
         kickoff={generalKickoff}
+      />
+      <ChatHost
+        useRun={useWorkerChatRun}
+        useOpenSubscription={trpc.workerChat.open.useSubscription}
+        kickoff={workerKickoff}
       />
       <ChatHost
         useRun={useRoadmapChatRun}

@@ -186,6 +186,26 @@ test('top bar shows the process indicator at idle', async () => {
   await app.close()
 })
 
+test('FAB type picker opens a worker chat', async () => {
+  const app = await electron.launch({ args: ['.'] })
+  const window = await app.firstWindow()
+  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+
+  // With no active chats, the FAB opens a two-icon picker (Chat vs Worker).
+  await window.getByRole('button', { name: 'Open chat' }).click()
+  await expect(window.getByRole('button', { name: 'Worker' })).toBeVisible()
+
+  // Opening Worker mounts the full-access worker overlay at its intro step.
+  await window.getByRole('button', { name: 'Worker' }).click()
+  await expect(window.getByRole('button', { name: /start worker/i })).toBeVisible()
+
+  // End the session via the tab's close (×); the intro disappears.
+  await window.getByRole('button', { name: 'Close worker' }).click()
+  await expect(window.getByRole('button', { name: /start worker/i })).toHaveCount(0)
+
+  await app.close()
+})
+
 test('Dashboard shows the processes panel', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()

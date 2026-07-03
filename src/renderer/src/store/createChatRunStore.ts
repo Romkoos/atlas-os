@@ -1,10 +1,15 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export interface ChatEntry {
-  kind: 'assistant' | 'tool' | 'user'
-  text: string
-}
+export type ChatEntry =
+  | { kind: 'assistant' | 'user'; text: string }
+  | {
+      kind: 'tool'
+      text: string
+      id: string
+      status: 'running' | 'done' | 'error'
+      resultText?: string
+    }
 export type ChatStatus = 'idle' | 'running' | 'awaiting' | 'done' | 'error' | 'aborted'
 
 export interface BaseChatRunState {
@@ -19,7 +24,8 @@ export interface BaseChatRunState {
   startBlank: () => void
   reattach: () => void
   appendToken: (text: string) => void
-  pushTool: (summary: string) => void
+  pushTool: (id: string, summary: string) => void
+  resolveTool: (id: string, resultText: string, isError: boolean) => void
   pushUserReply: (text: string) => void
   flushTurn: () => void
   setAwaiting: (v: boolean) => void
@@ -51,6 +57,14 @@ export interface ChatRunStoreOptions {
   // Transform the accumulated streamed text before it is committed as an
   // assistant transcript entry (e.g. strip a report sentinel). Defaults to identity.
   sanitizeStreaming?: (text: string) => string
+}
+
+// A turn/run boundary can arrive with a tool still marked `running` (its
+// tool_result never surfaced). Sweep those to `done` so no spinner sticks.
+function settleTools(transcript: ChatEntry[]): ChatEntry[] {
+  return transcript.map((e) =>
+    e.kind === 'tool' && e.status === 'running' ? { ...e, status: 'done' } : e,
+  )
 }
 
 export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) {
@@ -96,12 +110,23 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
         flushTurn: () =>
           set((s) => {
             const text = sanitize(s.streaming).trimEnd()
+            const swept = settleTools(s.transcript)
             return text.trim()
-              ? { transcript: [...s.transcript, { kind: 'assistant', text }], streaming: '' }
-              : { streaming: '' }
+              ? { transcript: [...swept, { kind: 'assistant', text }], streaming: '' }
+              : { transcript: swept, streaming: '' }
           }),
-        pushTool: (summary) =>
-          set((s) => ({ transcript: [...s.transcript, { kind: 'tool', text: summary }] })),
+        pushTool: (id, summary) =>
+          set((s) => ({
+            transcript: [...s.transcript, { kind: 'tool', id, text: summary, status: 'running' }],
+          })),
+        resolveTool: (id, resultText, isError) =>
+          set((s) => ({
+            transcript: s.transcript.map((e) =>
+              e.kind === 'tool' && e.id === id
+                ? { ...e, status: isError ? 'error' : 'done', resultText }
+                : e,
+            ),
+          })),
         pushUserReply: (text) =>
           set((s) => ({
             transcript: [...s.transcript, { kind: 'user', text }],
@@ -109,7 +134,13 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
           })),
         setAwaiting: (v) => set({ awaitingInput: v, status: v ? 'awaiting' : 'running' }),
         bumpSeq: (seq) => set((s) => ({ lastSeq: Math.max(s.lastSeq, seq) })),
-        finish: (status) => set({ running: false, awaitingInput: false, status }),
+        finish: (status) =>
+          set((s) => ({
+            running: false,
+            awaitingInput: false,
+            status,
+            transcript: settleTools(s.transcript),
+          })),
         reset: () =>
           set({
             sessionId: null,

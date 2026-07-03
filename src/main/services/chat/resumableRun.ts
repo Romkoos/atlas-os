@@ -64,7 +64,26 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
       } else if (message.type === 'assistant') {
         for (const block of message.message.content) {
           if (block.type === 'tool_use') {
-            opts.emit({ type: 'tool', name: block.name, summary: summarizeTool(block) })
+            opts.emit({
+              type: 'tool',
+              name: block.name,
+              summary: summarizeTool(block),
+              toolId: block.id,
+            })
+          }
+        }
+      } else if (message.type === 'user') {
+        const content = message.message.content
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'tool_result') {
+              opts.emit({
+                type: 'tool-result',
+                toolId: block.tool_use_id,
+                resultText: toolResultText(block.content),
+                isError: block.is_error === true,
+              })
+            }
           }
         }
       } else if (message.type === 'result') {
@@ -98,6 +117,25 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
     },
     done,
   }
+}
+
+// tool_result content is either a string or an array of blocks; flatten to text
+// and cap it so a huge file/bash dump does not bloat the event buffer.
+const RESULT_CAP = 4000
+function toolResultText(content: unknown): string {
+  let text: string
+  if (typeof content === 'string') {
+    text = content
+  } else if (Array.isArray(content)) {
+    text = content
+      .map((b) =>
+        b && typeof b === 'object' && 'text' in b ? String((b as { text: unknown }).text) : '',
+      )
+      .join('')
+  } else {
+    text = ''
+  }
+  return text.length > RESULT_CAP ? `${text.slice(0, RESULT_CAP)}\n…(truncated)` : text
 }
 
 function summarizeTool(block: { name: string; input: unknown }): string {

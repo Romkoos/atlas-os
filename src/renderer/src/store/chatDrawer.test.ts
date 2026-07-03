@@ -111,3 +111,12 @@ describe('useChatDrawer generalChat', () => {
     expect(s.activeSessionId).toBe('generalChat')
   })
 })
+
+describe('useChatDrawer worker', () => {
+  it('opens a worker tab with the default "worker" title', () => {
+    useChatDrawer.getState().openSession({ type: 'worker' })
+    const s = useChatDrawer.getState()
+    expect(s.sessions.some((x) => x.type === 'worker' && x.title === 'worker')).toBe(true)
+    expect(s.activeSessionId).toBe('worker')
+  })
+})

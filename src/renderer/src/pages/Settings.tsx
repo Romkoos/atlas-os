@@ -442,7 +442,6 @@ export function Settings() {
                       <input
                         id="settings-estimateDifficulty"
                         type="checkbox"
-                        style={{ accentColor: 'var(--amber)', cursor: 'pointer' }}
                         {...form.register('estimateDifficulty')}
                       />
                       estimate task difficulty with AI (experimental)

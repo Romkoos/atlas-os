@@ -57,7 +57,12 @@ export function startGeneralChat(opts: StartGeneralChatOptions): GeneralChatRun 
       } else if (message.type === 'assistant') {
         for (const block of message.message.content) {
           if (block.type === 'tool_use') {
-            opts.emit({ type: 'tool', name: block.name, summary: summarizeTool(block) })
+            opts.emit({
+              type: 'tool',
+              name: block.name,
+              summary: summarizeTool(block),
+              toolId: block.id,
+            })
           }
         }
       } else if (message.type === 'result') {

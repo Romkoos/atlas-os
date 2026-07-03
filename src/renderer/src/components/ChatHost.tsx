@@ -59,13 +59,24 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
     onData: ({ seq, event }) => {
       const store = useRun.getState()
       store.bumpSeq(seq)
-      const e = event as { type: string; text?: string; summary?: string; message?: string }
+      const e = event as {
+        type: string
+        text?: string
+        summary?: string
+        message?: string
+        toolId?: string
+        resultText?: string
+        isError?: boolean
+      }
       switch (e.type) {
         case 'token':
           store.appendToken(e.text ?? '')
           break
         case 'tool':
-          store.pushTool(e.summary ?? '')
+          store.pushTool(e.toolId ?? '', e.summary ?? '')
+          break
+        case 'tool-result':
+          store.resolveTool(e.toolId ?? '', e.resultText ?? '', e.isError === true)
           break
         case 'awaiting-input':
           store.flushTurn()

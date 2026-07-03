@@ -1,7 +1,8 @@
 // src/renderer/src/components/BenchmarkChatOverlay.tsx
+import { ChatComposer } from '@renderer/components/chat/ChatComposer'
+import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
-import { useEffect, useRef, useState } from 'react'
 
 // Body of the benchmark-discussion session, rendered inside UnifiedChatDrawer.
 // Reads the App-level store, so the session continues even when this body is
@@ -15,54 +16,23 @@ export function BenchmarkChatOverlay() {
   const pushUserReply = useBenchmarkChatRun((s) => s.pushUserReply)
 
   const reply = trpc.benchmarkChat.reply.useMutation()
-  const [draft, setDraft] = useState('')
-  const logRef = useRef<HTMLDivElement>(null)
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new output
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [transcript, streaming])
 
   if (status === 'idle') return null
 
-  const send = () => {
-    const text = draft.trim()
-    if (!text || !sessionId || !awaitingInput) return
+  const send = (text: string) => {
+    if (!sessionId || !awaitingInput) return
     pushUserReply(text)
     reply.mutate({ sessionId, text })
-    setDraft('')
   }
 
   return (
-    <div className="bench-chat-body">
-      <div className="bench-chat-log" ref={logRef}>
-        {transcript.map((e, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: transcript is append-only; no stable id
-          <div key={i} className={`bench-chat-entry ${e.kind}`}>
-            {e.kind === 'tool' ? `· ${e.text}` : e.text}
-          </div>
-        ))}
-        {streaming ? <div className="bench-chat-entry assistant">{streaming}</div> : null}
-      </div>
-      <div className="bench-chat-foot">
-        <textarea
-          className="input"
-          rows={2}
-          value={draft}
-          placeholder={awaitingInput ? 'Ask about the results…' : 'Model is working…'}
-          disabled={!awaitingInput}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send()
-            }
-          }}
-        />
-        <button type="button" className="btn primary" disabled={!awaitingInput} onClick={send}>
-          SEND
-        </button>
-      </div>
+    <div className="chat-body-flex">
+      <ChatTranscript transcript={transcript} streaming={streaming} onPickOption={send} />
+      <ChatComposer
+        disabled={!awaitingInput}
+        placeholder={awaitingInput ? 'Ask about the results…' : 'Model is working…'}
+        onSend={send}
+      />
     </div>
   )
 }
