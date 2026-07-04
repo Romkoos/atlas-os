@@ -6,7 +6,7 @@ import {
   pct,
   timeAgo,
 } from '@renderer/components/dashboard/dash-utils'
-import { ProcessesPanel } from '@renderer/components/dashboard/ProcessesPanel'
+import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
@@ -615,7 +615,9 @@ export function Dashboard() {
           <QuickActions />
         </div>
 
-        <ProcessesPanel />
+        <div className="mt-16">
+          <ProcessesStrip />
+        </div>
 
         <div className="grid-2 mt-16">
           <RecentActivity />
