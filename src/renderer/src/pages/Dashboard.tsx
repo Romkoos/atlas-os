@@ -1,3 +1,11 @@
+import {
+  compact,
+  DrillLink,
+  Note,
+  num,
+  pct,
+  timeAgo,
+} from '@renderer/components/dashboard/dash-utils'
 import { ProcessesPanel } from '@renderer/components/dashboard/ProcessesPanel'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
 import { Ticker } from '@renderer/components/fx/Ticker'
@@ -9,20 +17,8 @@ import { useTrendingRun } from '@renderer/store/trendingRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
 import { CLAUDE_MODELS } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
-import { type CSSProperties, type ReactNode, useMemo, useState } from 'react'
+import { type CSSProperties, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-
-const fmtInt = new Intl.NumberFormat('en-US')
-const num = (n: number): string => fmtInt.format(n)
-const pct = (v: number | null | undefined, digits = 0): string =>
-  v == null ? '—' : `${v.toFixed(digits)}%`
-
-// Compact token count: 12_345 → "12.3k", 1_200_000 → "1.2M".
-function compact(n: number): string {
-  if (n < 1000) return String(n)
-  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`
-  return `${(n / 1_000_000).toFixed(1)}M`
-}
 
 // ms → compact human duration for the avg-duration tile.
 function fmtDuration(ms: number): string {
@@ -32,21 +28,6 @@ function fmtDuration(ms: number): string {
   const m = Math.floor(ms / 60_000)
   const s = Math.round((ms % 60_000) / 1000)
   return `${m}m ${s}s`
-}
-
-// Date/ISO timestamp → "2h ago". Renderer-side relative time (Date.now is fine
-// here — the ban only applies to workflow scripts). Dates cross IPC as either
-// real Date objects or strings, so accept both.
-function timeAgo(value: Date | string | null | undefined): string {
-  if (!value) return 'never'
-  const then = new Date(value).getTime()
-  if (Number.isNaN(then)) return '—'
-  const min = Math.round((Date.now() - then) / 60_000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  return `${Math.round(hr / 24)}d ago`
 }
 
 // First couple of meaningful lines of a digest, with frontmatter + leading
@@ -63,39 +44,6 @@ function digestSnippet(raw: string): string {
     )
     .filter((l) => l.length > 0)
   return lines.slice(0, 2).join(' — ').slice(0, 160)
-}
-
-// Mono "// message" line for per-widget empty/loading states.
-function Note({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-4)', padding: '8px 0' }}
-    >
-      <span style={{ color: 'var(--amber-dim)' }}>{'// '}</span>
-      {children}
-    </div>
-  )
-}
-
-// "→ section" affordance in a panel head; switches the active page.
-function DrillLink({ to, label }: { to: Section; label: string }) {
-  const go = useUiStore((s) => s.setSection)
-  return (
-    <button
-      type="button"
-      className="meta"
-      onClick={() => go(to)}
-      style={{
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        fontFamily: 'var(--mono)',
-        padding: 0,
-      }}
-    >
-      {label} →
-    </button>
-  )
 }
 
 // ── TELEMETRY MARQUEE ──────────────────────────────────────────────────────
