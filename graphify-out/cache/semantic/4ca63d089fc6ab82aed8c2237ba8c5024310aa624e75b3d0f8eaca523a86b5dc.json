@@ -1,0 +1,1 @@
+{"nodes": [{"id": "db_table_events", "label": "DB Table: events", "file_type": "code", "source_file": "release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0000_messy_grandmaster.sql", "source_location": "1-9", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

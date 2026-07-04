@@ -5,6 +5,8 @@ import { DayDrawer, type DrawerSession } from '@renderer/components/charts/DayDr
 import { inDayRange, localDay } from '@renderer/components/charts/daySessions'
 import { HoverSyncProvider, useHoverSync } from '@renderer/components/charts/HoverSyncContext'
 import { type BrushRange, brushProps } from '@renderer/components/charts/rangeBrush'
+import { BorderBeam } from '@renderer/components/fx/BorderBeam'
+import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
@@ -734,14 +736,18 @@ function OverviewTab({ days, projectPath }: Scope) {
           <div className="label">
             <span className="id">[01]</span>TOTAL TOKENS
           </div>
-          <div className="val">{num(totals.totalTokens)}</div>
+          <div className="val">
+            <Ticker value={totals.totalTokens} />
+          </div>
           <div className="delta">{num(totals.turns)} turns</div>
         </div>
         <div className="kpi">
           <div className="label">
             <span className="id">[02]</span>SESSIONS
           </div>
-          <div className="val">{num(totals.sessions)}</div>
+          <div className="val">
+            <Ticker value={totals.sessions} />
+          </div>
           <div className="delta">{num(totals.totalCount)} total</div>
         </div>
         <div className="kpi">
@@ -2020,9 +2026,11 @@ function BenchmarkTab() {
 
   return (
     <>
-      <div className="panel mt-16">
+      <div className={`panel mt-16${running ? ' scanning' : ''}`}>
+        {running ? <BorderBeam /> : null}
         <div className="panel-head">
           <span className="ttl">run benchmark</span>
+          {running ? <span className="fx-radar" aria-hidden /> : null}
           <span className="meta">
             fixed tasks on real claude headless under current infra · spends tokens
           </span>
@@ -2276,7 +2284,7 @@ export function Productivity() {
   return (
     <>
       <PageHeader
-        num="03"
+        num="04"
         title="PRODUCTIVITY"
         description={
           <>

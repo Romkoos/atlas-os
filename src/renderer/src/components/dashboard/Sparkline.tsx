@@ -18,7 +18,17 @@ export function Sparkline({
 }) {
   if (data.length === 0) return null
   return (
-    <div style={{ height, width: '100%' }}>
+    <div
+      style={{
+        height,
+        width: '100%',
+        // Static glow under the line — a filter that never animates is cheap.
+        filter:
+          kind === 'line'
+            ? 'drop-shadow(0 0 4px color-mix(in oklch, var(--amber) 35%, transparent))'
+            : undefined,
+      }}
+    >
       <ResponsiveContainer width="100%" height="100%">
         {kind === 'line' ? (
           <LineChart data={data} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>

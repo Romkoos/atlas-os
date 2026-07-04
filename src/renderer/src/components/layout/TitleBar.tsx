@@ -57,7 +57,7 @@ export function TitleBar({ section }: { section: Section }) {
         {health.data ? <span>uptime {formatUptime(health.data.uptimeMs)}</span> : null}
         {health.data ? <span>mem {health.data.memMB}M</span> : null}
         <JobIndicator online={online} />
-        <span style={{ color: 'var(--fg-3)' }}>{clock}</span>
+        <span style={{ color: 'var(--fg-3)', fontVariantNumeric: 'tabular-nums' }}>{clock}</span>
       </div>
     </div>
   )

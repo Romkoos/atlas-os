@@ -1,3 +1,4 @@
+import { BorderBeam } from '@renderer/components/fx/BorderBeam'
 import { formatDuration, useJobs } from '@renderer/hooks/useJobs'
 import { trpc } from '@renderer/lib/trpc'
 import type { JobView } from '@shared/jobs'
@@ -40,6 +41,7 @@ export function JobIndicator({ online }: { online: boolean }) {
     <span className={count > 0 ? 'jobs live' : 'jobs'}>
       <span className="jobs-label">{count === 0 ? '● idle' : `◐ ${count} running`}</span>
       <div className="jobs-pop">
+        {count > 0 ? <BorderBeam size={40} duration={4} /> : null}
         {empty ? <div className="jobs-empty">no recent processes</div> : null}
         {running.map((j) => (
           <JobRow key={j.id} job={j} now={now} />

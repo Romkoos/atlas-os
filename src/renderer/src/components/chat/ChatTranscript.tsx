@@ -85,6 +85,13 @@ export function ChatTranscript({
       {streaming ? (
         <div className="chat-entry assistant">
           <Markdown remarkPlugins={[remarkGfm]}>{streaming}</Markdown>
+          <span className="fx-wave" aria-hidden>
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
         </div>
       ) : null}
     </div>

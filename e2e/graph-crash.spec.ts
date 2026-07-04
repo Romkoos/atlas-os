@@ -17,7 +17,7 @@ async function graphScenario(reload: boolean) {
     if (m.type() === 'error') consoleErrors.push(m.text())
   })
 
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // Land somewhere else first, so entering the graph is a fresh mount from
   // another page — the reported trigger.
@@ -51,7 +51,7 @@ async function graphScenario(reload: boolean) {
 
   if (reload) {
     await window.reload()
-    await expect(window.getByText('ATLAS.OS')).toBeVisible()
+    await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
     await window.waitForTimeout(1500)
   }
 
@@ -74,7 +74,7 @@ test('toggling to the 2D view and re-entering does not throw the rAF tick error'
   const pageErrors: string[] = []
   window.on('pageerror', (e) => pageErrors.push(String(e.message ?? e)))
 
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
   await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
 
   const graphTab = window.getByRole('button', { name: './graph' })

@@ -77,7 +77,7 @@ export function News() {
   return (
     <>
       <PageHeader
-        num="05"
+        num="06"
         title="NEWS"
         description={copy.description}
         action={

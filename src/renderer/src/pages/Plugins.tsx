@@ -505,7 +505,7 @@ export function Plugins() {
   return (
     <>
       <PageHeader
-        num="08"
+        num="09"
         title="PLUGINS"
         description="Browse, install and health-check your global Claude Code plugins & MCP servers."
       />

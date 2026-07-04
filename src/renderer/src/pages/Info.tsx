@@ -36,7 +36,7 @@ export function Info() {
   return (
     <>
       <PageHeader
-        num="06"
+        num="07"
         title="INFO"
         description="Token Efficiency — методика, данные, формулы"
       />

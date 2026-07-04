@@ -26,7 +26,13 @@ function ToolRow({ entry }: { entry: ToolEntry }) {
         <span className="chat-tool-row-label">{entry.text}</span>
         {hasBody ? <ChevronRight size={12} className={`chat-chev${open ? ' open' : ''}`} /> : null}
       </button>
-      {open && entry.resultText ? <pre className="chat-tool-out">{entry.resultText}</pre> : null}
+      {entry.resultText ? (
+        <div className={`chat-collapse${open ? ' open' : ''}`}>
+          <div className="chat-collapse-inner">
+            <pre className="chat-tool-out">{entry.resultText}</pre>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -49,13 +55,15 @@ export function ToolActivityGroup({ entries }: { entries: ToolEntry[] }) {
         <span className="chat-activity-label">{label}</span>
         <ChevronRight size={13} className={`chat-chev${open ? ' open' : ''}`} />
       </button>
-      {open ? (
-        <div className="chat-activity-body">
-          {entries.map((e) => (
-            <ToolRow key={e.id} entry={e} />
-          ))}
+      <div className={`chat-collapse${open ? ' open' : ''}`}>
+        <div className="chat-collapse-inner">
+          <div className="chat-activity-body">
+            {entries.map((e) => (
+              <ToolRow key={e.id} entry={e} />
+            ))}
+          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   )
 }

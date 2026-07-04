@@ -283,7 +283,7 @@ export function Settings() {
   return (
     <>
       <PageHeader
-        num="09"
+        num="10"
         title="SETTINGS"
         description={<>Model, output folder, theme, logging.</>}
       />

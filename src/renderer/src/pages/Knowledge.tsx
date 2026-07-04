@@ -1,5 +1,6 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
+import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDate } from '@renderer/lib/utils'
 import { CodeGraphTab } from '@renderer/pages/knowledge/CodeGraphTab'
@@ -7,6 +8,7 @@ import { GraphTab } from '@renderer/pages/knowledge/GraphTab'
 import { MarkdownView } from '@renderer/pages/knowledge/MarkdownView'
 import { useUiStore } from '@renderer/store/ui'
 import type { ArticleKind, ArticleMeta } from '@shared/knowledge'
+import { motion } from 'motion/react'
 import { type ReactNode, useMemo, useState } from 'react'
 
 type Tab = 'browse' | 'daily' | 'search' | 'graph' | 'code'
@@ -64,7 +66,7 @@ export function Knowledge() {
   return (
     <>
       <PageHeader
-        num="04"
+        num="05"
         title="KNOWLEDGE"
         description="Per-project knowledge base — read-only."
         action={
@@ -134,7 +136,7 @@ export function Knowledge() {
         ) : projects.data && projects.data.length > 0 ? (
           !active ? null : (
             <>
-              <div className="tabs">
+              <div className="tabs has-ink">
                 {TABS.map((t) => (
                   <button
                     key={t.id}
@@ -142,6 +144,13 @@ export function Knowledge() {
                     className={tab === t.id ? 'on' : ''}
                     onClick={() => setTab('knowledge', t.id)}
                   >
+                    {tab === t.id && (
+                      <motion.span
+                        layoutId="kb-tab"
+                        className="tab-ink"
+                        transition={springSnappy}
+                      />
+                    )}
                     {t.label}
                   </button>
                 ))}

@@ -1,3 +1,4 @@
+import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import type { ReactNode } from 'react'
 
 export function PageHeader({
@@ -17,7 +18,7 @@ export function PageHeader({
       <div>
         <h2>
           <span className="num">{num}</span>
-          {title}
+          <ScrambleText text={title} />
         </h2>
         {description ? <div className="desc">{description}</div> : null}
       </div>

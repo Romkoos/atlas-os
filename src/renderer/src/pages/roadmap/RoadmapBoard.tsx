@@ -221,7 +221,9 @@ export function RoadmapBoard({
             )
           })}
         </div>
-        <DragOverlay>{activeItem ? <CardOverlay item={activeItem} /> : null}</DragOverlay>
+        <DragOverlay dropAnimation={{ duration: 250, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }}>
+          {activeItem ? <CardOverlay item={activeItem} /> : null}
+        </DragOverlay>
       </DndContext>
     </div>
   )

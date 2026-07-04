@@ -1,3 +1,4 @@
+import { LetterGlitch } from '@renderer/components/fx/LetterGlitch'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
@@ -290,7 +291,7 @@ export function Skills() {
   return (
     <>
       <PageHeader
-        num="07"
+        num="08"
         title="SKILLS"
         description={
           <>
@@ -390,8 +391,9 @@ export function Skills() {
               <span className="ttl">editor · preview</span>
               <span className="meta">no selection</span>
             </div>
-            <div className="pane-body">
-              <div style={{ ...hintStyle, padding: '20px 24px' }}>
+            <div className="pane-body" style={{ position: 'relative' }}>
+              <LetterGlitch />
+              <div style={{ ...hintStyle, padding: '20px 24px', position: 'relative' }}>
                 {'// select a skill to edit its SKILL.md'}
               </div>
             </div>

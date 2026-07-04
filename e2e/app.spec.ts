@@ -6,7 +6,7 @@ test('boots, renders, and round-trips tRPC over IPC', async () => {
   const window = await app.firstWindow()
 
   // Renderer mounted.
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // query IPC: the sidebar auth badge resolves to the online indicator.
   await expect(window.getByText('● ok')).toBeVisible({ timeout: 15000 })
@@ -22,7 +22,7 @@ test('Knowledge graph tab renders a canvas', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
 
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
   await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
 
   // The graph tab is only present when projects exist; skip cleanly otherwise.
@@ -52,7 +52,7 @@ test('Code graph tab shows a single Build control', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
 
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
   await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
 
   // The code-graph tab is only present when projects exist; skip cleanly otherwise.
@@ -80,7 +80,7 @@ test('Code graph tab shows a single Build control', async () => {
 test('Roadmap page renders seeded items', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   await window.getByRole('button', { name: '02 ROADMAP' }).click()
 
@@ -96,7 +96,7 @@ test('Roadmap page renders seeded items', async () => {
 test('Roadmap Board view shows status columns', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   await window.getByRole('button', { name: '02 ROADMAP' }).click()
   await window.getByRole('button', { name: 'Board', exact: true }).click()
@@ -118,7 +118,7 @@ test('Roadmap Board view shows status columns', async () => {
 test('Roadmap "new idea" opens the incubator chat', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   await window.getByRole('button', { name: '02 ROADMAP' }).click()
   await window.getByRole('button', { name: /new idea/i }).click()
@@ -137,7 +137,7 @@ test('Roadmap "new idea" opens the incubator chat', async () => {
 test('restores last section + tab after reload', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // Navigate to News and select the GitHub Trending feed tab.
   await window.getByRole('button', { name: '06 NEWS' }).click()
@@ -146,7 +146,7 @@ test('restores last section + tab after reload', async () => {
 
   // Reload the renderer; persisted ui store should reopen News on the trending tab.
   await window.reload()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
   await expect(window.getByRole('button', { name: /GITHUB TRENDING/ })).toHaveClass(/on/, {
     timeout: 15000,
   })
@@ -157,7 +157,7 @@ test('restores last section + tab after reload', async () => {
 test('Productivity benchmark tab hides the days range selector', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   await window.getByRole('button', { name: '04 PRODUCTIVITY' }).click()
 
@@ -177,7 +177,7 @@ test('top bar shows the process indicator at idle', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
 
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // The JobIndicator subscribes to jobs.list and settles to idle when nothing
   // is running — proves the subscription round-trips over IPC.
@@ -189,7 +189,7 @@ test('top bar shows the process indicator at idle', async () => {
 test('FAB type picker opens a worker chat', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // With no active chats, the FAB opens a two-icon picker (Chat vs Worker).
   await window.getByRole('button', { name: 'Open chat' }).click()
@@ -209,7 +209,7 @@ test('FAB type picker opens a worker chat', async () => {
 test('Dashboard shows the processes panel', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window.getByText('ATLAS.OS')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   await window.getByRole('button', { name: '01 DASHBOARD' }).click()
 

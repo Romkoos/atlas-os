@@ -1,0 +1,22 @@
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0002_premium_martin_li.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0001_overrated_sir_ram.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0000_messy_grandmaster.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0004_slim_reaper.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0003_powerful_tana_nile.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/drizzle/0005_complex_epoch.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/rerun-failed-bench.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/INSTALL.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/hooks/config-change-hook.py
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/hooks/file-changed-hook.py
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/hooks/session-start-hook.py
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/hooks/session-end-hook.py
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/skills/done/done.py
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/scripts/agent-analytics/skills/done/SKILL.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/menu.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/logger.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/security.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/window.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/index.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/paths.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/store.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/src/main/db/schema.ts
