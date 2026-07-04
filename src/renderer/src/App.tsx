@@ -1,5 +1,6 @@
 import { ChatHost } from '@renderer/components/ChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
+import { GraphBuildRunHost } from '@renderer/components/GraphBuildRunHost'
 import { BootSequence } from '@renderer/components/fx/BootSequence'
 import { SpaceScene } from '@renderer/components/fx/SpaceScene'
 import { NAV } from '@renderer/components/layout/nav'
@@ -96,6 +97,7 @@ export function App() {
         </div>
         <NewsRunHost />
         <TrendingRunHost />
+        <GraphBuildRunHost />
         <ChatHost
           useRun={useGeneralChatRun}
           useOpenSubscription={trpc.generalChat.open.useSubscription}
