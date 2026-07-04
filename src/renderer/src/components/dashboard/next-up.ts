@@ -19,13 +19,13 @@ export function groupNextUp(items: RoadmapItem[]): NextUpGroups {
   const inProgress = items
     .filter((i) => i.status === 'in-progress')
     .sort(byRecency)
-    .slice(0, 3)
+    .slice(0, 4)
   const planned = items.filter((i) => i.status === 'planned').sort(byPriority)
   const todo = items.filter((i) => i.status === 'todo').sort(byPriority)
-  const nextUp = [...planned, ...todo].slice(0, 4)
+  const nextUp = [...planned, ...todo].slice(0, 6)
   const done = items
     .filter((i) => i.status === 'done')
     .sort(byRecency)
-    .slice(0, 3)
+    .slice(0, 4)
   return { inProgress, nextUp, done }
 }

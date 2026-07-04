@@ -46,16 +46,17 @@ export function GalaxyHero() {
     return { nodes: s.nodes, links: s.links, totalNodes: s.totalNodes, totalEdges: s.totalEdges }
   }, [graph.data, enabled])
 
-  // Square canvas: track the container's width; height === width.
+  // The canvas fills its panel column exactly (width × height), so the hero
+  // aligns flush with the NEXT UP / rail columns — no leftover gap.
   const roRef = useRef<ResizeObserver | null>(null)
-  const [size, setSize] = useState(0)
+  const [dims, setDims] = useState({ w: 0, h: 0 })
   const setContainer = useCallback((el: HTMLDivElement | null) => {
     roRef.current?.disconnect()
     if (!el) {
       roRef.current = null
       return
     }
-    const measure = () => setSize(el.clientWidth)
+    const measure = () => setDims({ w: el.clientWidth, h: el.clientHeight })
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
@@ -74,12 +75,13 @@ export function GalaxyHero() {
         <span className="meta">all projects · live</span>
       </div>
       <div className="galaxy-canvas" ref={setContainer}>
-        {!failed && !empty && size > 0 && (
+        {!failed && !empty && dims.w > 0 && dims.h > 0 && (
           <Graph3DBoundary onError={() => setFailed(true)}>
             <Suspense fallback={null}>
               <DecorGalaxy3D
                 graphData={data}
-                size={size}
+                width={dims.w}
+                height={dims.h}
                 nodeColor={(n) => colorForNode(n as CodeGraphNode)}
                 clusterKey={(n) => communityKey(n as CodeGraphNode)}
               />

@@ -4319,11 +4319,17 @@ textarea.input:focus,
 .galaxy-hero {
   position: relative;
   overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .galaxy-canvas {
   position: relative;
   width: 100%;
-  aspect-ratio: 1;
+  flex: 1 1 auto;
+  /* Never shorter than a near-square so the hero stays a proper poster even when
+     the NEXT UP column is short. */
+  min-height: 360px;
   pointer-events: none;
   overflow: hidden;
   background: #000;
@@ -4427,7 +4433,16 @@ textarea.input:focus,
 }
 
 /* NEXT UP kanban digest */
+.nextup-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.nextup-lists {
+  flex: 0 0 auto;
+}
 .nextup-tally {
+  margin-top: auto;
   display: flex;
   gap: 14px;
   align-items: center;
@@ -4438,7 +4453,6 @@ textarea.input:focus,
   background: none;
   cursor: pointer;
   padding: 12px 0 0;
-  margin-top: 12px;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -4555,13 +4569,14 @@ textarea.input:focus,
   display: grid;
   grid-auto-flow: column;
   grid-template-columns: repeat(var(--weeks, 13), minmax(0, 1fr));
-  grid-template-rows: repeat(7, auto);
+  grid-template-rows: repeat(7, minmax(0, 1fr));
   gap: 3px;
   width: 100%;
+  height: 100%;
 }
 .heatmap-cell {
-  aspect-ratio: 1;
-  width: 100%;
+  min-width: 0;
+  min-height: 0;
   border-radius: 2px;
   background: var(--line-dim);
 }
@@ -4696,23 +4711,51 @@ textarea.input:focus,
 }
 
 /* dashboard layout */
-/* Hero band: galaxy square (fixed) · a WIDE NEXT UP that takes the flexible
-   space · a narrow rail of stacked widgets. Columns align to the TOP; the rail
-   widgets and NEXT UP each take only the height their content needs (they don't
-   stretch to the galaxy's height). */
+/* Hero band: galaxy square (fixed, sets the band height) · a WIDE NEXT UP · a
+   narrow rail of three stacked widgets. All three columns stretch to the same
+   height with aligned bottoms — no ragged empty space below the short ones. */
 .dash-hero-row {
   display: grid;
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) minmax(240px, 300px);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 .dash-hero-row > * {
   min-width: 0;
+  min-height: 0;
 }
-.dash-rail {
+/* Galaxy (first child) is a self-sizing square; NEXT UP fills the row height. */
+.dash-hero-row > .dash-reveal:nth-child(2) .panel {
+  height: 100%;
   display: flex;
   flex-direction: column;
+}
+.dash-hero-row > .dash-reveal:nth-child(2) .panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dash-rail {
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  min-height: 0;
+}
+.dash-rail > .dash-reveal {
+  min-height: 0;
+}
+/* Rail widgets fill their equal thirds; the body flexes so the heatmap can tile
+   the full area and the stat widgets center vertically. */
+.dash-rail .panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.dash-rail .panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dash-rail .dash-widget:not(.dash-widget-heatmap) .panel-body {
+  justify-content: center;
 }
 .dash-mid {
   display: grid;
@@ -4732,15 +4775,22 @@ textarea.input:focus,
   .dash-hero-row {
     grid-template-columns: 1fr;
   }
-  .dash-rail {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .dash-hero-row > .dash-reveal:nth-child(2) .panel {
+    height: auto;
   }
-  .dash-rail > .dash-reveal {
-    flex: 1 1 220px;
+  .dash-rail {
+    grid-template-rows: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
   }
   .dash-mid {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 780px) {
+  .dash-rail {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
   }
 }
 

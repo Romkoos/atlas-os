@@ -16,7 +16,7 @@ export function TokenHeatmap() {
   const weeks = Math.ceil((cells.length + lead) / 7)
 
   return (
-    <div className="panel dash-widget">
+    <div className="panel dash-widget dash-widget-heatmap">
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="heatmap · 13w" />

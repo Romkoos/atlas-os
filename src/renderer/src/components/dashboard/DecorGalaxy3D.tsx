@@ -24,7 +24,8 @@ interface DecorGalaxy3DProps {
     nodes: DecorNode[]
     links: Array<{ source: string | DecorNode; target: string | DecorNode }>
   }
-  size: number
+  width: number
+  height: number
   // biome-ignore lint/suspicious/noExplicitAny: force-graph node type is untyped
   nodeColor: (n: any) => string
   // biome-ignore lint/suspicious/noExplicitAny: force-graph node type is untyped
@@ -39,7 +40,8 @@ const BACKGROUND = '#000000'
 // interaction stripped — no hover, no click, no drag, permanent auto-rotate.
 export default function DecorGalaxy3D({
   graphData,
-  size,
+  width,
+  height,
   nodeColor,
   clusterKey,
 }: DecorGalaxy3DProps) {
@@ -75,7 +77,7 @@ export default function DecorGalaxy3D({
       const composer = fg.postProcessingComposer?.()
       if (composer) {
         bloom = new UnrealBloomPass(
-          new THREE.Vector2(Math.max(size, 1), Math.max(size, 1)),
+          new THREE.Vector2(Math.max(width, 1), Math.max(height, 1)),
           0.6, // strength
           0.55, // radius
           0.18, // threshold
@@ -194,8 +196,8 @@ export default function DecorGalaxy3D({
   return (
     <ForceGraph3D
       ref={fgRef}
-      width={size}
-      height={size}
+      width={width}
+      height={height}
       graphData={graphData}
       backgroundColor={BACKGROUND}
       controlType="orbit"
