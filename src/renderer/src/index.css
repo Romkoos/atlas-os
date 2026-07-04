@@ -4506,3 +4506,55 @@ textarea.input:focus,
     animation: none;
   }
 }
+
+/* NEXT UP kanban digest */
+.nextup-group {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  margin: 10px 0 2px;
+}
+.nextup-group:first-child {
+  margin-top: 0;
+}
+.nextup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--line-dim);
+  padding: 6px 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.nextup-row:hover .nextup-title {
+  color: var(--amber);
+}
+.nextup-glyph {
+  color: var(--amber);
+  flex-shrink: 0;
+}
+.nextup-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nextup-pri {
+  color: #ff6b74;
+  font-size: 11px;
+}
+.nextup-row.done .nextup-glyph,
+.nextup-row.done .nextup-title {
+  color: var(--fg-4);
+}
+.nextup-row.done .nextup-title {
+  text-decoration: line-through;
+}
