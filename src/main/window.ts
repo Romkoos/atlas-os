@@ -37,7 +37,13 @@ export function createMainWindow(): BrowserWindow {
     },
   })
 
-  win.on('ready-to-show', () => win.show())
+  // Launch filling the screen. Maximize (not fullscreen) so the custom title
+  // bar and window controls stay visible; the width/height above are the
+  // restore-down size.
+  win.on('ready-to-show', () => {
+    win.maximize()
+    win.show()
+  })
 
   // External links open in the user's browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {

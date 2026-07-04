@@ -9,7 +9,6 @@ import {
 } from '@renderer/components/dashboard/dash-utils'
 import { GalaxyHero } from '@renderer/components/dashboard/GalaxyHero'
 import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
-import { MissionClock } from '@renderer/components/dashboard/MissionClock'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
@@ -439,45 +438,42 @@ export function Dashboard() {
           <StatusRow />
         </div>
 
+        <div className="dash-reveal mt-16" style={{ '--i': 1 } as CSSProperties}>
+          <QuickActions />
+        </div>
+
+        {/* Hero band: galaxy square · narrow NEXT UP · vertical widget rail —
+            all three columns stretch to the galaxy's height for one clean line. */}
         <div className="dash-hero-row mt-16">
-          <div className="dash-reveal" style={{ '--i': 1 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 2 } as CSSProperties}>
             <GalaxyHero />
           </div>
-          <div className="dash-side">
-            <div className="dash-reveal" style={{ '--i': 2 } as CSSProperties}>
-              <RoadmapNextUp />
+          <div className="dash-reveal" style={{ '--i': 3 } as CSSProperties}>
+            <RoadmapNextUp />
+          </div>
+          <div className="dash-rail">
+            <div className="dash-reveal" style={{ '--i': 4 } as CSSProperties}>
+              <TokenHeatmap />
             </div>
-            <div className="dash-reveal" style={{ '--i': 3 } as CSSProperties}>
-              <QuickActions />
+            <div className="dash-reveal" style={{ '--i': 5 } as CSSProperties}>
+              <KnowledgePulse />
+            </div>
+            <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
+              <BenchmarkWidget />
             </div>
           </div>
         </div>
 
         <div className="dash-mid mt-16">
-          <div className="dash-reveal" style={{ '--i': 4 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
             <ActivityPanel />
           </div>
-          <div className="dash-reveal" style={{ '--i': 5 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
             <SignalsPanel />
           </div>
         </div>
 
-        <div className="dash-widgets mt-16">
-          <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
-            <TokenHeatmap />
-          </div>
-          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
-            <KnowledgePulse />
-          </div>
-          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
-            <BenchmarkWidget />
-          </div>
-          <div className="dash-reveal" style={{ '--i': 9 } as CSSProperties}>
-            <MissionClock />
-          </div>
-        </div>
-
-        <div className="dash-reveal mt-16" style={{ '--i': 10 } as CSSProperties}>
+        <div className="dash-reveal mt-16" style={{ '--i': 9 } as CSSProperties}>
           <ProcessesStrip />
         </div>
 
