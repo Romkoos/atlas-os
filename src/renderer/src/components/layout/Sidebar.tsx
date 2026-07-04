@@ -1,12 +1,28 @@
+import { Ticker } from '@renderer/components/fx/Ticker'
 import { NAV } from '@renderer/components/layout/nav'
+import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
 import { useUiStore } from '@renderer/store/ui'
+import gsap from 'gsap'
+import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
+import { motion } from 'motion/react'
+import type { MouseEvent } from 'react'
 
-// Compact token count: 1_340_000 → "1.34M", 17_500 → "17.5K".
-function fmtCompact(n: number): string {
-  if (n >= 1e6) return `${(n / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`
-  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.?0+$/, '')}K`
-  return String(n)
+gsap.registerPlugin(ScrambleTextPlugin)
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// Decrypt the label (the class-less span) on hover — presentation only; the
+// DOM text resolves back to the same string, so accessible names are stable.
+function scrambleLabel(e: MouseEvent<HTMLButtonElement>) {
+  if (reduced) return
+  const label = e.currentTarget.querySelector<HTMLElement>('span:not([class])')
+  if (!label) return
+  gsap.to(label, {
+    duration: 0.3,
+    ease: 'none',
+    scrambleText: { text: label.textContent ?? '', chars: 'upperCase', speed: 1.3 },
+  })
 }
 
 export function Sidebar() {
@@ -43,7 +59,11 @@ export function Sidebar() {
             type="button"
             className={section === n.id ? 'active' : ''}
             onClick={() => setSection(n.id)}
+            onMouseEnter={scrambleLabel}
           >
+            {section === n.id && (
+              <motion.span layoutId="nav-pill" className="nav-pill" transition={springSnappy} />
+            )}
             <span className="k">{n.key}</span>
             <span>{n.label}</span>
             <span className="badge" />
@@ -72,11 +92,18 @@ export function Sidebar() {
       <div className="sb-foot">
         <div className="row">
           <span>tokens.today</span>
-          <b>{fmtCompact(tokensToday)}</b>
+          <b>
+            <Ticker
+              value={tokensToday}
+              format={{ notation: 'compact', maximumFractionDigits: 2 }}
+            />
+          </b>
         </div>
         <div className="row">
           <span>turns.today</span>
-          <b>{runsToday}</b>
+          <b>
+            <Ticker value={runsToday} />
+          </b>
         </div>
         <div className="row">
           <span>auth</span>

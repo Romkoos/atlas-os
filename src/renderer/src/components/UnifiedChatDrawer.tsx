@@ -3,6 +3,7 @@ import { GeneralChatOverlay } from '@renderer/components/GeneralChatOverlay'
 import { RoadmapChatOverlay } from '@renderer/components/RoadmapChatOverlay'
 import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
 import { WorkerChatOverlay } from '@renderer/components/WorkerChatOverlay'
+import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
@@ -11,6 +12,7 @@ import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatR
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import { MessageSquare, Plus, Wrench, X } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
 // The single UI surface for every chat session. Sessions themselves live in the
@@ -115,7 +117,7 @@ export function UnifiedChatDrawer() {
 
       <button
         type="button"
-        className={`chat-fab${open ? ' chat-fab-hidden' : ''}`}
+        className={`chat-fab${open ? ' chat-fab-hidden' : ''}${sessions.length > 0 ? ' live' : ''}`}
         aria-label="Open chat"
         onClick={() => (sessions.length === 0 ? setPickerOpen((o) => !o) : setOpen(true))}
       >
@@ -131,6 +133,13 @@ export function UnifiedChatDrawer() {
           <div className="chat-drawer-tablist">
             {sessions.map((s) => (
               <div key={s.id} className={`chat-tab${s.id === activeSessionId ? ' active' : ''}`}>
+                {s.id === activeSessionId && (
+                  <motion.span
+                    layoutId="drawer-tab"
+                    className="tab-ink"
+                    transition={springSnappy}
+                  />
+                )}
                 <button type="button" className="chat-tab-btn" onClick={() => setActive(s.id)}>
                   {s.title}
                 </button>

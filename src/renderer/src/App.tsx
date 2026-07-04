@@ -1,5 +1,7 @@
 import { ChatHost } from '@renderer/components/ChatHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
+import { BootSequence } from '@renderer/components/fx/BootSequence'
+import { SpaceScene } from '@renderer/components/fx/SpaceScene'
 import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
@@ -27,6 +29,7 @@ import { type Section, useUiStore } from '@renderer/store/ui'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
+import { MotionConfig } from 'motion/react'
 import { type ComponentType, useEffect } from 'react'
 
 const PAGES: Record<Section, ComponentType> = {
@@ -76,52 +79,61 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <div className="win">
-        <TitleBar section={section} />
-        <div className="app">
-          <Sidebar />
-          <main className="main">
-            <Page />
-          </main>
+      <MotionConfig reducedMotion="user">
+        <SpaceScene />
+        <div className="win">
+          <TitleBar section={section} />
+          <div className="app">
+            <Sidebar />
+            <main className="main">
+              {/* Glitch-burst on section switch (CSS, enter-only): remounting
+                  the keyed div restarts the animation; navigation never blocks. */}
+              <div key={section} className="page-anim">
+                <Page />
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
-      <NewsRunHost />
-      <TrendingRunHost />
-      <ChatHost
-        useRun={useGeneralChatRun}
-        useOpenSubscription={trpc.generalChat.open.useSubscription}
-        kickoff={generalKickoff}
-      />
-      <ChatHost
-        useRun={useWorkerChatRun}
-        useOpenSubscription={trpc.workerChat.open.useSubscription}
-        kickoff={workerKickoff}
-      />
-      <ChatHost
-        useRun={useRoadmapChatRun}
-        useOpenSubscription={trpc.roadmapChat.open.useSubscription}
-        kickoff={roadmapKickoff}
-        onEvent={(event) => {
-          const e = event as { type: string; item?: RoadmapItem }
-          if (e.type === 'saved' && e.item) useRoadmapSaved.getState().setSaved(e.item)
-        }}
-      />
-      <ChatHost
-        useRun={useBenchmarkChatRun}
-        useOpenSubscription={trpc.benchmarkChat.open.useSubscription}
-        kickoff={benchmarkKickoff}
-      />
-      <ChatHost
-        useRun={useSkillImproverRun}
-        useOpenSubscription={trpc.skillImprover.open.useSubscription}
-        kickoff={improverKickoff}
-        onEvent={(event) => {
-          const e = event as { type: string; report?: ImproverReport }
-          if (e.type === 'report' && e.report) useSkillImproverExtra.getState().setReport(e.report)
-        }}
-      />
-      <UnifiedChatDrawer />
-      <Toaster theme={theme} richColors closeButton />
+        <NewsRunHost />
+        <TrendingRunHost />
+        <ChatHost
+          useRun={useGeneralChatRun}
+          useOpenSubscription={trpc.generalChat.open.useSubscription}
+          kickoff={generalKickoff}
+        />
+        <ChatHost
+          useRun={useWorkerChatRun}
+          useOpenSubscription={trpc.workerChat.open.useSubscription}
+          kickoff={workerKickoff}
+        />
+        <ChatHost
+          useRun={useRoadmapChatRun}
+          useOpenSubscription={trpc.roadmapChat.open.useSubscription}
+          kickoff={roadmapKickoff}
+          onEvent={(event) => {
+            const e = event as { type: string; item?: RoadmapItem }
+            if (e.type === 'saved' && e.item) useRoadmapSaved.getState().setSaved(e.item)
+          }}
+        />
+        <ChatHost
+          useRun={useBenchmarkChatRun}
+          useOpenSubscription={trpc.benchmarkChat.open.useSubscription}
+          kickoff={benchmarkKickoff}
+        />
+        <ChatHost
+          useRun={useSkillImproverRun}
+          useOpenSubscription={trpc.skillImprover.open.useSubscription}
+          kickoff={improverKickoff}
+          onEvent={(event) => {
+            const e = event as { type: string; report?: ImproverReport }
+            if (e.type === 'report' && e.report)
+              useSkillImproverExtra.getState().setReport(e.report)
+          }}
+        />
+        <UnifiedChatDrawer />
+        <Toaster theme={theme} richColors closeButton />
+        <BootSequence />
+      </MotionConfig>
     </ErrorBoundary>
   )
 }

@@ -1,6 +1,7 @@
 import { ChartFrame } from '@renderer/components/charts/ChartFrame'
 import { eventsPerDayMeta } from '@renderer/components/charts/chartMeta'
 import { brushProps } from '@renderer/components/charts/rangeBrush'
+import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDateTime } from '@renderer/lib/utils'
@@ -64,7 +65,7 @@ export function Stats() {
   return (
     <>
       <PageHeader
-        num="02"
+        num="03"
         title="STATS"
         description="Usage over the last 30 days."
         action={
@@ -80,7 +81,9 @@ export function Stats() {
             <div className="label">
               <span className="id">[01]</span>TOTAL EVENTS
             </div>
-            <div className="val">{total}</div>
+            <div className="val">
+              <Ticker value={total} />
+            </div>
             <div className="delta">last 30 days</div>
             <Spark values={sparkValues} />
           </div>
@@ -102,7 +105,9 @@ export function Stats() {
             <div className="label">
               <span className="id">[03]</span>AVG RESPONSE TOKENS
             </div>
-            <div className="val">{avgTokens}</div>
+            <div className="val">
+              <Ticker value={avgTokens} />
+            </div>
             <div className="delta">output tokens / run</div>
           </div>
 

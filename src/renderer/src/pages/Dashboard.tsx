@@ -1,5 +1,6 @@
 import { ProcessesPanel } from '@renderer/components/dashboard/ProcessesPanel'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
+import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { formatDateTime } from '@renderer/lib/utils'
@@ -8,7 +9,7 @@ import { useTrendingRun } from '@renderer/store/trendingRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
 import { CLAUDE_MODELS } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type CSSProperties, type ReactNode, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 const fmtInt = new Intl.NumberFormat('en-US')
@@ -97,6 +98,35 @@ function DrillLink({ to, label }: { to: Section; label: string }) {
   )
 }
 
+// ── TELEMETRY MARQUEE ──────────────────────────────────────────────────────
+// A thin, endlessly scrolling strip of live readouts (all real data; the
+// queries are the same ones the panels below use, so nothing extra is fetched).
+function TelemetryMarquee() {
+  const health = trpc.health.ping.useQuery()
+  const today = trpc.productivity.today.useQuery({})
+  const kpi = trpc.productivity.kpi.useQuery({ days: 30 })
+  const settings = trpc.settings.get.useQuery()
+  const t = today.data?.totals
+  const items = [
+    `TOKENS.TODAY ${t ? num(t.totalTokens) : '—'}`,
+    `TURNS ${t ? num(t.turns) : '—'}`,
+    `EFF ${pct(kpi.data?.overall)}`,
+    `MODEL ${settings.data?.model.replace(/^claude-/, '') ?? '—'}`,
+    `MEM ${health.data?.memMB ?? '—'}M`,
+    `VER v${health.data?.version ?? '—'}`,
+    `STATUS ${health.data?.ok ? 'NOMINAL' : 'DEGRADED'}`,
+  ]
+  const track = items.map((s) => `▪ ${s}`).join('  ')
+  return (
+    <div className="fx-marquee" aria-hidden>
+      <div className="fx-marquee-track">
+        <span>{track}</span>
+        <span>{track}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── STATUS ROW ─────────────────────────────────────────────────────────────
 // Four headline tiles. Each is a single value; Productivity/Stats own the
 // behavior behind it. All four read from the today + kpi + summary queries,
@@ -114,18 +144,23 @@ function StatusRow() {
   const trend = byDay.length >= 2 ? byDay[byDay.length - 1].kpiSmooth - byDay[0].kpiSmooth : null
 
   return (
-    <div className="kpis k4">
-      <div className="kpi">
+    <div className="kpis bento">
+      <div className="kpi hero">
         <div className="label">
           <span className="id">[01]</span>TODAY TOKENS
         </div>
-        <div className="val">{t ? num(t.totalTokens) : '—'}</div>
+        <div className="val">{t ? <Ticker value={t.totalTokens} /> : '—'}</div>
         <div className="delta">
           {t ? `${num(t.turns)} turns · ${num(t.activeHours)} active hrs` : 'no activity yet'}
         </div>
       </div>
 
-      <div className="kpi">
+      <div className="kpi wide">
+        <div
+          className="fx-gauge"
+          style={{ '--val': Math.max(0, Math.min(140, kpi.data?.overall ?? 0)) } as CSSProperties}
+          aria-hidden
+        />
         <div className="label">
           <span className="id">[02]</span>TOKEN EFFICIENCY
         </div>
@@ -141,7 +176,7 @@ function StatusRow() {
         <div className="label">
           <span className="id">[03]</span>SESSIONS · 30D
         </div>
-        <div className="val">{kpi.data ? num(sessions30d) : '—'}</div>
+        <div className="val">{kpi.data ? <Ticker value={sessions30d} /> : '—'}</div>
         <div className="delta">{kpi.data ? `${compact(tokens30d)} tokens` : 'last 30 days'}</div>
       </div>
 
@@ -149,7 +184,7 @@ function StatusRow() {
         <div className="label">
           <span className="id">[04]</span>AGENT RUNS
         </div>
-        <div className="val">{summary.data ? num(summary.data.total) : '—'}</div>
+        <div className="val">{summary.data ? <Ticker value={summary.data.total} /> : '—'}</div>
         <div className="delta">
           {summary.data ? `avg ${fmtDuration(summary.data.avgDurationMs)}` : 'all time'}
         </div>
@@ -623,6 +658,7 @@ export function Dashboard() {
         title="DASHBOARD"
         description="System overview at a glance — efficiency, activity, signals, and quick actions."
       />
+      <TelemetryMarquee />
       <div className="scroll">
         <StatusRow />
 

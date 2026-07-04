@@ -52,6 +52,7 @@ export function ProcessesPanel() {
     <div className="panel mt-16">
       <div className="panel-head">
         <span className="ttl">processes</span>
+        {running.length > 0 ? <span className="fx-radar" aria-hidden /> : null}
       </div>
       <div className="panel-body">
         <div className="proc-group">active</div>

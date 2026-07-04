@@ -1,18 +1,19 @@
 import type { CodeNodeKind } from '@shared/graph'
 
-// Categorical palette for graph node coloring (community or project). Chosen to
-// read on the dark terminal background.
+// Categorical palette for graph node coloring (community or project). Tuned to
+// the cool near-black background: slots 1–2 mirror the app accents (amber,
+// cyan), the rest keep matched chroma/lightness so no hue shouts.
 export const PALETTE: readonly string[] = [
-  '#e6b450', // amber
-  '#59c2ff', // blue
-  '#7fd962', // green
-  '#d2a6ff', // violet
-  '#ff8f40', // orange
-  '#f07178', // red
-  '#5ccfe6', // cyan
-  '#ffd173', // gold
-  '#bae67e', // lime
-  '#cfbafa', // lavender
+  '#f5b13d', // amber (≈ --amber)
+  '#4fd6e8', // cyan (≈ --cyan)
+  '#86e07c', // green
+  '#c9a8ff', // violet
+  '#ff9550', // orange
+  '#ff6b74', // red
+  '#6cb2ff', // blue
+  '#ffd685', // gold
+  '#c8e88a', // lime
+  '#d6c2ff', // lavender
 ]
 
 export function colorForCommunity(community: number): string {
@@ -26,11 +27,11 @@ export function colorForProject(project: string, projects: string[]): string {
 }
 
 const KIND_COLORS: Record<CodeNodeKind, string> = {
-  code: '#59c2ff', // blue
-  doc: '#7fd962', // green
-  skill: '#d2a6ff', // violet
-  knowledge: '#e6b450', // amber
-  session: '#ff8f40', // orange
+  code: '#6cb2ff', // blue
+  doc: '#86e07c', // green
+  skill: '#c9a8ff', // violet
+  knowledge: '#f5b13d', // amber
+  session: '#ff9550', // orange
 }
 
 export function colorForKind(kind: CodeNodeKind): string {
@@ -39,12 +40,12 @@ export function colorForKind(kind: CodeNodeKind): string {
 
 // graphify-origin nodes get one distinct color so the semantic layer is legible
 // against the kind-colored structural layer. Magenta-purple — deliberately not
-// any KIND_COLORS value (skill's violet #d2a6ff is the closest, kept separate).
-export const GRAPHIFY_COLOR = '#e06fd6'
+// any KIND_COLORS value (skill's violet #c9a8ff is the closest, kept separate).
+export const GRAPHIFY_COLOR = '#e878d8'
 
 // defined_in bridge edges (graphify symbol → structural file) render muted so
 // they don't compete with structural and semantic edges.
-export const DEFINED_IN_EDGE_COLOR = 'rgba(210,166,255,0.25)'
+export const DEFINED_IN_EDGE_COLOR = 'rgba(201, 168, 255, 0.25)'
 
 export function colorForNode(node: { origin: string; kind: CodeNodeKind }): string {
   return node.origin === 'graphify' ? GRAPHIFY_COLOR : colorForKind(node.kind)

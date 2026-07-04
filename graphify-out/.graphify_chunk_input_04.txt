@@ -1,0 +1,22 @@
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-06-08-dashboard-redesign-design.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-05-23-kpd-efficiency-metric-design.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-05-23-complexity-quality-metrics-design.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-05-25-benchmark-suite-handoff.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-05-30-knowledge-ui-handoff.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/docs/superpowers/specs/2026-06-08-github-trending-feed-design.md
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0002_premium_martin_li.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0007_calm_scrambler.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0001_overrated_sir_ram.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0000_messy_grandmaster.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0004_slim_reaper.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0010_mighty_ronan.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0006_reflective_spirit.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0009_happy_krista_starr.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0008_jazzy_moonstone.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0003_powerful_tana_nile.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/drizzle/0005_complex_epoch.sql
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/e2e/app.spec.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/e2e/graph-crash.spec.ts
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/latest-mac.yml
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/builder-debug.yml
+/Users/Roman.Neganov/Projects/PersonalProjects/atlas-os/release/mac-arm64/Atlas OS.app/Contents/Resources/app-update.yml

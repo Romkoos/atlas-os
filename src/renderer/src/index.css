@@ -1,4 +1,10 @@
 @import 'katex/dist/katex.min.css';
+@import '@fontsource/geist-mono/400.css';
+@import '@fontsource/geist-mono/500.css';
+@import '@fontsource/geist-mono/700.css';
+@import '@fontsource/geist-sans/400.css';
+@import '@fontsource/geist-sans/500.css';
+@import '@fontsource/geist-sans/700.css';
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -11,24 +17,25 @@
  * changes (charts read --color-chart-*, borders read --color-border, etc.).
  */
 :root {
-  /* --- terminal palette (source of truth) --- */
-  --bg: oklch(0.158 0.008 65);
-  --bg-2: oklch(0.195 0.008 65);
-  --panel: oklch(0.205 0.008 65);
-  --panel-2: oklch(0.235 0.008 65);
-  --line: oklch(0.32 0.008 65);
-  --line-dim: oklch(0.255 0.008 65);
-  --fg: oklch(0.95 0.005 70);
-  --fg-2: oklch(0.8 0.005 70);
-  --fg-3: oklch(0.66 0.008 65);
-  --fg-4: oklch(0.54 0.008 65);
-  --amber: oklch(0.79 0.14 72);
-  --amber-2: oklch(0.68 0.13 72);
-  --amber-dim: oklch(0.52 0.1 72);
-  --ok: oklch(0.76 0.09 145);
-  --warn: oklch(0.72 0.14 40);
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: "Inter", system-ui, -apple-system, sans-serif;
+  /* --- mission-control palette (source of truth) --- */
+  --bg: oklch(0.14 0.01 250);
+  --bg-2: oklch(0.17 0.01 250);
+  --panel: oklch(0.185 0.01 250);
+  --panel-2: oklch(0.215 0.01 250);
+  --line: oklch(0.3 0.012 250);
+  --line-dim: oklch(0.24 0.01 250);
+  --fg: oklch(0.95 0.005 250);
+  --fg-2: oklch(0.8 0.008 250);
+  --fg-3: oklch(0.64 0.01 250);
+  --fg-4: oklch(0.5 0.01 250);
+  --amber: oklch(0.8 0.17 75);
+  --amber-2: oklch(0.7 0.15 72);
+  --amber-dim: oklch(0.55 0.1 70);
+  --gold: oklch(0.88 0.11 90); /* light gold — second chart voice in the amber ramp */
+  --ok: oklch(0.76 0.11 150);
+  --warn: oklch(0.65 0.19 25);
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Geist Sans", system-ui, -apple-system, sans-serif;
   --corner-display: block;
 
   /* Short aliases consumed by the Info-page CSS/inline styles. Without these
@@ -38,11 +45,19 @@
   --color-muted-fg: var(--fg-3);
 
   /* --- ambient FX dials (turn an effect off by zeroing its strength) --- */
-  --crt-scanlines: 0.4; /* phosphor scanline opacity (0 = off) */
-  --crt-sweep: 0.5; /* slow scan-sweep opacity (0 = off) */
-  --grid-strength: 0.28; /* blueprint background grid — kept faint so it reads as texture, not cells (0 = off) */
-  --phosphor: 0.55; /* amber text-glow strength (0 = off) */
-  --boot-reveal: 1; /* staggered panel boot-in (0 = off) */
+  --fx-grid: 0.25; /* blueprint grid strength (0 = off) */
+  --fx-glow: 1; /* ambient panel glow (0 = off) */
+  --fx-shader: 0.5; /* WebGL ambient background opacity (0 = off) */
+  --fx-boot: 1; /* boot sequence (0 = off) */
+
+  /* --- motion tokens (spec §5) --- */
+  --dur-fast: 120ms; /* press, hover-in, nav pill */
+  --dur-base: 180ms; /* tabs, popovers, dropdowns, exits */
+  --dur-slow: 240ms; /* modals, section fade, card FLIP */
+  --dur-ambient: 450ms; /* chart draw-in, counters, first-load stagger */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* default enter/exit */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* on-screen movement */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* drawers, 500ms */
 
   /* --- shadcn tokens remapped onto the terminal palette --- */
   --radius: 0rem;
@@ -64,10 +79,10 @@
   --border: var(--line);
   --input: var(--line);
   --ring: var(--amber-dim);
-  --chart-1: var(--amber-2);
-  --chart-2: var(--amber-dim);
-  --chart-3: var(--amber);
-  --chart-4: var(--fg-3);
+  --chart-1: var(--amber);
+  --chart-2: var(--gold);
+  --chart-3: var(--fg-2);
+  --chart-4: var(--amber-dim);
   --chart-5: var(--fg-4);
   --sidebar: var(--bg);
   --sidebar-foreground: var(--fg);
@@ -209,7 +224,7 @@
     align-items: center;
     gap: 8px;
     padding: 0 12px;
-    background: linear-gradient(180deg, oklch(0.215 0.008 65), oklch(0.185 0.008 65));
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
     border-bottom: 1px solid var(--line);
     font-family: var(--mono);
     font-size: 12px;
@@ -265,7 +280,7 @@
   /* ============ APP LAYOUT ============ */
   .app {
     display: grid;
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 248px 1fr;
     min-height: 0;
   }
   .sidebar {
@@ -329,15 +344,33 @@
     display: grid;
     grid-template-columns: 24px 1fr auto;
     align-items: center;
-    padding: 7px 16px;
+    height: 36px;
+    padding: 0 16px;
     font-family: var(--mono);
     font-size: 13px;
     color: var(--fg-2);
     text-align: left;
     background: none;
     border: 0;
-    border-left: 2px solid transparent;
     cursor: pointer;
+    position: relative;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .sb-nav button > span {
+    position: relative;
+    z-index: 1;
+  }
+  /* Shared-layout amber pill that springs between nav items (Motion layoutId). */
+  .sb-nav .nav-pill {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: color-mix(in oklch, var(--amber) 9%, transparent);
+    border-left: 2px solid var(--amber);
   }
   .sb-nav button .k {
     color: var(--fg-4);
@@ -352,9 +385,7 @@
     color: var(--fg);
   }
   .sb-nav button.active {
-    background: var(--bg-2);
     color: var(--fg);
-    border-left-color: var(--amber);
   }
   .sb-nav button.active .k {
     color: var(--amber);
@@ -369,6 +400,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    font-variant-numeric: tabular-nums;
   }
   .sb-foot .row {
     display: flex;
@@ -396,15 +428,30 @@
   }
   .page-head h2 {
     margin: 0;
+    display: flex;
+    align-items: center;
     font-family: var(--mono);
-    font-size: 22px;
-    font-weight: 500;
+    font-size: 30px;
+    font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--fg);
   }
+  /* Dot-matrix hero glyph for the two-digit screen id. */
   .page-head h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    margin-right: 14px;
+    font-size: 17px;
+    font-weight: 700;
     color: var(--amber);
-    margin-right: 10px;
+    border: 1px solid var(--line-dim);
+    background:
+      radial-gradient(circle 1px at 2px 2px, oklch(1 0 0 / 0.1) 99%, transparent) 0 0 / 5px 5px,
+      var(--panel);
+    font-variant-numeric: tabular-nums;
   }
   .page-head .desc {
     font-family: var(--mono);
@@ -424,11 +471,65 @@
     padding: 20px 28px 60px;
     flex: 1;
   }
+  /* Section transition host: must not break each page's own scroll layout. */
+  .page-anim {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* Smooth cinematic entry: fade + gentle rise, nothing jittery. */
+    .page-anim {
+      animation: fx-page-in 0.26s var(--ease-out) both;
+    }
+  }
+  @keyframes fx-page-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Animated collapse (grid-rows trick): body stays mounted, height animates. */
+  .chat-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-slow) var(--ease-out);
+  }
+  .chat-collapse.open {
+    grid-template-rows: 1fr;
+  }
+  .chat-collapse-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Shared-layout tab ink (Motion layoutId) for tab strips. Strips that render
+     the ink opt out of the CSS draw-in underline via .has-ink. */
+  .tabs.has-ink button.on::after {
+    display: none;
+  }
+  .tab-ink {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    background: var(--amber);
+    pointer-events: none;
+  }
 
   /* ============ CONTROLS ============ */
   .btn {
     font-family: var(--mono);
     font-size: 12px;
+    font-weight: 500;
     color: var(--fg-2);
     padding: 6px 10px;
     border: 1px solid var(--line);
@@ -436,11 +537,13 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
     cursor: pointer;
     transition:
-      border-color 0.12s,
-      color 0.12s;
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
   }
   .btn:hover {
     color: var(--fg);
@@ -473,6 +576,10 @@
     border: 0;
     border-right: 1px solid var(--line);
     cursor: pointer;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
   }
   .seg button:last-child {
     border-right: 0;
@@ -577,10 +684,15 @@
   }
 
   /* ============ PANELS ============ */
+  /* Panels are opaque raised "decks" floating above the space scene: solid
+     fill, hard drop shadow for depth, hairline light-catch on the top edge. */
   .panel {
     position: relative;
     border: 1px solid var(--line-dim);
     background: var(--panel);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.05),
+      0 14px 44px oklch(0 0 0 / 0.45);
   }
   /* Target-lock reticle: four corner ticks painted from a single layer of
      gradient slivers, so no extra DOM is needed. Brightens + glows on hover. */
@@ -590,7 +702,7 @@
     inset: -1px;
     pointer-events: none;
     display: var(--corner-display);
-    --tick: 9px;
+    --tick: 16px;
     --hair: 1px;
     --reticle: var(--amber-dim);
     background-image:
@@ -613,15 +725,27 @@
       100% 0, 100% 0,
       0 100%, 0 100%,
       100% 100%, 100% 100%;
-    opacity: 0.45;
+    opacity: 0.6;
     transition:
-      opacity 0.18s ease,
-      filter 0.18s ease;
+      opacity var(--dur-base) var(--ease-out),
+      filter var(--dur-base) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* HUD brackets snap into place as the panel mounts. */
+    .panel::before {
+      animation: fx-bracket-in 0.5s var(--ease-out) backwards;
+    }
+  }
+  @keyframes fx-bracket-in {
+    from {
+      opacity: 0;
+      transform: scale(1.05);
+    }
   }
   .panel:hover::before {
     --reticle: var(--amber);
     opacity: 0.9;
-    filter: drop-shadow(0 0 3px color-mix(in oklch, var(--amber) 55%, transparent));
+    filter: drop-shadow(0 0 4px color-mix(in oklch, var(--amber) 45%, transparent));
   }
   .panel-head {
     display: flex;
@@ -630,9 +754,10 @@
     padding: 12px 16px;
     border-bottom: 1px solid var(--line-dim);
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--fg-3);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
   .panel-head .ttl {
@@ -660,6 +785,9 @@
     display: grid;
     gap: 0;
     border: 1px solid var(--line-dim);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.05),
+      0 14px 44px oklch(0 0 0 / 0.45);
   }
   .kpis.k5 {
     grid-template-columns: repeat(5, 1fr);
@@ -670,12 +798,43 @@
   .kpis.k3 {
     grid-template-columns: repeat(3, 1fr);
   }
+  /* Bento variant: hairline gaps, a 2×2 hero cell and a wide cell. */
+  .kpis.bento {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line-dim);
+  }
+  .kpis.bento .kpi {
+    border-right: 0;
+  }
+  .kpi.hero {
+    grid-column: span 2;
+    grid-row: span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px 26px;
+  }
+  .kpi.hero .val {
+    font-size: 46px;
+    letter-spacing: -0.02em;
+    color: var(--amber);
+  }
+  .kpi.wide {
+    grid-column: span 2;
+  }
   .kpi {
     padding: 16px 18px;
     border-right: 1px solid var(--line-dim);
     position: relative;
     min-height: 96px;
     background: var(--panel);
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .kpi:hover {
+      background: var(--panel-2);
+    }
   }
   .kpi:last-child {
     border-right: 0;
@@ -694,7 +853,7 @@
   .kpi .val {
     font-family: var(--mono);
     font-size: 26px;
-    font-weight: 500;
+    font-weight: 700;
     color: var(--fg);
     margin-top: 8px;
     letter-spacing: -0.01em;
@@ -770,7 +929,7 @@
   }
   .tbl th,
   .tbl td {
-    padding: 10px 14px;
+    padding: 8px 14px;
     text-align: left;
     border-bottom: 1px solid var(--line-dim);
   }
@@ -789,6 +948,9 @@
   .tbl th.num {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .tbl td {
+    transition: background-color var(--dur-fast) var(--ease-out);
   }
   .tbl tr:hover td {
     background: var(--bg-2);
@@ -814,6 +976,7 @@
     border-bottom: 1px solid var(--line-dim);
     appearance: none;
     padding: 12px 14px;
+    transition: background-color var(--dur-fast) var(--ease-out);
     cursor: pointer;
   }
   .skill-item:hover {
@@ -893,6 +1056,9 @@
     color: var(--fg-4);
     background: var(--panel);
     border: 1px solid var(--line);
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
     padding: 5px 9px;
     cursor: pointer;
     min-width: 92px;
@@ -1107,6 +1273,9 @@
     border-bottom: 1px solid transparent;
     margin-bottom: -1px;
     cursor: pointer;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
   }
   .tabs button:hover {
     color: var(--fg);
@@ -1131,7 +1300,7 @@
   .chip.on {
     border-color: var(--amber-dim);
     color: var(--amber);
-    background: oklch(0.22 0.04 72);
+    background: color-mix(in oklch, var(--amber) 10%, var(--panel));
   }
   .chip.on::before {
     content: "✓";
@@ -1279,7 +1448,7 @@
     font-family: var(--mono);
   }
   .md-prose a {
-    color: var(--amber);
+    color: var(--amber-2);
     text-decoration: underline;
     text-decoration-color: var(--amber-dim);
     text-underline-offset: 2px;
@@ -1519,6 +1688,25 @@
     color: var(--fg);
     border-color: var(--amber);
   }
+  /* Amber breathing ring while any chat session is alive. */
+  @media (prefers-reduced-motion: no-preference) {
+    .chat-fab.live {
+      animation: fx-fab-pulse 2.6s ease-in-out infinite;
+    }
+  }
+  @keyframes fx-fab-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 0 color-mix(in oklch, var(--amber) 35%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 5px color-mix(in oklch, var(--amber) 12%, transparent);
+    }
+  }
   .chat-fab.chat-fab-hidden {
     display: none;
   }
@@ -1558,9 +1746,9 @@
        swallows clicks in the drawer's top strip (tabs / tab × / collapse ×). */
     -webkit-app-region: no-drag;
     transition:
-      transform 0.24s ease,
-      width 0.24s ease,
-      visibility 0s linear 0.24s;
+      transform 0.5s var(--ease-drawer),
+      width 0.5s var(--ease-drawer),
+      visibility 0s linear 0.5s;
     z-index: 55;
   }
   .chat-drawer.open {
@@ -1568,8 +1756,8 @@
     visibility: visible;
     pointer-events: auto;
     transition:
-      transform 0.24s ease,
-      width 0.24s ease;
+      transform 0.5s var(--ease-drawer),
+      width 0.5s var(--ease-drawer);
   }
   .chat-drawer.wide {
     width: 560px;
@@ -1594,11 +1782,12 @@
     padding: 4px 6px 4px 10px;
     background: var(--bg-2);
     border: 1px solid var(--line);
-    border-radius: 6px;
     white-space: nowrap;
+    position: relative;
+    transition: border-color var(--dur-fast) var(--ease-out);
   }
   .chat-tab.active {
-    border-color: var(--amber);
+    border-color: var(--amber-dim);
   }
   .chat-tab-btn {
     background: none;
@@ -2031,10 +2220,14 @@
   background: none;
   border: none;
   padding: 0;
-  color: var(--amber);
+  color: var(--amber-2);
   cursor: pointer;
   text-decoration: underline;
   font: inherit;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.wikilink:hover {
+  color: var(--amber);
 }
 .kb-search {
   margin-top: 16px;
@@ -2124,138 +2317,482 @@
 }
 
 /* ============================================================
- * AMBIENT FX — CRT phosphor / blueprint / target-lock layer.
- * Cohesive "mission-control terminal" atmosphere. Every effect
- * is gated by a dial in :root (set to 0 to disable) and honors
+ * AMBIENT FX — instrument layer (blueprint grid, glow, glass).
+ * Cohesive "mission control" atmosphere. Effects are gated by
+ * the --fx-* dials in :root (set to 0 to disable) and honor
  * prefers-reduced-motion. Overlays are pointer-events:none so
  * they never intercept input.
  * ============================================================ */
 
-/* Blueprint grid breathing behind the working area (sidebar bg is
-   opaque so it stays clean; the grid only shows through .main). */
-.win {
-  background-color: var(--bg);
-  background-image:
-    linear-gradient(
-      to right,
-      color-mix(in oklch, var(--line-dim) calc(var(--grid-strength) * 100%), transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in oklch, var(--line-dim) calc(var(--grid-strength) * 100%), transparent) 1px,
-      transparent 1px
-    );
-  background-size: 40px 40px;
-  background-position: -1px -1px;
+@property --mx {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+@property --my {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 50%;
 }
 
-/* Edge vignette — focuses the eye toward center, CRT curvature hint. */
-.win::before {
+/* The shell floats over the SpaceScene canvas: no texture of its own. */
+.win {
+  /* stays position:fixed from the shell rule; sits above .fx-ambient */
+  z-index: 1;
+  background-color: transparent;
+}
+
+/* Deep-space canvas background (mounted by <SpaceScene/>). */
+.fx-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: calc(var(--fx-shader) * 1.8);
+}
+
+/* Boot overlay (mounted by <BootSequence/>): never intercepts input. */
+.fx-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  font-family: var(--mono);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  animation: fx-boot-out 200ms var(--ease-out) 1.2s forwards;
+}
+@keyframes fx-boot-out {
+  to {
+    opacity: 0;
+  }
+}
+.fx-boot-brand {
+  position: relative;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+  text-shadow: 0 0 24px color-mix(in oklch, var(--amber) 55%, transparent);
+  animation: fx-boot-flicker 0.6s steps(1, end) both;
+}
+/* A light bar sweeps across the brand once it stabilizes. */
+.fx-boot-brand::after {
+  content: "";
+  position: absolute;
+  inset: -6px -14px;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    oklch(1 0 0 / 0.18) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: fx-boot-sweep 0.5s var(--ease-out) 0.65s forwards;
+}
+@keyframes fx-boot-flicker {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.6;
+  }
+  14% {
+    opacity: 0.1;
+  }
+  28% {
+    opacity: 0.9;
+  }
+  38% {
+    opacity: 0.4;
+  }
+  52% {
+    opacity: 1;
+  }
+  64% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes fx-boot-sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+.fx-boot-log {
+  min-height: 76px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--fg-3);
+}
+.fx-boot-log div {
+  animation: fx-rise 0.3s var(--ease-out) both;
+}
+
+/* Matrix glyph field for empty states. */
+.fx-letterglitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Endless telemetry strip under the Dashboard header. */
+.fx-marquee {
+  overflow: hidden;
+  border-bottom: 1px solid var(--line-dim);
+  background: color-mix(in oklab, var(--panel) 60%, transparent);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--fg-3);
+  padding: 5px 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.fx-marquee-track {
+  display: inline-flex;
+  gap: 48px;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-marquee-track {
+    animation: fx-marquee 36s linear infinite;
+  }
+  .fx-marquee:hover .fx-marquee-track {
+    animation-play-state: paused;
+  }
+}
+@keyframes fx-marquee {
+  to {
+    transform: translateX(calc(-50% - 24px));
+  }
+}
+
+/* Efficiency arc gauge (280° sweep, --val in percent points, ~0-140). */
+.fx-gauge {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%) rotate(140deg);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--amber) calc(var(--val, 0) * 2deg),
+    var(--line-dim) calc(var(--val, 0) * 2deg) 280deg,
+    transparent 280deg
+  );
+  mask: radial-gradient(closest-side, transparent 71%, #000 72%);
+  -webkit-mask: radial-gradient(closest-side, transparent 71%, #000 72%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* Radar sweep — spins in a panel head while something is running. */
+.fx-radar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  background: conic-gradient(
+    color-mix(in oklch, var(--amber) 75%, transparent),
+    transparent 70deg,
+    transparent
+  );
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-radar {
+    animation: fx-radar-spin 1.8s linear infinite;
+  }
+}
+@keyframes fx-radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Traveling border shine on hover — the signature hover effect for every
+   interactive card (::before slot; ::after is the spotlight sheen). */
+.kpi::before,
+.rm-card::before,
+.mkt-card::before,
+.skill-item::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 49;
   pointer-events: none;
+  padding: 1px;
+  background: radial-gradient(transparent, transparent, var(--amber), transparent, transparent);
+  background-size: 300% 300%;
+  mask:
+    linear-gradient(#000, #000) content-box,
+    linear-gradient(#000, #000);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .kpi:hover::before,
+  .rm-card:hover::before,
+  .mkt-card:hover::before,
+  .skill-item:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Border beam track (element rendered by <BorderBeam/>). */
+.fx-border-beam-wrap {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  mask-image: linear-gradient(transparent, transparent), linear-gradient(#000, #000);
+  mask-clip: padding-box, border-box;
+  mask-composite: intersect;
+}
+.fx-border-beam {
+  position: absolute;
+  aspect-ratio: 1;
+  animation: fx-beam 5s linear infinite;
+}
+@keyframes fx-beam {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+/* Cursor-tracking spotlight sheen (driven by initSpotlight delegation). */
+.kpi::after,
+.rm-card::after,
+.mkt-card::after,
+.skill-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
   background: radial-gradient(
-    ellipse 120% 130% at 50% 50%,
-    transparent 58%,
-    color-mix(in srgb, #000 22%, transparent) 100%
+    220px circle at var(--mx, 50%) var(--my, 50%),
+    oklch(1 0 0 / 0.06),
+    transparent 60%
   );
 }
-
-/* Phosphor scanlines + slow amber scan-sweep. */
-.win::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      color-mix(in srgb, #000 calc(var(--crt-scanlines) * 45%), transparent) 0 1px,
-      transparent 1px 3px
-    ),
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      color-mix(in srgb, var(--amber) calc(var(--crt-sweep) * 7%), transparent) 50%,
-      transparent 100%
-    );
-  background-repeat: repeat, no-repeat;
-  background-size:
-    auto,
-    100% 26%;
-  background-position:
-    0 0,
-    0 -30%;
+.kpi,
+.rm-card,
+.mkt-card,
+.skill-item {
+  position: relative;
 }
 
-/* Amber phosphor bloom on the accent glyphs. */
-.page-head h2 .num,
-.sb-head .brand .ver,
-.sb-nav button.active .k,
-.win-bar .path b {
-  text-shadow: 0 0 calc(var(--phosphor) * 10px)
-    color-mix(in oklch, var(--amber) calc(var(--phosphor) * 55%), transparent);
+@media (hover: hover) and (pointer: fine) {
+  .kpi:hover::after,
+  .rm-card:hover::after,
+  .mkt-card:hover::after,
+  .skill-item:hover::after {
+    opacity: 1;
+  }
+}
+
+/* 3D tilt toward the cursor (vars driven by initSpotlight delegation). */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .kpi,
+  .mkt-card {
+    transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition:
+      transform 0.15s var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+}
+
+/* Streaming waveform in chat: five bars breathing while text streams. */
+.fx-wave {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  margin-top: 6px;
+}
+.fx-wave i {
+  width: 2px;
+  height: 100%;
+  background: var(--amber);
+  transform-origin: bottom;
+  transform: scaleY(0.2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fx-wave i {
+    animation: fx-wave 0.9s ease-in-out infinite;
+  }
+  .fx-wave i:nth-child(2) {
+    animation-delay: 0.12s;
+  }
+  .fx-wave i:nth-child(3) {
+    animation-delay: 0.24s;
+  }
+  .fx-wave i:nth-child(4) {
+    animation-delay: 0.36s;
+  }
+  .fx-wave i:nth-child(5) {
+    animation-delay: 0.48s;
+  }
+}
+@keyframes fx-wave {
+  0%,
+  100% {
+    transform: scaleY(0.2);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Energetic scan band sweeping a panel while its job runs. */
+.panel.scanning {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .panel.scanning::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        180deg,
+        transparent,
+        color-mix(in oklch, var(--amber) 9%, transparent) 50%,
+        transparent
+      )
+      no-repeat;
+    background-size: 100% 34%;
+    animation: fx-scan-panel 1.7s linear infinite;
+  }
+}
+@keyframes fx-scan-panel {
+  from {
+    background-position: 0 -60%;
+  }
+  to {
+    background-position: 0 160%;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Refresh sweep crawls down the panel slowly. */
-  .win::after {
-    animation: atlas-scan 7.5s linear infinite;
-  }
-  @keyframes atlas-scan {
-    from {
-      background-position:
-        0 0,
-        0 -30%;
-    }
-    to {
-      background-position:
-        0 0,
-        0 130%;
-    }
-  }
-
   /* Panels boot in with a brief staggered rise on mount / navigation. */
   .panel,
   .kpis {
-    animation: atlas-rise calc(var(--boot-reveal) * 0.45s) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: fx-rise 0.45s var(--ease-out) both;
   }
   .panel:nth-of-type(2),
   .kpis + .panel {
-    animation-delay: calc(var(--boot-reveal) * 0.06s);
+    animation-delay: 0.06s;
   }
   .panel:nth-of-type(3) {
-    animation-delay: calc(var(--boot-reveal) * 0.12s);
+    animation-delay: 0.12s;
   }
-  @keyframes atlas-rise {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+  /* KPI tiles cascade in behind their container. */
+  .kpis .kpi {
+    animation: fx-rise 0.4s var(--ease-out) backwards;
+  }
+  .kpis .kpi:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .kpis .kpi:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .kpis .kpi:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .kpis .kpi:nth-child(n + 5) {
+    animation-delay: 160ms;
+  }
+  /* Live process rows breathe. */
+  .proc-row.running .proc-icon,
+  .jobs-row.running .jobs-icon {
+    animation: fx-pulse 1.6s ease-in-out infinite;
   }
 
   /* Breathing telemetry pulse on the live backend indicator. */
   .win-bar .right .live {
-    animation: atlas-telemetry 2.4s ease-in-out infinite;
+    animation: fx-pulse 2.4s ease-in-out infinite;
   }
-  @keyframes atlas-telemetry {
-    0%,
-    100% {
-      opacity: 0.72;
-      text-shadow: none;
+
+  /* Global press feedback (R5); transform transitions live on each base rule. */
+  .btn:active:not(:disabled),
+  .seg button:active,
+  .tabs button:active,
+  .sb-nav button:active {
+    transform: scale(0.97);
+  }
+
+  /* Shine only animates while hovered — no permanent paint loop at opacity 0. */
+  @media (hover: hover) and (pointer: fine) {
+    .kpi:hover::before,
+    .rm-card:hover::before,
+    .mkt-card:hover::before,
+    .skill-item:hover::before {
+      animation: fx-shine 3.2s linear infinite;
     }
-    50% {
-      opacity: 1;
-      text-shadow: 0 0 7px color-mix(in oklch, var(--ok) 70%, transparent);
-    }
+  }
+}
+
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fx-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    text-shadow: none;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 7px color-mix(in oklch, var(--ok) 70%, transparent);
+  }
+}
+@keyframes fx-shine {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-boot {
+    display: none;
+  }
+  .kpi::before,
+  .rm-card::before,
+  .mkt-card::before,
+  .skill-item::before,
+  .fx-border-beam {
+    animation: none !important;
+  }
+  .chat-collapse {
+    transition: none;
   }
 }
 
@@ -2280,51 +2817,26 @@
 .input,
 .select {
   transition:
-    border-color 0.14s ease,
-    box-shadow 0.18s ease;
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
 }
 .input:focus,
 textarea.input:focus,
 .select:focus {
+  border-color: var(--amber-dim);
   box-shadow:
     0 0 0 1px color-mix(in oklch, var(--amber) 28%, transparent),
-    0 0 11px color-mix(in oklch, var(--amber) 16%, transparent);
+    0 0 0 3px color-mix(in oklch, var(--amber) 12%, transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Page title boots in with a CRT power-on flicker on every navigation;
-     the description fades up just behind it. */
+  /* Page title rises in; the description fades up just behind it.
+     (The title text itself scramble-decrypts via <ScrambleText>.) */
   .page-head h2 {
-    animation: atlas-crt-on 0.55s steps(1, end) both;
+    animation: fx-rise 0.3s var(--ease-out) both;
   }
   .page-head .desc {
-    animation: atlas-fade-up 0.45s 0.14s ease both;
-  }
-  @keyframes atlas-crt-on {
-    0% {
-      opacity: 0;
-    }
-    10% {
-      opacity: 0.55;
-    }
-    16% {
-      opacity: 0.15;
-    }
-    32% {
-      opacity: 0.9;
-    }
-    42% {
-      opacity: 0.35;
-    }
-    56% {
-      opacity: 1;
-    }
-    68% {
-      opacity: 0.7;
-    }
-    100% {
-      opacity: 1;
-    }
+    animation: atlas-fade-up 0.45s 0.14s var(--ease-out) both;
   }
   @keyframes atlas-fade-up {
     from {
@@ -2339,7 +2851,7 @@ textarea.input:focus,
 
   /* Sidebar nav items stagger in from the left on mount. */
   .sb-nav button {
-    animation: atlas-nav-in 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: atlas-nav-in 0.34s var(--ease-out) both;
   }
   .sb-nav button:nth-child(1) {
     animation-delay: 0.02s;
@@ -2370,38 +2882,6 @@ textarea.input:focus,
     }
   }
 
-  /* Amber data-streak sweeps across a nav item on hover. */
-  .sb-nav button::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      color-mix(in oklch, var(--amber) 16%, transparent) 50%,
-      transparent 100%
-    );
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  .sb-nav button:hover::after {
-    animation: atlas-streak 0.55s ease;
-  }
-  @keyframes atlas-streak {
-    0% {
-      transform: translateX(-100%);
-      opacity: 0;
-    }
-    30% {
-      opacity: 1;
-    }
-    100% {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-  }
-
   /* Active tab underline draws in from the left instead of snapping. */
   .tabs button.on {
     border-bottom-color: transparent;
@@ -2412,10 +2892,10 @@ textarea.input:focus,
     left: 0;
     right: 0;
     bottom: -1px;
-    height: 1px;
+    height: 2px;
     background: var(--amber);
     transform-origin: left;
-    animation: atlas-underline 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: atlas-underline 0.28s var(--ease-out) both;
   }
   @keyframes atlas-underline {
     from {
@@ -2426,8 +2906,8 @@ textarea.input:focus,
     }
   }
 
-  /* A light glint sweeps across buttons on hover. */
-  .btn::after {
+  /* A light glint sweeps across the primary CTA on hover (rare-use delight). */
+  .btn.primary::after {
     content: "";
     position: absolute;
     top: 0;
@@ -2444,7 +2924,7 @@ textarea.input:focus,
     transform: translateX(-180%);
     opacity: 0;
   }
-  .btn:hover:not(:disabled)::after {
+  .btn.primary:hover:not(:disabled)::after {
     animation: atlas-glint 0.5s ease;
   }
   @keyframes atlas-glint {
@@ -3299,7 +3779,24 @@ textarea.input:focus,
   overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--line);
-  box-shadow: 0 24px 80px color-mix(in srgb, black 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.05),
+    0 24px 80px color-mix(in srgb, black 55%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rm-modal {
+    animation: fx-modal-in 0.2s var(--ease-out) both;
+  }
+}
+@keyframes fx-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .rm-modal-head {
   display: flex;
@@ -3489,11 +3986,17 @@ textarea.input:focus,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .rm-card:hover {
   border-color: var(--line);
   background: var(--bg-2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
 }
 .rm-card.p-high {
   border-left-color: var(--amber);
@@ -3505,11 +4008,19 @@ textarea.input:focus,
   border-left-color: var(--line);
 }
 .rm-card.dragging {
-  opacity: 0.4;
+  opacity: 0.45;
+  border-style: dashed;
 }
+/* The lifted clone that follows the pointer: scale+tilt live on the card
+   itself (dnd-kit positions the overlay wrapper — never transform that). */
 .rm-card.overlay {
   cursor: grabbing;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transform: scale(1.04) rotate(1.5deg);
+  border-color: var(--amber-dim);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.rm-card.overlay:hover {
+  transform: scale(1.04) rotate(1.5deg);
 }
 .rm-card-title {
   font-family: var(--mono);
@@ -3623,6 +4134,13 @@ textarea.input:focus,
   font-size: 13px;
   line-height: 1.5;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .chat-entry,
+  .chat-skill,
+  .chat-activity {
+    animation: fx-rise var(--dur-base) var(--ease-out) both;
+  }
+}
 .chat-entry.user {
   opacity: 0.85;
 }
@@ -3647,7 +4165,7 @@ textarea.input:focus,
   margin: 2px 0;
 }
 .chat-entry a {
-  color: var(--amber);
+  color: var(--amber-2);
 }
 .chat-entry :where(h1, h2, h3, h4) {
   font-size: 13px;

@@ -8,11 +8,16 @@ function Toaster(props: ToasterProps) {
       className="toaster group"
       style={
         {
-          '--normal-bg': 'var(--popover)',
+          '--normal-bg': 'var(--panel)',
           '--normal-text': 'var(--popover-foreground)',
-          '--normal-border': 'var(--border)',
+          '--normal-border': 'var(--line)',
         } as CSSProperties
       }
+      toastOptions={{
+        classNames: {
+          toast: 'font-mono! rounded-none! shadow-[0_8px_32px_oklch(0_0_0/0.36)]!',
+        },
+      }}
       {...props}
     />
   )
