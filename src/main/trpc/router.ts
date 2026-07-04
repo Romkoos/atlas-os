@@ -1,4 +1,3 @@
-import { agentRouter } from '@main/trpc/routers/agent'
 import { benchmarkRouter } from '@main/trpc/routers/benchmark'
 import { benchmarkChatRouter } from '@main/trpc/routers/benchmarkChat'
 import { generalChatRouter } from '@main/trpc/routers/generalChat'
@@ -23,7 +22,6 @@ export const appRouter = router({
   health: healthRouter,
   jobs: jobsRouter,
   settings: settingsRouter,
-  agent: agentRouter,
   stats: statsRouter,
   skills: skillsRouter,
   skillImprover: skillImproverRouter,
