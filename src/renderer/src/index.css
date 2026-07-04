@@ -4338,6 +4338,11 @@ textarea.input:focus,
   font-size: 12px;
   color: var(--fg-4);
 }
+/* react-force-graph injects a "Left-click: rotate…" nav hint; the hero is
+   decorative and non-interactive, so hide it. */
+.galaxy-canvas .scene-nav-info {
+  display: none;
+}
 .galaxy-hud {
   position: absolute;
   inset: 10px;

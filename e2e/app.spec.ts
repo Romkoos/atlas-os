@@ -213,10 +213,9 @@ test('Dashboard shows the processes panel', async () => {
 
   await window.getByRole('button', { name: '01 DASHBOARD' }).click()
 
-  // Panel title + both group labels render (idle state is deterministic).
+  // Panel title + the deterministic idle state of the chip strip render.
   await expect(window.getByText('processes', { exact: true })).toBeVisible({ timeout: 15000 })
-  await expect(window.getByText('active', { exact: true })).toBeVisible()
-  await expect(window.getByText('nothing running')).toBeVisible()
+  await expect(window.getByText('// all systems idle')).toBeVisible()
 
   await app.close()
 })

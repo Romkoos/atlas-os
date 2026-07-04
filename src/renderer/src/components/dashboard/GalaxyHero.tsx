@@ -8,8 +8,14 @@ import { communityKey, filterBySources } from '@renderer/pages/knowledge/source-
 import { useUiStore } from '@renderer/store/ui'
 import type { CodeGraphNode } from '@shared/graph'
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { sampleGraph } from './sample-graph'
 
 const DecorGalaxy3D = lazy(() => import('./DecorGalaxy3D'))
+
+// A full multi-project graph is thousands of nodes; a 3D force sim + per-edge
+// comets at that size janks and can crash the GPU process. So we RENDER a
+// bounded, highest-degree sample while the HUD reports the true totals.
+const RENDER_NODE_CAP = 1400
 
 // Decorative hero: the unified multi-project graph (scope __all__), filtered by
 // the user's persisted source toggles, rendered as a square auto-rotating galaxy
@@ -27,6 +33,8 @@ export function GalaxyHero() {
       return {
         nodes: [] as Array<CodeGraphNode & { x?: number }>,
         links: [] as Array<{ source: string; target: string }>,
+        totalNodes: 0,
+        totalEdges: 0,
       }
     const scoped = filterBySources(raw, enabled)
     const nodes = scoped.nodes.map((n) => ({ ...n }))
@@ -34,7 +42,8 @@ export function GalaxyHero() {
     const links = scoped.edges
       .filter((e) => ids.has(e.source) && ids.has(e.target))
       .map((e) => ({ source: e.source, target: e.target }))
-    return { nodes, links }
+    const s = sampleGraph(nodes, links, RENDER_NODE_CAP)
+    return { nodes: s.nodes, links: s.links, totalNodes: s.totalNodes, totalEdges: s.totalEdges }
   }, [graph.data, enabled])
 
   // Square canvas: track the container's width; height === width.
@@ -90,7 +99,7 @@ export function GalaxyHero() {
           <div className="galaxy-reticle" />
           <div className="galaxy-scanline" />
           <div className="galaxy-readout">
-            NODES {num(data.nodes.length)} · EDGES {num(data.links.length)}
+            NODES {num(data.totalNodes)} · EDGES {num(data.totalEdges)}
           </div>
         </div>
       </div>
