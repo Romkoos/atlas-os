@@ -1,3 +1,4 @@
+import { BenchmarkWidget } from '@renderer/components/dashboard/BenchmarkWidget'
 import {
   compact,
   DrillLink,
@@ -6,18 +7,23 @@ import {
   pct,
   timeAgo,
 } from '@renderer/components/dashboard/dash-utils'
+import { GalaxyHero } from '@renderer/components/dashboard/GalaxyHero'
+import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
+import { MissionClock } from '@renderer/components/dashboard/MissionClock'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
+import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
+import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
+import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { formatDateTime } from '@renderer/lib/utils'
+import { useChatDrawer } from '@renderer/store/chatDrawer'
+import { useGraphBuildRun } from '@renderer/store/graphBuildRun'
 import { useNewsRun } from '@renderer/store/newsRun'
 import { useTrendingRun } from '@renderer/store/trendingRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
-import { CLAUDE_MODELS } from '@shared/models'
-import { skipToken } from '@tanstack/react-query'
-import { type CSSProperties, useMemo, useState } from 'react'
+import { type CSSProperties, useMemo } from 'react'
 import { toast } from 'sonner'
 
 // ms → compact human duration for the avg-duration tile.
@@ -64,7 +70,7 @@ function TelemetryMarquee() {
     `VER v${health.data?.version ?? '—'}`,
     `STATUS ${health.data?.ok ? 'NOMINAL' : 'DEGRADED'}`,
   ]
-  const track = items.map((s) => `▪ ${s}`).join('  ')
+  const track = items.map((s) => `▪ ${s}`).join('  ')
   return (
     <div className="fx-marquee" aria-hidden>
       <div className="fx-marquee-track">
@@ -207,7 +213,9 @@ function ActivityPanel() {
   return (
     <div className="panel">
       <div className="panel-head">
-        <span className="ttl">activity · 30d</span>
+        <span className="ttl">
+          <ScrambleText text="activity · 30d" />
+        </span>
         <DrillLink to="productivity" label="productivity" />
       </div>
       <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -252,24 +260,12 @@ function ActivityPanel() {
 }
 
 // ── QUICK ACTIONS ──────────────────────────────────────────────────────────
-// The demoted run-agent (compact prompt → stream) plus one-tap launchers for
-// the digest/compile runs that live on their own pages. Refresh runs use the
-// App-level run stores so they keep going after leaving the Dashboard.
-const DEFAULT_PROMPT = 'Generate an idea for an AI tool in a single sentence.'
-
+// One-tap launchers only (the old inline prompt-runner is gone). Long runs use
+// App-level run stores / the job registry, so they survive leaving the page.
 function QuickActions() {
-  const settings = trpc.settings.get.useQuery()
-  const utils = trpc.useUtils()
-  const openFile = trpc.agent.openFile.useMutation()
-
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
-  const [output, setOutput] = useState('')
-  const [running, setRunning] = useState(false)
-  const [requestId, setRequestId] = useState<string | null>(null)
-  const model = settings.data?.model ?? CLAUDE_MODELS[0].id
-
   const newsRun = useNewsRun()
   const trendingRun = useTrendingRun()
+  const buildRun = useGraphBuildRun()
   const compile = trpc.knowledge.compileAll.useMutation({
     onSuccess: (rows) => {
       const ok = rows.filter((r) => r.status === 'compiled').length
@@ -279,222 +275,79 @@ function QuickActions() {
     },
     onError: (e) => toast.error(e.message),
   })
-
-  const subInput = useMemo(
-    () => (running && requestId ? { requestId, prompt, model } : skipToken),
-    [running, requestId, prompt, model],
-  )
-
-  trpc.agent.run.useSubscription(subInput, {
-    onData: (event) => {
-      switch (event.type) {
-        case 'token':
-          setOutput((prev) => prev + event.text)
-          break
-        case 'done':
-          setRunning(false)
-          void utils.stats.invalidate()
-          toast.success(`Saved to ${event.filePath}`, {
-            duration: 8000,
-            action: {
-              label: 'Open file',
-              onClick: () => openFile.mutate({ path: event.filePath }),
-            },
-          })
-          break
-        case 'error':
-          setRunning(false)
-          toast.error(event.message)
-          break
-        case 'aborted':
-          setRunning(false)
-          toast('Run cancelled')
-          break
-      }
-    },
-    onError: (error) => {
-      setRunning(false)
-      toast.error(error.message)
-    },
+  const benchmark = trpc.benchmark.run.useMutation({
+    onSuccess: (r) => toast.success(`Benchmark started — ${r.total} runs queued`),
+    onError: (e) => toast.error(e.message),
   })
 
-  const start = () => {
-    setOutput('')
-    setRequestId(crypto.randomUUID())
-    setRunning(true)
-  }
-  // Flipping `running` off switches the subscription to skipToken → unsubscribe
-  // → the main-side run is aborted in the observable teardown.
-  const cancel = () => setRunning(false)
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !running && prompt.trim().length > 0) {
-      start()
-    }
-  }
+  // Deep-map target: the project matching the sidebar selection, else the first.
+  const projects = trpc.graph.listProjects.useQuery()
+  const selectedProject = useUiStore((s) => s.selectedProject)
+  const buildPath = useMemo(() => {
+    const list = projects.data ?? []
+    return (
+      list.find((p) => p.project === selectedProject)?.projectPath ?? list[0]?.projectPath ?? null
+    )
+  }, [projects.data, selectedProject])
 
   return (
     <div className="panel">
       <div className="panel-head">
-        <span className="ttl">quick actions</span>
+        <span className="ttl">
+          <ScrambleText text="quick actions" />
+        </span>
         <span className="meta">$ atlas run</span>
       </div>
-      <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="label-block">
-          <label htmlFor="dash-prompt">quick prompt</label>
-          <textarea
-            id="dash-prompt"
-            className="input"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={running}
-            rows={3}
-          />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={start}
-            disabled={running || prompt.trim().length === 0}
-          >
-            <span className="arrow">▶</span>&nbsp;{running ? 'RUNNING…' : 'RUN'}
-          </button>
-          {running && (
-            <button type="button" className="btn" onClick={cancel}>
-              ■ CANCEL
-            </button>
-          )}
-        </div>
-
-        {(running || output) && (
-          <div
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 12,
-              lineHeight: 1.6,
-              color: 'var(--fg)',
-              whiteSpace: 'pre-wrap',
-              maxHeight: 140,
-              overflowY: 'auto',
-              borderTop: '1px solid var(--line-dim)',
-              paddingTop: 10,
-            }}
-          >
-            <span style={{ color: 'var(--fg-4)' }}>{'>> '}</span>
-            {output}
-            {running && <span className="caret" />}
-          </div>
-        )}
-
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            borderTop: '1px solid var(--line-dim)',
-            paddingTop: 12,
-          }}
+      <div className="panel-body dash-actions">
+        <button type="button" className="btn" onClick={newsRun.start} disabled={newsRun.running}>
+          ↻ {newsRun.running ? 'NEWS…' : 'AI NEWS'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={trendingRun.start}
+          disabled={trendingRun.running}
         >
-          <button type="button" className="btn" onClick={newsRun.start} disabled={newsRun.running}>
-            ↻ {newsRun.running ? 'NEWS…' : 'AI NEWS'}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={trendingRun.start}
-            disabled={trendingRun.running}
-          >
-            ↻ {trendingRun.running ? 'TRENDING…' : 'TRENDING'}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => compile.mutate()}
-            disabled={compile.isPending}
-          >
-            ↻ {compile.isPending ? 'COMPILING…' : 'KNOWLEDGE'}
-          </button>
-        </div>
+          ↻ {trendingRun.running ? 'TRENDING…' : 'TRENDING'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => compile.mutate()}
+          disabled={compile.isPending}
+        >
+          ↻ {compile.isPending ? 'COMPILING…' : 'KNOWLEDGE'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => buildPath && buildRun.start(buildPath)}
+          disabled={!buildPath || buildRun.running}
+        >
+          ▶ {buildRun.running ? 'BUILDING…' : 'BUILD MAP'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => benchmark.mutate({})}
+          disabled={benchmark.isPending}
+        >
+          ▶ BENCHMARK
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => useChatDrawer.getState().openSession({ type: 'roadmap' })}
+        >
+          ◈ ROADMAP IDEA
+        </button>
       </div>
     </div>
   )
 }
 
-// ── RECENT ACTIVITY ────────────────────────────────────────────────────────
-// The three newest sessions across all projects as a "what did I work on
-// lately" feed — project, when, volume, summary. Read-only; the full registry
-// and rating/difficulty editing live on Productivity.
-function RecentActivity() {
-  const go = useUiStore((s) => s.setSection)
-  const sessions = trpc.productivity.sessions.useQuery({ days: 30 })
-  const rows = (sessions.data ?? []).slice(0, 3)
-
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <span className="ttl">recent activity</span>
-        <DrillLink to="productivity" label="all sessions" />
-      </div>
-      <div className="panel-body">
-        {sessions.isLoading ? (
-          <Note>loading…</Note>
-        ) : rows.length === 0 ? (
-          <Note>no sessions yet — use Claude Code, then refresh on Productivity.</Note>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {rows.map((s) => (
-              <button
-                key={s.sessionId}
-                type="button"
-                onClick={() => go('productivity')}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                  textAlign: 'left',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: '1px dashed var(--line-dim)',
-                  cursor: 'pointer',
-                  padding: '10px 0',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    fontFamily: 'var(--mono)',
-                    fontSize: 12,
-                  }}
-                >
-                  <span style={{ color: 'var(--amber)' }}>{s.project}</span>
-                  <span style={{ color: 'var(--fg-4)' }}>{timeAgo(s.endedAt ?? s.startedAt)}</span>
-                </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
-                  {compact(s.totalTokens)} tokens · {num(s.turnCount)} turns
-                </div>
-                <span
-                  className="line-clamp-2"
-                  style={{ fontSize: 13, color: 'var(--fg-3)' }}
-                  title={s.summary ?? ''}
-                >
-                  {s.summary ?? '—'}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── SIGNALS + SYSTEM ───────────────────────────────────────────────────────
-// External digests (news/trending freshness + preview) and the live state of
-// the user's setup (skills/plugins counts + last ecosystem change).
+// ── SIGNALS ────────────────────────────────────────────────────────────────
+// External digest freshness only — the skills/plugins/system counters are gone.
 function SignalCard({
   label,
   to,
@@ -543,20 +396,15 @@ function SignalCard({
   )
 }
 
-function SignalsSystem() {
+function SignalsPanel() {
   const news = trpc.news.read.useQuery()
   const trending = trpc.trending.read.useQuery()
-  const skills = trpc.skills.list.useQuery()
-  const plugins = trpc.plugins.list.useQuery()
-  const ecosystem = trpc.productivity.ecosystem.useQuery({ days: 30 })
-
-  const lastChange = ecosystem.data?.[0]
-  const enabledPlugins = (plugins.data ?? []).filter((p) => p.enabled).length
-
   return (
     <div className="panel">
       <div className="panel-head">
-        <span className="ttl">signals + system</span>
+        <span className="ttl">
+          <ScrambleText text="signals" />
+        </span>
         <DrillLink to="news" label="news" />
       </div>
       <div className="panel-body">
@@ -572,27 +420,6 @@ function SignalsSystem() {
           updatedAt={trending.data?.updatedAt}
           raw={trending.data?.raw}
         />
-
-        <div className="kv" style={{ marginTop: 8 }}>
-          <div className="k">skills</div>
-          <div className="v">{skills.data ? `${num(skills.data.length)} installed` : '—'}</div>
-        </div>
-        <div className="kv">
-          <div className="k">plugins</div>
-          <div className="v">
-            {plugins.data
-              ? `${num(plugins.data.length)} installed · ${num(enabledPlugins)} on`
-              : '—'}
-          </div>
-        </div>
-        <div className="kv">
-          <div className="k">last change</div>
-          <div className="v" title={lastChange?.target ?? lastChange?.note ?? ''}>
-            {lastChange
-              ? `${lastChange.type.replace(/_/g, ' ')} · ${formatDateTime(lastChange.ts)}`
-              : 'no changes in 30d'}
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -604,25 +431,57 @@ export function Dashboard() {
       <PageHeader
         num="01"
         title="DASHBOARD"
-        description="System overview at a glance — efficiency, activity, signals, and quick actions."
+        description="Mission overview — the whole system at a glance."
       />
       <TelemetryMarquee />
       <div className="scroll">
-        <StatusRow />
-
-        <div className="mt-16" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-          <ActivityPanel />
-          <QuickActions />
+        <div className="dash-reveal" style={{ '--i': 0 } as CSSProperties}>
+          <StatusRow />
         </div>
 
-        <div className="mt-16">
+        <div className="dash-hero-row mt-16">
+          <div className="dash-reveal" style={{ '--i': 1 } as CSSProperties}>
+            <GalaxyHero />
+          </div>
+          <div className="dash-side">
+            <div className="dash-reveal" style={{ '--i': 2 } as CSSProperties}>
+              <RoadmapNextUp />
+            </div>
+            <div className="dash-reveal" style={{ '--i': 3 } as CSSProperties}>
+              <QuickActions />
+            </div>
+          </div>
+        </div>
+
+        <div className="dash-mid mt-16">
+          <div className="dash-reveal" style={{ '--i': 4 } as CSSProperties}>
+            <ActivityPanel />
+          </div>
+          <div className="dash-reveal" style={{ '--i': 5 } as CSSProperties}>
+            <SignalsPanel />
+          </div>
+        </div>
+
+        <div className="dash-widgets mt-16">
+          <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
+            <TokenHeatmap />
+          </div>
+          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
+            <KnowledgePulse />
+          </div>
+          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
+            <BenchmarkWidget />
+          </div>
+          <div className="dash-reveal" style={{ '--i': 9 } as CSSProperties}>
+            <MissionClock />
+          </div>
+        </div>
+
+        <div className="dash-reveal mt-16" style={{ '--i': 10 } as CSSProperties}>
           <ProcessesStrip />
         </div>
 
-        <div className="grid-2 mt-16">
-          <RecentActivity />
-          <SignalsSystem />
-        </div>
+        <div className="dash-scan" aria-hidden />
       </div>
     </>
   )

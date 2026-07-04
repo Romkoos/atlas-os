@@ -4661,3 +4661,94 @@ textarea.input:focus,
     animation: none;
   }
 }
+
+/* dashboard layout */
+.dash-hero-row {
+  display: grid;
+  grid-template-columns: minmax(400px, 480px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.dash-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.dash-side .dash-reveal:first-child {
+  flex: 1;
+  min-height: 0;
+}
+.dash-side .dash-reveal:first-child .panel {
+  height: 100%;
+}
+.dash-mid {
+  display: grid;
+  grid-template-columns: 2fr minmax(0, 1fr);
+  gap: 16px;
+}
+.dash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 1240px) {
+  .dash-hero-row {
+    grid-template-columns: 1fr;
+  }
+  .dash-mid {
+    grid-template-columns: 1fr;
+  }
+  .dash-widgets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* mount-time cascade: panels rise in with a stagger, one scanline sweeps down */
+.dash-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: dash-reveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  min-width: 0;
+}
+@keyframes dash-reveal {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.dash-scan {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  box-shadow: 0 0 24px var(--amber);
+  opacity: 0;
+  animation: dash-scan 1.1s ease-out 0.1s 1;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  z-index: 40;
+}
+@keyframes dash-scan {
+  0% {
+    opacity: 0.8;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .dash-scan {
+    display: none;
+  }
+}
