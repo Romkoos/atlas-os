@@ -26,7 +26,12 @@ export function SkillImproverOverlay() {
   return (
     <div className="skill-improver-body">
       <div className="chat-body-flex">
-        <ChatTranscript transcript={run.transcript} streaming={run.streaming} onPickOption={send} />
+        <ChatTranscript
+          transcript={run.transcript}
+          streaming={run.streaming}
+          awaitingInput={run.awaitingInput}
+          onPickOption={send}
+        />
         {report ? (
           <div className="improver-report-wrap">
             <ImproverReportView report={report} />

@@ -7,6 +7,7 @@ export type ChatEntry =
       kind: 'tool'
       text: string
       id: string
+      name: string
       status: 'running' | 'done' | 'error'
       resultText?: string
     }
@@ -24,7 +25,7 @@ export interface BaseChatRunState {
   startBlank: () => void
   reattach: () => void
   appendToken: (text: string) => void
-  pushTool: (id: string, summary: string) => void
+  pushTool: (id: string, name: string, summary: string) => void
   resolveTool: (id: string, resultText: string, isError: boolean) => void
   pushUserReply: (text: string) => void
   flushTurn: () => void
@@ -115,9 +116,12 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
               ? { transcript: [...swept, { kind: 'assistant', text }], streaming: '' }
               : { transcript: swept, streaming: '' }
           }),
-        pushTool: (id, summary) =>
+        pushTool: (id, name, summary) =>
           set((s) => ({
-            transcript: [...s.transcript, { kind: 'tool', id, text: summary, status: 'running' }],
+            transcript: [
+              ...s.transcript,
+              { kind: 'tool', id, name, text: summary, status: 'running' },
+            ],
           })),
         resolveTool: (id, resultText, isError) =>
           set((s) => ({

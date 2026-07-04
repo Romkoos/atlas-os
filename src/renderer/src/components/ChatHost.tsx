@@ -62,6 +62,7 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
       const e = event as {
         type: string
         text?: string
+        name?: string
         summary?: string
         message?: string
         toolId?: string
@@ -73,7 +74,7 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
           store.appendToken(e.text ?? '')
           break
         case 'tool':
-          store.pushTool(e.toolId ?? '', e.summary ?? '')
+          store.pushTool(e.toolId ?? '', e.name ?? '', e.summary ?? '')
           break
         case 'tool-result':
           store.resolveTool(e.toolId ?? '', e.resultText ?? '', e.isError === true)

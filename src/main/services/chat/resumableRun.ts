@@ -142,9 +142,12 @@ function summarizeTool(block: { name: string; input: unknown }): string {
   const input = block.input as Record<string, unknown> | undefined
   if (!input) return block.name
   const hint =
+    (typeof input.skill === 'string' && input.skill) ||
+    (typeof input.subagent_type === 'string' && input.subagent_type) ||
     (typeof input.file_path === 'string' && input.file_path) ||
     (typeof input.pattern === 'string' && input.pattern) ||
     (typeof input.command === 'string' && input.command) ||
+    (typeof input.description === 'string' && input.description) ||
     ''
   const text = String(hint).slice(0, 80)
   return text ? `${block.name}: ${text}` : block.name
