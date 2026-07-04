@@ -4427,16 +4427,7 @@ textarea.input:focus,
 }
 
 /* NEXT UP kanban digest */
-.nextup-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.nextup-lists {
-  flex: 0 0 auto;
-}
 .nextup-tally {
-  margin-top: auto;
   display: flex;
   gap: 14px;
   align-items: center;
@@ -4447,7 +4438,7 @@ textarea.input:focus,
   background: none;
   cursor: pointer;
   padding: 12px 0 0;
-  margin-bottom: 0;
+  margin-top: 12px;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -4523,11 +4514,6 @@ textarea.input:focus,
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-/* In the vertical rail the widgets share a fixed cell height; center their
-   content so the stat sits balanced instead of hugging the top. */
-.dash-rail .dash-widget .panel-body {
-  justify-content: center;
 }
 .dash-widget-big {
   font-family: var(--mono);
@@ -4708,34 +4694,23 @@ textarea.input:focus,
 }
 
 /* dashboard layout */
-/* Hero band: galaxy square (its aspect-ratio sets the band height) · narrow
-   NEXT UP · a vertical rail of three equal widgets. align-items:stretch makes
-   the NEXT UP + rail columns match the galaxy's height for one clean line. */
+/* Hero band: galaxy square (fixed) · a WIDE NEXT UP that takes the flexible
+   space · a narrow rail of stacked widgets. Columns align to the TOP; the rail
+   widgets and NEXT UP each take only the height their content needs (they don't
+   stretch to the galaxy's height). */
 .dash-hero-row {
   display: grid;
-  grid-template-columns: minmax(360px, 440px) minmax(220px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) minmax(240px, 300px);
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 .dash-hero-row > * {
   min-width: 0;
-  min-height: 0;
-}
-/* Everything except the galaxy (first child, self-sizing square) fills the row. */
-.dash-hero-row > .dash-reveal:nth-child(2) .panel {
-  height: 100%;
 }
 .dash-rail {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  min-height: 0;
-}
-.dash-rail > .dash-reveal {
-  min-height: 0;
-}
-.dash-rail .panel {
-  height: 100%;
 }
 .dash-mid {
   display: grid;
@@ -4755,22 +4730,15 @@ textarea.input:focus,
   .dash-hero-row {
     grid-template-columns: 1fr;
   }
-  .dash-hero-row > .dash-reveal:nth-child(2) .panel {
-    height: auto;
-  }
   .dash-rail {
-    grid-template-rows: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .dash-rail > .dash-reveal {
+    flex: 1 1 220px;
   }
   .dash-mid {
     grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 780px) {
-  .dash-rail {
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
   }
 }
 
