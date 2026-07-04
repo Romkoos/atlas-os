@@ -4558,3 +4558,79 @@ textarea.input:focus,
 .nextup-row.done .nextup-title {
   text-decoration: line-through;
 }
+
+/* 4-up widget row */
+.dash-widgets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.dash-widget .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-widget-big {
+  font-family: var(--mono);
+  font-size: 28px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.dash-widget-big.amber {
+  color: var(--amber);
+}
+.dash-widget-big.good {
+  color: #86e07c;
+}
+.dash-widget-big.bad {
+  color: #ff6b74;
+}
+.dash-widget-big .clock-sec {
+  font-size: 18px;
+  color: var(--fg-3);
+}
+.dash-widget-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dash-widget-foot {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+}
+
+/* token heatmap */
+.heatmap-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 10px);
+  grid-auto-columns: 10px;
+  gap: 3px;
+  overflow: hidden;
+}
+.heatmap-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--line-dim);
+}
+.heatmap-cell.pad {
+  background: transparent;
+}
+.heatmap-cell[data-level="1"] {
+  background: oklch(0.8 0.17 75 / 0.22);
+}
+.heatmap-cell[data-level="2"] {
+  background: oklch(0.8 0.17 75 / 0.45);
+}
+.heatmap-cell[data-level="3"] {
+  background: oklch(0.8 0.17 75 / 0.7);
+}
+.heatmap-cell[data-level="4"] {
+  background: var(--amber);
+  box-shadow: 0 0 6px oklch(0.8 0.17 75 / 0.5);
+}
