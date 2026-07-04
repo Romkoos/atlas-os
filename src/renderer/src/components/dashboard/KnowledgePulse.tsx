@@ -29,10 +29,10 @@ export function KnowledgePulse() {
         ) : (
           <>
             <div className="dash-widget-big">{num(articles)}</div>
-            <div className="dash-widget-sub">
-              articles · {num(rows.length)} projects · {num(daily)} daily logs
+            <div className="dash-widget-sub">articles · {num(rows.length)} projects</div>
+            <div className="dash-widget-foot">
+              {num(daily)} logs · updated {timeAgo(freshest)}
             </div>
-            <div className="dash-widget-foot">updated {timeAgo(freshest)}</div>
           </>
         )}
       </div>
