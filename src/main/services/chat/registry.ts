@@ -137,6 +137,11 @@ export class ChatSessionRegistry {
       return
     }
 
+    // A rate-limit rejection already scheduled a reset-timed resume; the SDK also
+    // emits a trailing non-success result (error) for the same turn — absorb it so
+    // it can't cancel the reset timer and retry immediately.
+    if (record.status === 'limited' && record.limitTimer !== null && type === 'error') return
+
     const kind = classifyStop(event as { type: string; status?: string }, record.userCancelled)
     if (kind === 'clean') {
       this.subscriberEmit(record, event)
@@ -148,24 +153,28 @@ export class ChatSessionRegistry {
     // *this* stop toward the no-progress streak before deciding (not inside
     // autoContinue()) so the cap trips on the Nth stop itself, not the (N+1)th.
     record.noProgressCount += 1
-    if (shouldStopAutoContinue(record.noProgressCount)) {
-      this.subscriberEmit(record, {
-        type: 'error',
-        message: 'Auto-continue gave up after repeated failures',
-      })
-      this.finalize(record, event)
-      return
-    }
 
-    // A non-resumable session type (e.g. the skill improver) cannot be safely
-    // rebuilt via buildRun — its build args require a kickoff that only exists on
-    // the very first open. Treat any unexpected/rate-limited stop as terminal
-    // instead of scheduling an auto-continue that would crash on rebuild.
-    if (!record.resumable) {
-      this.subscriberEmit(record, {
-        type: 'error',
-        message: 'Chat run failed and cannot be resumed',
-      })
+    // Terminal short-circuits — do NOT schedule an auto-continue when:
+    //  - the session type is non-resumable (e.g. the skill improver): buildRun's
+    //    args require a kickoff that only exists on the first open, so a rebuild
+    //    would crash;
+    //  - an unexpected error arrived while cleanly awaiting the user (idle): the
+    //    connection died with nothing in flight, so injecting a "continue where
+    //    you left off" turn would be spurious;
+    //  - the loop-guard cap of consecutive no-progress retries is reached.
+    // All three forward a terminal error and finalize. (The rate-limited
+    // scheduling path below is intentionally left untouched.)
+    if (
+      !record.resumable ||
+      (kind === 'unexpected' && record.status === 'awaiting') ||
+      shouldStopAutoContinue(record.noProgressCount)
+    ) {
+      const message = !record.resumable
+        ? 'Chat run failed and cannot be resumed'
+        : kind === 'unexpected' && record.status === 'awaiting'
+          ? 'Chat connection lost'
+          : 'Auto-continue gave up after repeated failures'
+      this.subscriberEmit(record, { type: 'error', message })
       this.finalize(record, event)
       return
     }
@@ -173,10 +182,9 @@ export class ChatSessionRegistry {
     const now = Date.now()
     // Rate-limited stops always wait for the subscription window (resetsAt, or
     // exponential backoff if the SDK didn't report one). Unexpected stops (dead
-    // stream, stall, non-user abort) retry immediately — the noProgressCount cap
-    // above is what bounds the loop, not a timer; an artificial backoff here
-    // buys nothing since these are one-shot connection hiccups, not a shared
-    // rate budget.
+    // stream, stall, non-user abort) retry immediately — they rely on the SDK's
+    // own api_retry backoff plus the noProgressCount cap above to bound the loop,
+    // so an artificial delay here buys nothing.
     const delayMs =
       kind === 'rate-limited'
         ? nextAutoContinueDelayMs({
@@ -203,6 +211,13 @@ export class ChatSessionRegistry {
 
   private autoContinue(record: SessionRecord): void {
     if (!this.records.has(record.sessionId)) return
+    // A non-resumable session type cannot be rebuilt (its buildRun needs a kickoff
+    // that only exists on the first open) — never auto-continue it.
+    if (!record.resumable) return
+    // The reset/backoff timer (if any) has fired by the time we get here; null it
+    // so a stale non-null handle can't later mis-trigger the absorb-trailing-error
+    // guard in handle() once status leaves 'limited'.
+    record.limitTimer = null
     // Silently tear down the superseded run's SDK child process before it is
     // overwritten below — otherwise it stays parked on its mailbox forever.
     record.run?.dispose()
@@ -245,7 +260,7 @@ export class ChatSessionRegistry {
   // that re-enters handle() and could double-trigger the continuation.
   nudgeStalled(): void {
     for (const record of this.records.values()) {
-      if (record.status === 'running') this.autoContinue(record)
+      if (record.status === 'running' && record.resumable) this.autoContinue(record)
     }
   }
 

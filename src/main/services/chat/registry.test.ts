@@ -130,4 +130,55 @@ describe('ChatSessionRegistry auto-continue', () => {
     expect(f.builds.length).toBe(2)
     expect(f.builds[1].resume).toBe(true)
   })
+
+  it('honors the rate-limit reset wait despite the trailing turn error', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    const events: unknown[] = []
+    reg.open(
+      {
+        sessionId: 's6',
+        lastSeq: 0,
+        kickoff: 'do the thing',
+        resumable: true,
+        continuationKind: 'worker',
+        buildRun: f.buildRun,
+      },
+      (env) => events.push(env.event),
+    )
+    // Subscription limit: rejection schedules a reset-timed resume far in the
+    // future, then the SDK emits a trailing non-success result (error) for the
+    // same turn — which must NOT cancel the timer and retry immediately.
+    const resetsAt = Date.now() + 3_600_000 // 1h out ⇒ setTimeout, nothing fires sync
+    f.push({ type: 'rate-limit', status: 'rejected', resetsAt })
+    f.push({ type: 'error', message: 'Chat run failed' })
+    expect(f.builds.length).toBe(1) // no synchronous rebuild
+    expect(events.some((e) => (e as { type: string }).type === 'limited')).toBe(true)
+    expect(
+      events.some(
+        (e) =>
+          (e as { type: string; message?: string }).type === 'error' &&
+          (e as { message?: string }).message === 'Auto-continue gave up after repeated failures',
+      ),
+    ).toBe(false)
+  })
+
+  it('nudgeStalled skips a non-resumable running session', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    reg.open(
+      {
+        sessionId: 's7',
+        lastSeq: 0,
+        kickoff: 'skill-id',
+        resumable: false,
+        continuationKind: 'plain',
+        buildRun: f.buildRun,
+      },
+      () => {},
+    )
+    expect(f.builds.length).toBe(1)
+    reg.nudgeStalled()
+    expect(f.builds.length).toBe(1) // skipped — non-resumable must not be rebuilt
+  })
 })
