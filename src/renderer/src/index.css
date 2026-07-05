@@ -2594,7 +2594,7 @@
   color: #86e07c;
 }
 .plasma-pct.bad {
-  color: var(--warn);
+  color: #ff6b74;
 }
 
 .plasma-reset-label {
