@@ -1,7 +1,9 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
+import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
 import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
 import { trpc } from '@renderer/lib/trpc'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
+import type { ClaudeModelId } from '@shared/models'
 import { useState } from 'react'
 
 // Body of the general chat session, rendered inside UnifiedChatDrawer. Reads the
@@ -18,8 +20,11 @@ export function GeneralChatOverlay() {
 
   const reply = trpc.generalChat.reply.useMutation()
   const [draft, setDraft] = useState('')
+  // null → the global default model (resolved in ChatModelSelect / on the server).
+  const [model, setModel] = useState<ClaudeModelId | null>(null)
 
   const started = status !== 'idle'
+  const startChat = () => draft.trim() && startSession(draft.trim(), model)
 
   const send = (text: string) => {
     if (!sessionId || !awaitingInput) return
@@ -40,7 +45,7 @@ export function GeneralChatOverlay() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
-              if (draft.trim()) startSession(draft.trim())
+              startChat()
             }
           }}
           // biome-ignore lint/a11y/noAutofocus: focus the message field when a new chat opens
@@ -49,11 +54,12 @@ export function GeneralChatOverlay() {
         <div className="rm-chat-hint">
           The assistant has read-only access to this repo. ⌘↵ to start.
         </div>
+        <ChatModelSelect value={model} onChange={setModel} />
         <div className="rm-chat-intro-foot">
           <button
             type="button"
             className="btn primary"
-            onClick={() => draft.trim() && startSession(draft.trim())}
+            onClick={startChat}
             disabled={!draft.trim()}
           >
             start chat

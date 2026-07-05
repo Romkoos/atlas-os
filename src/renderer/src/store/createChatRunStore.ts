@@ -1,3 +1,4 @@
+import type { ClaudeModelId } from '@shared/models'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -29,8 +30,11 @@ export interface BaseChatRunState {
   status: ChatStatus
   lastSeq: number
   running: boolean
-  start: (message: string) => void
-  startBlank: () => void
+  // Model chosen for this chat. null = fall back to the global default model.
+  // Fixed for the life of a session (captured at start / reused on reattach).
+  model: ClaudeModelId | null
+  start: (message: string, model?: ClaudeModelId | null) => void
+  startBlank: (model?: ClaudeModelId | null) => void
   reattach: () => void
   appendToken: (text: string) => void
   pushTool: (id: string, name: string, summary: string) => void
@@ -59,7 +63,7 @@ const noopStorage: Storage = {
 
 type Persisted = Pick<
   BaseChatRunState,
-  'sessionId' | 'transcript' | 'status' | 'awaitingInput' | 'lastSeq'
+  'sessionId' | 'transcript' | 'status' | 'awaitingInput' | 'lastSeq' | 'model'
 >
 
 // Builds a persisted zustand store for one chat type. `running` (transient) and
@@ -94,8 +98,9 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
         status: 'idle',
         lastSeq: 0,
         running: false,
-        start: (message) =>
-          set({
+        model: null,
+        start: (message, model) =>
+          set((s) => ({
             sessionId: crypto.randomUUID(),
             transcript: [{ kind: 'user', text: message }],
             streaming: '',
@@ -103,11 +108,12 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             status: 'running',
             lastSeq: 0,
             running: true,
-          }),
+            model: model !== undefined ? model : s.model,
+          })),
         // For chats whose kickoff is not a user-visible message (benchmark
         // batchId, improver skillId): mint the session with an empty transcript.
-        startBlank: () =>
-          set({
+        startBlank: (model) =>
+          set((s) => ({
             sessionId: crypto.randomUUID(),
             transcript: [],
             streaming: '',
@@ -115,7 +121,8 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             status: 'running',
             lastSeq: 0,
             running: true,
-          }),
+            model: model !== undefined ? model : s.model,
+          })),
         reattach: () => set({ running: true }),
         appendToken: (text) =>
           set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
@@ -168,6 +175,7 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             status: 'idle',
             lastSeq: 0,
             running: false,
+            model: null,
           }),
       }),
       {
@@ -180,6 +188,7 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
           status: s.status,
           awaitingInput: s.awaitingInput,
           lastSeq: s.lastSeq,
+          model: s.model,
         }),
       },
     ),

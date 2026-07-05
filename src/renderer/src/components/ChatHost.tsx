@@ -1,4 +1,5 @@
 import type { BaseChatRunState } from '@renderer/store/createChatRunStore'
+import type { ClaudeModelId } from '@shared/models'
 import { skipToken } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
@@ -9,6 +10,8 @@ interface OpenInput {
   lastSeq: number
   kickoff?: string
   continueWork?: boolean
+  // Per-chat model override; omitted → the router uses the global default.
+  model?: ClaudeModelId
 }
 
 interface OpenHandlers {
@@ -67,6 +70,7 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
       lastSeq: s.lastSeq,
       kickoff: isFreshStart ? kickoff : undefined,
       continueWork,
+      model: s.model ?? undefined,
     }
   }, [running, sessionId, kickoff, useRun])
 

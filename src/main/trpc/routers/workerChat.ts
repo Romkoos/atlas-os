@@ -7,7 +7,7 @@ import { buildWorkerChatSeed } from '@main/services/workerChat/seed'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import type { BaseChatEvent, SeqEnvelope } from '@shared/ipc-events'
-import { DEFAULT_MODEL_ID } from '@shared/models'
+import { CLAUDE_MODEL_IDS, DEFAULT_MODEL_ID } from '@shared/models'
 import { observable } from '@trpc/server/observable'
 import { app } from 'electron'
 import { z } from 'zod'
@@ -23,11 +23,12 @@ export const workerChatRouter = router({
         lastSeq: z.number().int().nonnegative(),
         kickoff: z.string().min(1).optional(),
         continueWork: z.boolean().optional(),
+        model: z.enum(CLAUDE_MODEL_IDS).optional(),
       }),
     )
     .subscription(({ input }) =>
       observable<SeqEnvelope<BaseChatEvent>>((emit) => {
-        const model = getSettings().model ?? DEFAULT_MODEL_ID
+        const model = input.model ?? getSettings().model ?? DEFAULT_MODEL_ID
         const repoRoot = app.getAppPath()
         return chatRegistry.open(
           {
