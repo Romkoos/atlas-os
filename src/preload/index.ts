@@ -31,6 +31,12 @@ const atlas: AtlasBridge = {
     toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
     close: () => ipcRenderer.send('window:close'),
   },
+  tray: {
+    navigate: (section: string) => ipcRenderer.send('tray:navigate', section),
+    openMain: () => ipcRenderer.send('tray:open'),
+    quit: () => ipcRenderer.send('tray:quit'),
+    hide: () => ipcRenderer.send('tray:hide'),
+  },
 }
 
 contextBridge.exposeInMainWorld('atlas', atlas)
