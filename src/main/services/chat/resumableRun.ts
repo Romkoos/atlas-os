@@ -157,6 +157,11 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
         } else {
           const reason = message.errors?.join('; ') || message.subtype
           opts.emit({ type: 'error', message: `Chat run failed: ${reason}` })
+          // A failed turn also idles the persistent multi-turn generator waiting
+          // for the next user message — a legitimate idle, like awaiting-input.
+          // Disarm so the watchdog does not false-fire 90s later.
+          idle = true
+          clearWatchdog()
         }
       }
     }
@@ -165,6 +170,9 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
       opts.emit({ type: 'error', message: 'Chat stream ended unexpectedly' })
     }
   })().catch((error) => {
+    // Ensure any pending stall timer is disarmed on every thrown-exception exit,
+    // not just the watchdog's own abort, so it can never fire on a dead run.
+    clearWatchdog()
     if (stopped) return
     const message = error instanceof Error ? error.message : 'Unknown error'
     logger.error('Resumable chat failed', message)
