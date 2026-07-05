@@ -58,6 +58,9 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
     watchdog = setTimeout(() => {
       if (stopped || idle) return
       // No SDK activity for STALL_MS while mid-turn — treat as a dead stream.
+      // Mark this run stopped BEFORE aborting so neither the outer `.catch`
+      // nor the post-loop guard re-emits: the registry only wants one `error`.
+      stopped = true
       opts.emit({ type: 'error', message: 'Run stalled — reconnecting' })
       controller.abort()
       queryRef?.interrupt().catch(() => {})
