@@ -1,8 +1,8 @@
-import { DrillLink, Note, num, timeAgo } from '@renderer/components/dashboard/dash-utils'
-import { ScrambleText } from '@renderer/components/fx/ScrambleText'
+import { num, timeAgo } from '@renderer/components/dashboard/dash-utils'
 import { trpc } from '@renderer/lib/trpc'
 
-// Knowledge-base vitals: article volume across all project KBs + freshness.
+// Knowledge-base vitals as a KPI tile: article volume across all project KBs +
+// freshness, framed to match the other tiles in the hero band.
 export function KnowledgePulse() {
   const projects = trpc.knowledge.projects.useQuery()
   const rows = projects.data ?? []
@@ -14,27 +14,15 @@ export function KnowledgePulse() {
   )
 
   return (
-    <div className="panel dash-widget">
-      <div className="panel-head">
-        <span className="ttl">
-          <ScrambleText text="knowledge" />
-        </span>
-        <DrillLink to="knowledge" label="browse" />
+    <div className="kpi">
+      <div className="label">
+        <span className="id">[04]</span>KNOWLEDGE
       </div>
-      <div className="panel-body">
-        {projects.isLoading ? (
-          <Note>loading…</Note>
-        ) : rows.length === 0 ? (
-          <Note>no knowledge bases yet.</Note>
-        ) : (
-          <>
-            <div className="dash-widget-big">{num(articles)}</div>
-            <div className="dash-widget-sub">articles · {num(rows.length)} projects</div>
-            <div className="dash-widget-foot">
-              {num(daily)} logs · updated {timeAgo(freshest)}
-            </div>
-          </>
-        )}
+      <div className="val">{projects.isLoading || rows.length === 0 ? '—' : num(articles)}</div>
+      <div className="delta">
+        {rows.length === 0
+          ? 'no knowledge bases yet'
+          : `${num(rows.length)} projects · ${num(daily)} logs · ${timeAgo(freshest)}`}
       </div>
     </div>
   )

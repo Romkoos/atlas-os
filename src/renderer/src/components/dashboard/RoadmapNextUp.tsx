@@ -1,6 +1,8 @@
 import { Note } from '@renderer/components/dashboard/dash-utils'
+import { BorderBeam } from '@renderer/components/fx/BorderBeam'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { trpc } from '@renderer/lib/trpc'
+import { useBeamRoam } from '@renderer/store/beamRoam'
 import { useUiStore } from '@renderer/store/ui'
 import type { RoadmapItem, RoadmapStatus } from '@shared/roadmap'
 import { useMemo } from 'react'
@@ -13,6 +15,7 @@ export function RoadmapNextUp() {
   const items = trpc.roadmap.list.useQuery()
   const rows = items.data ?? []
   const groups = useMemo(() => groupNextUp(rows), [rows])
+  const beam = useBeamRoam((s) => s.active === 'nextup')
 
   const openBoard = () => {
     setTab('roadmap', 'board')
@@ -37,6 +40,7 @@ export function RoadmapNextUp() {
 
   return (
     <div className="panel">
+      {beam && <BorderBeam />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="next up" />

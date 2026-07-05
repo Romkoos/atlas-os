@@ -1,4 +1,3 @@
-import { BenchmarkWidget } from '@renderer/components/dashboard/BenchmarkWidget'
 import {
   compact,
   DrillLink,
@@ -15,27 +14,19 @@ import { Sparkline } from '@renderer/components/dashboard/Sparkline'
 import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
 import { UsagePlasmaWidget } from '@renderer/components/dashboard/UsagePlasmaWidget'
 import { WeeklyPlasmaWidget } from '@renderer/components/dashboard/WeeklyPlasmaWidget'
+import { BorderBeam } from '@renderer/components/fx/BorderBeam'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
+import { useBeamRoam } from '@renderer/store/beamRoam'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
 import { useGraphBuildRun } from '@renderer/store/graphBuildRun'
 import { useNewsRun } from '@renderer/store/newsRun'
 import { useTrendingRun } from '@renderer/store/trendingRun'
 import { type Section, useUiStore } from '@renderer/store/ui'
-import { type CSSProperties, useMemo } from 'react'
+import { type CSSProperties, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-
-// ms → compact human duration for the avg-duration tile.
-function fmtDuration(ms: number): string {
-  if (ms <= 0) return '—'
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
-  const m = Math.floor(ms / 60_000)
-  const s = Math.round((ms % 60_000) / 1000)
-  return `${m}m ${s}s`
-}
 
 // First couple of meaningful lines of a digest, with frontmatter + leading
 // markdown heading marks stripped, for the signal-card preview.
@@ -83,24 +74,21 @@ function TelemetryMarquee() {
 }
 
 // ── STATUS ROW ─────────────────────────────────────────────────────────────
-// Four headline tiles. Each is a single value; Productivity/Stats own the
-// behavior behind it. All four read from the today + kpi + summary queries,
-// which the panels below reuse (react-query dedupes by key — no double fetch).
+// Bento band: left stack (today tokens + sessions) · two plasma rings · right
+// stack (heatmap + knowledge tiles). All fed by the today + kpi queries the
+// panels below reuse (react-query dedupes by key — no double fetch).
 function StatusRow() {
   const today = trpc.productivity.today.useQuery({})
   const kpi = trpc.productivity.kpi.useQuery({ days: 30 })
-  const summary = trpc.stats.summary.useQuery()
 
   const t = today.data?.totals
   const byDay = kpi.data?.byDay ?? []
   const sessions30d = byDay.reduce((s, d) => s + d.sessions, 0)
   const tokens30d = byDay.reduce((s, d) => s + d.tokens, 0)
-  // Trend direction over the window: last vs first smoothed efficiency point.
-  const trend = byDay.length >= 2 ? byDay[byDay.length - 1].kpiSmooth - byDay[0].kpiSmooth : null
 
   return (
     <div className="kpis-hero">
-      {/* ── Left stack: TODAY TOKENS + TOKEN EFFICIENCY ────────────────────── */}
+      {/* ── Left stack: TODAY TOKENS + SESSIONS · 30D ──────────────────────── */}
       <div className="kpis-hero-side">
         <div className="kpi">
           <div className="label">
@@ -112,21 +100,12 @@ function StatusRow() {
           </div>
         </div>
 
-        <div className="kpi" style={{ position: 'relative' }}>
-          <div
-            className="fx-gauge"
-            style={{ '--val': Math.max(0, Math.min(140, kpi.data?.overall ?? 0)) } as CSSProperties}
-            aria-hidden
-          />
+        <div className="kpi">
           <div className="label">
-            <span className="id">[02]</span>TOKEN EFFICIENCY
+            <span className="id">[02]</span>SESSIONS · 30D
           </div>
-          <div className="val amber">{pct(kpi.data?.overall)}</div>
-          <div className={`delta${trend == null ? '' : trend >= 0 ? ' up' : ' dn'}`}>
-            {trend == null
-              ? 'vs baseline'
-              : `${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(0)} pts · 30d`}
-          </div>
+          <div className="val">{kpi.data ? <Ticker value={sessions30d} /> : '—'}</div>
+          <div className="delta">{kpi.data ? `${compact(tokens30d)} tokens` : 'last 30 days'}</div>
         </div>
       </div>
 
@@ -134,25 +113,10 @@ function StatusRow() {
       <UsagePlasmaWidget />
       <WeeklyPlasmaWidget />
 
-      {/* ── Right stack: SESSIONS 30D + AGENT RUNS ─────────────────────────── */}
+      {/* ── Right stack: heatmap + knowledge tiles ─────────────────────────── */}
       <div className="kpis-hero-side">
-        <div className="kpi">
-          <div className="label">
-            <span className="id">[03]</span>SESSIONS · 30D
-          </div>
-          <div className="val">{kpi.data ? <Ticker value={sessions30d} /> : '—'}</div>
-          <div className="delta">{kpi.data ? `${compact(tokens30d)} tokens` : 'last 30 days'}</div>
-        </div>
-
-        <div className="kpi">
-          <div className="label">
-            <span className="id">[04]</span>AGENT RUNS
-          </div>
-          <div className="val">{summary.data ? <Ticker value={summary.data.total} /> : '—'}</div>
-          <div className="delta">
-            {summary.data ? `avg ${fmtDuration(summary.data.avgDurationMs)}` : 'all time'}
-          </div>
-        </div>
+        <TokenHeatmap />
+        <KnowledgePulse />
       </div>
     </div>
   )
@@ -220,9 +184,11 @@ function ActivityPanel() {
   const sessions30d = byDay.reduce((s, d) => s + d.sessions, 0)
   const perDayTokens = byDay.length ? tokens30d / 30 : 0
   const perDaySessions = byDay.length ? sessions30d / 30 : 0
+  const beam = useBeamRoam((s) => s.active === 'activity')
 
   return (
     <div className="panel">
+      {beam && <BorderBeam duration={5} />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="activity · 30d" />
@@ -300,9 +266,11 @@ function QuickActions() {
       list.find((p) => p.project === selectedProject)?.projectPath ?? list[0]?.projectPath ?? null
     )
   }, [projects.data, selectedProject])
+  const beam = useBeamRoam((s) => s.active === 'quick')
 
   return (
     <div className="panel">
+      {beam && <BorderBeam duration={5} />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="quick actions" />
@@ -410,8 +378,10 @@ function SignalCard({
 function SignalsPanel() {
   const news = trpc.news.read.useQuery()
   const trending = trpc.trending.read.useQuery()
+  const beam = useBeamRoam((s) => s.active === 'signals')
   return (
     <div className="panel">
+      {beam && <BorderBeam duration={5} />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="signals" />
@@ -437,6 +407,13 @@ function SignalsPanel() {
 }
 
 export function Dashboard() {
+  // Roam the border-beam to a new random panel every 5s (each fires one lap).
+  const roam = useBeamRoam((s) => s.roam)
+  useEffect(() => {
+    const id = window.setInterval(roam, 5000)
+    return () => window.clearInterval(id)
+  }, [roam])
+
   return (
     <>
       <PageHeader
@@ -454,8 +431,8 @@ export function Dashboard() {
           <QuickActions />
         </div>
 
-        {/* Hero band: galaxy square · narrow NEXT UP · vertical widget rail —
-            all three columns stretch to the galaxy's height for one clean line. */}
+        {/* Hero band: galaxy square · NEXT UP · signals — NEXT UP and signals
+            share equal width, both stretching to the galaxy's height. */}
         <div className="dash-hero-row mt-16">
           <div className="dash-reveal" style={{ '--i': 2 } as CSSProperties}>
             <GalaxyHero />
@@ -463,30 +440,18 @@ export function Dashboard() {
           <div className="dash-reveal" style={{ '--i': 3 } as CSSProperties}>
             <RoadmapNextUp />
           </div>
-          <div className="dash-rail">
-            <div className="dash-reveal" style={{ '--i': 4 } as CSSProperties}>
-              <TokenHeatmap />
-            </div>
-            <div className="dash-reveal" style={{ '--i': 5 } as CSSProperties}>
-              <KnowledgePulse />
-            </div>
-            <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
-              <BenchmarkWidget />
-            </div>
-          </div>
-        </div>
-
-        <div className="dash-mid mt-16">
-          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
-            <ActivityPanel />
-          </div>
-          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 4 } as CSSProperties}>
             <SignalsPanel />
           </div>
         </div>
 
-        <div className="dash-reveal mt-16" style={{ '--i': 9 } as CSSProperties}>
-          <ProcessesStrip />
+        <div className="dash-mid mt-16">
+          <div className="dash-reveal" style={{ '--i': 5 } as CSSProperties}>
+            <ActivityPanel />
+          </div>
+          <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
+            <ProcessesStrip />
+          </div>
         </div>
 
         <div className="dash-scan" aria-hidden />
