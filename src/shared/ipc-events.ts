@@ -10,6 +10,29 @@ export type BaseChatEvent =
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'aborted' }
+  // Durability signals (see docs/superpowers/specs/2026-07-05-durable-chat-runs-design.md):
+  // the SDK is auto-retrying a dropped API connection (e.g. after sleep).
+  | { type: 'reconnecting'; attempt: number; maxRetries: number; delayMs: number }
+  // Live subscription rate-limit info; feeds the usage gauge and limit handling.
+  | {
+      type: 'rate-limit'
+      status: 'allowed' | 'allowed_warning' | 'rejected'
+      utilization?: number
+      resetsAt?: number
+      rateLimitType?: string
+    }
+  // The run is paused until the subscription window resets, then auto-continues.
+  | { type: 'limited'; resetsAt?: number; rateLimitType?: string; resumesInMs?: number }
+  // An interrupted run is being auto-continued via resume + a continuation turn.
+  | { type: 'resuming'; attempt: number }
+
+// Last-known subscription rate-limit snapshot cached in main + shown in the gauge.
+export interface RateLimitInfo {
+  status: 'allowed' | 'allowed_warning' | 'rejected'
+  utilization?: number
+  resetsAt?: number
+  rateLimitType?: string
+}
 
 // Every chat event forwarded to the renderer is wrapped with a per-session
 // monotonic sequence number so a reattaching client can replay only the gap.

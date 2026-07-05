@@ -19,7 +19,18 @@ export interface StartResumableChatOptions {
   env: Record<string, string>
   seed?: string
   resume: boolean
+  // Seeded into the mailbox when resume === true so the SDK, after loading the
+  // on-disk transcript, immediately processes a continuation turn instead of
+  // idling. Undefined on a plain reattach (idle) or a fresh session.
+  resumeMessage?: string
   emit: (event: BaseChatEvent) => void
+  // Called on every SDK rate_limit_event so the caller can cache account usage.
+  onRateLimit?: (info: {
+    status: 'allowed' | 'allowed_warning' | 'rejected'
+    utilization?: number
+    resetsAt?: number
+    rateLimitType?: string
+  }) => void
   onAssistantText?: (delta: string, accumulated: string) => void
   onTurnComplete?: (accumulated: string) => void
 }
@@ -34,8 +45,27 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
   let stopped = false
   let accumulated = ''
 
+  const STALL_MS = 90_000
+  let watchdog: ReturnType<typeof setTimeout> | null = null
+  let idle = false // true between a clean awaiting-input and the next activity
+  const clearWatchdog = () => {
+    if (watchdog) clearTimeout(watchdog)
+    watchdog = null
+  }
+  const armWatchdog = () => {
+    clearWatchdog()
+    if (stopped || idle) return
+    watchdog = setTimeout(() => {
+      if (stopped || idle) return
+      // No SDK activity for STALL_MS while mid-turn — treat as a dead stream.
+      opts.emit({ type: 'error', message: 'Run stalled — reconnecting' })
+      controller.abort()
+      queryRef?.interrupt().catch(() => {})
+    }, STALL_MS)
+  }
+
   const done = (async (): Promise<void> => {
-    mailbox = createMailbox(opts.resume ? undefined : opts.seed)
+    mailbox = createMailbox(opts.resume ? opts.resumeMessage : opts.seed)
     const { query } = await import('@anthropic-ai/claude-agent-sdk')
     const q = query({
       prompt: mailbox.stream,
@@ -54,6 +84,8 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
     queryRef = q
 
     for await (const message of q as AsyncIterable<SDKMessage>) {
+      idle = false
+      armWatchdog()
       if (message.type === 'stream_event') {
         const event = message.event
         if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
@@ -86,17 +118,48 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
             }
           }
         }
+      } else if (message.type === 'system' && message.subtype === 'api_retry') {
+        // The SDK hit a retryable API error (incl. connection timeouts after
+        // sleep, error_status === null) and will retry after a delay. Surface it
+        // so the UI shows "reconnecting" instead of a silent hang.
+        opts.emit({
+          type: 'reconnecting',
+          attempt: message.attempt,
+          maxRetries: message.max_retries,
+          delayMs: message.retry_delay_ms,
+        })
+      } else if (message.type === 'rate_limit_event') {
+        const info = message.rate_limit_info
+        opts.onRateLimit?.({
+          status: info.status,
+          utilization: info.utilization,
+          resetsAt: info.resetsAt,
+          rateLimitType: info.rateLimitType,
+        })
+        opts.emit({
+          type: 'rate-limit',
+          status: info.status,
+          utilization: info.utilization,
+          resetsAt: info.resetsAt,
+          rateLimitType: info.rateLimitType,
+        })
       } else if (message.type === 'result') {
         if (stopped) continue
         opts.onTurnComplete?.(accumulated)
         accumulated = ''
         if (message.subtype === 'success') {
           opts.emit({ type: 'awaiting-input' })
+          idle = true
+          clearWatchdog()
         } else {
           const reason = message.errors?.join('; ') || message.subtype
           opts.emit({ type: 'error', message: `Chat run failed: ${reason}` })
         }
       }
+    }
+    clearWatchdog()
+    if (!stopped && !idle) {
+      opts.emit({ type: 'error', message: 'Chat stream ended unexpectedly' })
     }
   })().catch((error) => {
     if (stopped) return
@@ -110,6 +173,7 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
     cancel: () => {
       if (stopped) return
       stopped = true
+      clearWatchdog()
       mailbox?.close()
       controller.abort()
       queryRef?.interrupt().catch(() => {})
