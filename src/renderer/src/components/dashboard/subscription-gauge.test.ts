@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { formatCountdown, gaugeTone } from './subscription-gauge'
+import { formatCountdown, formatResetClock, gaugeTone } from './subscription-gauge'
+
+describe('formatResetClock', () => {
+  it('formats weekday + 12h clock in local time', () => {
+    // 2026-07-11 is a Saturday; 05:59 local.
+    expect(formatResetClock(new Date(2026, 6, 11, 5, 59).getTime())).toBe('Sat 5:59 AM')
+  })
+  it('handles noon and midnight', () => {
+    expect(formatResetClock(new Date(2026, 6, 8, 21, 0).getTime())).toBe('Wed 9:00 PM')
+    expect(formatResetClock(new Date(2026, 6, 6, 0, 5).getTime())).toBe('Mon 12:05 AM')
+    expect(formatResetClock(new Date(2026, 6, 6, 12, 0).getTime())).toBe('Mon 12:00 PM')
+  })
+})
 
 describe('formatCountdown', () => {
   it('formats hours:minutes:seconds', () => {

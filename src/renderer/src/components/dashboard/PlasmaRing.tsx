@@ -1,69 +1,77 @@
 import { useEffect, useRef } from 'react'
-import { animParams, ringColor, ringNoise } from './plasma-ring'
+import { animParams, pulseStrength, ringNoise } from './plasma-ring'
+
+/** One concentric ring to render. Colors are pre-resolved by the caller. */
+export interface RingSpec {
+  /** 0–1 fraction consumed (clamped by the caller). */
+  utilization: number
+  /** Resolved 'rgb(r,g,b)' stroke color for this ring. */
+  color: string
+  /** Ring radius as a fraction of min(width,height). Default 0.38. */
+  radiusScale?: number
+  /** Arc stroke width in px. Default 9. */
+  lineWidth?: number
+  /** Render orbital particles on this ring. Default true. */
+  particles?: boolean
+}
 
 export interface PlasmaRingProps {
-  /** 0–1 fraction of subscription window consumed. */
-  utilization: number
-  /** Raw SDK status string: 'allowed' | 'allowed_warning' | 'rejected'. */
-  status: string
-  /** True when no rate_limit_event has been received yet (no data). */
+  /** One or more concentric rings, outer→inner. */
+  rings: RingSpec[]
+  /** True when no data yet — shows the idle sweep. */
   isIdle: boolean
-  /** Logical width in CSS px. */
+  /** Red flash overlay (e.g. a window is rejected / over limit). */
+  flash?: boolean
   width: number
-  /** Logical height in CSS px. */
   height: number
 }
 
 interface Particle {
-  /** Position along the arc in radians, relative to arc start (0 = start of arc). */
   angle: number
-  /** Recent angle history for trail rendering. */
   trail: number[]
 }
 
-const PARTICLE_COUNT = 10
+const PARTICLE_COUNT = 8
 const TRAIL_LEN = 8
 const TRAIL_SPEED = 1.5 // radians per second at particleSpeed=1
 
 function initParticles(): Particle[] {
   return Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
-    angle: (i / PARTICLE_COUNT) * Math.PI * 2 * 0.8, // spread across 80% of arc
+    angle: (i / PARTICLE_COUNT) * Math.PI * 2 * 0.8,
     trail: [],
   }))
 }
 
+const withAlpha = (rgb: string, a: number) => rgb.replace('rgb(', 'rgba(').replace(')', `,${a})`)
+
 /**
- * Canvas-animated plasma ring visualization.
- * All animation state lives in refs so React never re-renders on frame;
- * latest props are read via propsRef inside the rAF loop.
+ * Canvas-animated plasma ring(s). All animation state lives in refs so React
+ * never re-renders on frame; latest props are read via propsRef inside the rAF
+ * loop. Renders each ring's track (a faint full circle that breathes in sync with
+ * the arc so it doesn't look static at high utilization), arc, corona, tip bloom
+ * and orbital particles.
  */
-export function PlasmaRing({ utilization, status, isIdle, width, height }: PlasmaRingProps) {
+export function PlasmaRing({ rings, isIdle, flash, width, height }: PlasmaRingProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Animation state — mutated in-place inside rAF, never triggers React renders.
   const stateRef = useRef({
     raf: 0,
     t: 0,
     lastTime: 0,
     idleAngle: -Math.PI / 2,
-    particles: initParticles(),
+    ringParticles: [] as Particle[][],
   })
 
-  // Always-current props snapshot read by the rAF loop.
-  const propsRef = useRef({ utilization, status, isIdle })
-  propsRef.current = { utilization, status, isIdle }
+  const propsRef = useRef({ rings, isIdle, flash })
+  propsRef.current = { rings, isIdle, flash }
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx: CanvasRenderingContext2D | null = canvas.getContext('2d')
     if (ctx === null) return
-    // ctx is narrowed to CanvasRenderingContext2D for the rest of this effect scope,
-    // but TypeScript cannot track narrowing into a nested function closure, so we
-    // capture it in a non-null typed alias used throughout frame().
     const c: CanvasRenderingContext2D = ctx
 
-    // Retina: scale internal pixel buffer by DPR.
     const dpr = window.devicePixelRatio || 1
     canvas.width = Math.round(width * dpr)
     canvas.height = Math.round(height * dpr)
@@ -76,133 +84,149 @@ export function PlasmaRing({ utilization, status, isIdle, width, height }: Plasm
       state.lastTime = timestamp
       state.t += dt
 
-      const { utilization: util, status: st, isIdle: idle } = propsRef.current
-      const params = animParams(util)
-      const color = ringColor(util, st)
-
+      const { rings: ringSpecs, isIdle: idle, flash: doFlash } = propsRef.current
       const cx = width / 2
       const cy = height / 2
-      const radius = Math.min(width, height) * 0.38
+      const base = Math.min(width, height)
 
       c.clearRect(0, 0, width, height)
 
-      // 1. Track ring — ghost of the full circle.
-      c.beginPath()
-      c.arc(cx, cy, radius, 0, Math.PI * 2)
-      c.strokeStyle = 'rgba(255,255,255,0.07)'
-      c.lineWidth = 8
-      c.stroke()
-
-      if (idle) {
+      if (idle || ringSpecs.length === 0) {
         // ── Idle: slowly rotating 25% arc, no particles, low glow. ──────────
-        state.idleAngle += dt * 0.4
-        const start = state.idleAngle
-        const end = start + Math.PI * 0.5
+        const radius = base * 0.38
+        c.beginPath()
+        c.arc(cx, cy, radius, 0, Math.PI * 2)
+        c.strokeStyle = 'rgba(255,255,255,0.07)'
+        c.lineWidth = 8
+        c.stroke()
 
+        state.idleAngle += dt * 0.4
+        const color = ringSpecs[0]?.color ?? 'rgb(212,152,45)'
         c.shadowColor = color
         c.shadowBlur = 10
         c.beginPath()
-        c.arc(cx, cy, radius, start, end)
-        c.strokeStyle = color.replace('rgb(', 'rgba(').replace(')', ',0.35)')
+        c.arc(cx, cy, radius, state.idleAngle, state.idleAngle + Math.PI * 0.5)
+        c.strokeStyle = withAlpha(color, 0.35)
         c.lineWidth = 10
         c.stroke()
         c.shadowBlur = 0
-      } else {
-        // ── Active: full plasma animation. ───────────────────────────────────
-        const jitter = ringNoise(state.t * 3) * params.jitterAmp
-        const r = radius + jitter
+        state.raf = requestAnimationFrame(frame)
+        return
+      }
+
+      // Keep a particle set per ring.
+      if (state.ringParticles.length !== ringSpecs.length) {
+        state.ringParticles = ringSpecs.map(() => initParticles())
+      }
+
+      // Core pulse once, from the highest-utilization ring — only visible when
+      // that ring is above the 50% pulse threshold.
+      const maxUtil = Math.max(...ringSpecs.map((r) => r.utilization))
+      const coreParams = animParams(maxUtil)
+      const coreOsc = Math.sin(state.t * coreParams.pulseFreq * Math.PI * 2) * 0.5 + 0.5
+      const corePulse = pulseStrength(maxUtil) * coreOsc
+      const coreRadius = base * (ringSpecs[0].radiusScale ?? 0.38) * 0.72
+      const coreAlpha = corePulse * maxUtil * coreParams.glowIntensity * 0.3
+      if (coreAlpha > 0.001) {
+        const core = c.createRadialGradient(cx, cy, 0, cx, cy, coreRadius)
+        core.addColorStop(0, withAlpha(ringSpecs[0].color, coreAlpha))
+        core.addColorStop(1, 'rgba(0,0,0,0)')
+        c.beginPath()
+        c.arc(cx, cy, coreRadius, 0, Math.PI * 2)
+        c.fillStyle = core
+        c.fill()
+      }
+
+      ringSpecs.forEach((ring, ri) => {
+        const util = ring.utilization
+        const params = animParams(util)
+        // Oscillating pulse contribution, gated to >50% and ramping with util.
+        // Each ring pulses at its own frequency/phase; calmer rings stay steady.
+        const ringOsc = Math.sin(state.t * params.pulseFreq * Math.PI * 2) * 0.5 + 0.5
+        const pulse = pulseStrength(util)
+        const pc = pulse * ringOsc
+        const lineWidth = ring.lineWidth ?? 9
+        const baseRadius = base * (ring.radiusScale ?? 0.38)
+        // Track ring — breathes only when this ring pulses; otherwise static.
+        const trackAlpha = 0.07 + pc * 0.06
+        c.shadowColor = ring.color
+        c.shadowBlur = pc * params.glowIntensity * 8
+        c.beginPath()
+        c.arc(cx, cy, baseRadius, 0, Math.PI * 2)
+        c.strokeStyle = `rgba(255,255,255,${trackAlpha})`
+        c.lineWidth = Math.max(2, lineWidth - 2)
+        c.stroke()
+        c.shadowBlur = 0
+
+        // Radius jitter only wobbles once the ring is pulsing (>50%).
+        const jitter = ringNoise(state.t * 3 + ri) * params.jitterAmp * pulse
+        const r = baseRadius + jitter
         const startAngle = -Math.PI / 2
         const endAngle = startAngle + util * Math.PI * 2
 
-        // 7. Outer corona — multiple dim arcs at increasing radii.
+        // Outer corona.
         for (let i = 3; i >= 1; i--) {
           c.beginPath()
-          c.arc(cx, cy, r + i * 5, startAngle, endAngle)
-          c.strokeStyle = color.replace('rgb(', 'rgba(').replace(')', `,${0.04 * (4 - i)})`)
+          c.arc(cx, cy, r + i * 4, startAngle, endAngle)
+          c.strokeStyle = withAlpha(ring.color, 0.04 * (4 - i))
           c.lineWidth = 2
           c.stroke()
         }
 
-        // 2. Main arc.
-        c.shadowColor = color
-        c.shadowBlur = 20 + params.glowIntensity * 20
+        // Main arc — steady base glow plus an extra pulse above 50%.
+        c.shadowColor = ring.color
+        c.shadowBlur = 12 + params.glowIntensity * 8 + pc * 14
         c.beginPath()
         c.arc(cx, cy, r, startAngle, endAngle)
-        c.strokeStyle = color
-        c.lineWidth = 10
+        c.strokeStyle = ring.color
+        c.lineWidth = lineWidth
         c.stroke()
         c.shadowBlur = 0
 
-        // 3. Leading-edge bloom at arc tip.
+        // Leading-edge bloom.
         const tipX = cx + r * Math.cos(endAngle)
         const tipY = cy + r * Math.sin(endAngle)
-        const bloomR = 16 + params.glowIntensity * 14
+        const bloomR = 14 + params.glowIntensity * 12
         const bloom = c.createRadialGradient(tipX, tipY, 0, tipX, tipY, bloomR)
-        bloom.addColorStop(
-          0,
-          color.replace('rgb(', 'rgba(').replace(')', `,${0.9 * params.glowIntensity})`),
-        )
+        bloom.addColorStop(0, withAlpha(ring.color, 0.9 * params.glowIntensity))
         bloom.addColorStop(1, 'rgba(0,0,0,0)')
         c.beginPath()
         c.arc(tipX, tipY, bloomR, 0, Math.PI * 2)
         c.fillStyle = bloom
         c.fill()
 
-        // 6. Inner core pulse — central radial gradient that breathes.
-        const pulseMag = Math.sin(state.t * params.pulseFreq * Math.PI * 2) * 0.5 + 0.5
-        const coreAlpha = pulseMag * util * params.glowIntensity * 0.3
-        const core = c.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.72)
-        core.addColorStop(0, color.replace('rgb(', 'rgba(').replace(')', `,${coreAlpha})`))
-
-        core.addColorStop(1, 'rgba(0,0,0,0)')
-        c.beginPath()
-        c.arc(cx, cy, radius * 0.72, 0, Math.PI * 2)
-        c.fillStyle = core
-        c.fill()
-
-        // 5. Orbital particles — only rendered when there's meaningful arc.
-        if (util > 0.04) {
+        // Orbital particles.
+        if ((ring.particles ?? true) && util > 0.04) {
           const maxAngle = util * Math.PI * 2
-          for (const p of state.particles) {
+          for (const p of state.ringParticles[ri]) {
             p.angle += params.particleSpeed * TRAIL_SPEED * dt
             if (p.angle > maxAngle) {
               p.angle = 0
               p.trail.length = 0
             }
-
-            const absAngle = startAngle + p.angle
-
-            // Trail
             p.trail.push(p.angle)
             if (p.trail.length > TRAIL_LEN) p.trail.shift()
-
             for (let i = 0; i < p.trail.length; i++) {
               const ta = startAngle + p.trail[i]
-              const tx = cx + r * Math.cos(ta)
-              const ty = cy + r * Math.sin(ta)
               const alpha = (i / p.trail.length) * 0.5 * params.glowIntensity
               c.beginPath()
-              c.arc(tx, ty, 2, 0, Math.PI * 2)
-              c.fillStyle = color.replace('rgb(', 'rgba(').replace(')', `,${alpha})`)
+              c.arc(cx + r * Math.cos(ta), cy + r * Math.sin(ta), 2, 0, Math.PI * 2)
+              c.fillStyle = withAlpha(ring.color, alpha)
               c.fill()
             }
-
-            // Dot
-            const px = cx + r * Math.cos(absAngle)
-            const py = cy + r * Math.sin(absAngle)
+            const absAngle = startAngle + p.angle
             c.beginPath()
-            c.arc(px, py, 2.5, 0, Math.PI * 2)
-            c.fillStyle = color
+            c.arc(cx + r * Math.cos(absAngle), cy + r * Math.sin(absAngle), 2.5, 0, Math.PI * 2)
+            c.fillStyle = ring.color
             c.fill()
           }
         }
+      })
 
-        // Rejected: red flash overlay.
-        if (st === 'rejected') {
-          const flashAlpha = Math.max(0, Math.sin(state.t * 3 * Math.PI * 2)) * 0.1
-          c.fillStyle = `rgba(218,60,48,${flashAlpha})`
-          c.fillRect(0, 0, width, height)
-        }
+      if (doFlash) {
+        const flashAlpha = Math.max(0, Math.sin(state.t * 3 * Math.PI * 2)) * 0.1
+        c.fillStyle = `rgba(218,60,48,${flashAlpha})`
+        c.fillRect(0, 0, width, height)
       }
 
       state.raf = requestAnimationFrame(frame)

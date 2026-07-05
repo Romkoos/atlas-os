@@ -2524,8 +2524,12 @@
    Replaces .kpis.bento for the main StatusRow. */
 .kpis-hero {
   display: grid;
-  grid-template-columns: 1fr 1.6fr 1fr;
+  /* KPI stack · session ring · weekly ring · KPI stack */
+  grid-template-columns: 0.9fr 1fr 1fr 0.9fr;
   gap: 1px;
+  /* Cap the whole band so the plasma widgets (which stretch to the row height)
+     stay ≤300px tall. Both side stacks split this height as 1fr/1fr. */
+  height: 280px;
   background: var(--line-dim);    /* hairline dividers between columns */
   border: 1px solid var(--line-dim);
   box-shadow:
@@ -2557,7 +2561,7 @@
 /* Center plasma ring container. */
 .plasma-widget {
   position: relative;
-  min-height: 220px;
+  min-height: 0;
   min-width: 0;
   background: var(--bg);
   display: flex;
@@ -2585,7 +2589,7 @@
 
 .plasma-pct {
   font-family: var(--mono);
-  font-size: 42px;
+  font-size: 30px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -2604,12 +2608,12 @@
   color: var(--fg-3);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .plasma-countdown {
   font-family: var(--mono);
-  font-size: 20px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
   color: var(--fg-2);
   line-height: 1.2;
@@ -2622,6 +2626,107 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-top: 2px;
+}
+
+/* Weekly widget overlay — two type-colored %s (week / fable) + a small legend. */
+.plasma-week-vals {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.pw-val.week {
+  color: #38bdf8;
+}
+.pw-val.fable {
+  color: #a78bfa;
+}
+.plasma-week-vals .pw-sep {
+  color: var(--fg-4);
+  font-weight: 400;
+  font-size: 18px;
+}
+.plasma-week-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.plasma-week-legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.plasma-week-legend .lg::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.plasma-week-legend .lg.week::before {
+  background: #38bdf8;
+}
+.plasma-week-legend .lg.fable::before {
+  background: #a78bfa;
+}
+
+/* Footer: reload button + "updated Xm ago", pinned to the bottom-left corner.
+   Separate from the pointer-events:none overlay so the button stays clickable. */
+.plasma-footer {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+.plasma-reload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-dim);
+  background: oklch(1 0 0 / 0.03);
+  cursor: pointer;
+  color: var(--fg-2);
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 6px;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.plasma-reload:hover:not(:disabled) {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: oklch(1 0 0 / 0.07);
+}
+.plasma-reload:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.plasma-reload.spinning {
+  animation: plasma-spin 0.8s linear infinite;
+}
+@keyframes plasma-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Traveling border shine on hover — the signature hover effect for every

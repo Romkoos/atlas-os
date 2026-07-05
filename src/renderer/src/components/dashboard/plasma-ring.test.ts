@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { animParams, piecewiseLerp, ringColor, ringNoise } from './plasma-ring'
+import {
+  animParams,
+  piecewiseLerp,
+  pulseStrength,
+  ringColor,
+  ringNoise,
+  typeColor,
+} from './plasma-ring'
+
+describe('pulseStrength', () => {
+  it('is zero at or below 50% and ramps to 1 at 100%', () => {
+    expect(pulseStrength(0)).toBe(0)
+    expect(pulseStrength(0.5)).toBe(0)
+    expect(pulseStrength(0.75)).toBeCloseTo(0.5)
+    expect(pulseStrength(1)).toBe(1)
+    expect(pulseStrength(1.2)).toBe(1)
+  })
+})
+
+describe('typeColor', () => {
+  it('returns distinct type-keyed colors for the weekly rings', () => {
+    expect(typeColor('week')).toBe('rgb(56,189,248)')
+    expect(typeColor('fable')).toBe('rgb(167,139,250)')
+    expect(typeColor('week')).not.toBe(typeColor('fable'))
+  })
+})
 
 describe('piecewiseLerp', () => {
   it('returns first stop value when t is below lower bound', () => {

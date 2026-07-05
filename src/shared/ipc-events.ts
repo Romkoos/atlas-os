@@ -34,6 +34,26 @@ export interface RateLimitInfo {
   rateLimitType?: string
 }
 
+// One subscription limit window (5h session, 7d week, 7d per-model) as shown in
+// the usage widget. `utilization` is a 0–1 fraction (may exceed 1 in overage);
+// `resetsAt` is epoch ms. `label` is a display string, e.g. 'session', 'week',
+// 'week · Fable'.
+export interface UsageWindow {
+  label: string
+  status: 'allowed' | 'allowed_warning' | 'rejected'
+  utilization: number
+  resetsAt?: number
+}
+
+// Full multi-window usage snapshot shown by the gauge, plus when it was captured.
+// `source` distinguishes a full `/usage` poll from a single-window live
+// rate_limit_event harvested during a chat run.
+export interface UsageSnapshot {
+  windows: UsageWindow[]
+  fetchedAt: number
+  source: 'poll' | 'event'
+}
+
 // Every chat event forwarded to the renderer is wrapped with a per-session
 // monotonic sequence number so a reattaching client can replay only the gap.
 export interface SeqEnvelope<E> {

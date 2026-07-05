@@ -138,17 +138,21 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
         })
       } else if (message.type === 'rate_limit_event') {
         const info = message.rate_limit_info
+        // The SDK reports resetsAt as Unix epoch SECONDS. Every downstream
+        // consumer (widget countdown, auto-continue backoff) treats it as ms,
+        // so normalize here at the single ingestion point.
+        const resetsAtMs = info.resetsAt != null ? info.resetsAt * 1000 : undefined
         opts.onRateLimit?.({
           status: info.status,
           utilization: info.utilization,
-          resetsAt: info.resetsAt,
+          resetsAt: resetsAtMs,
           rateLimitType: info.rateLimitType,
         })
         opts.emit({
           type: 'rate-limit',
           status: info.status,
           utilization: info.utilization,
-          resetsAt: info.resetsAt,
+          resetsAt: resetsAtMs,
           rateLimitType: info.rateLimitType,
         })
       } else if (message.type === 'result') {

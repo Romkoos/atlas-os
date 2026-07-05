@@ -50,6 +50,50 @@ describe('startResumableChat', () => {
     expect(events).toEqual([{ type: 'token', text: 'hi' }, { type: 'awaiting-input' }])
   })
 
+  it('normalizes SDK resetsAt from epoch seconds to ms on both emit and callback', async () => {
+    // The SDK reports resetsAt as Unix epoch SECONDS; all downstream consumers
+    // (widget countdown, auto-continue backoff) assume ms. Convert at the source.
+    const resetsAtSec = 1_751_000_000
+    queryMock.mockImplementation(() =>
+      fakeQuery([
+        {
+          type: 'rate_limit_event',
+          rate_limit_info: {
+            status: 'rejected',
+            utilization: 1.02,
+            resetsAt: resetsAtSec,
+            rateLimitType: 'five_hour',
+          },
+        },
+        { type: 'result', subtype: 'success' },
+      ]),
+    )
+    // biome-ignore lint/suspicious/noExplicitAny: collected events / callback info
+    const events: any[] = []
+    // biome-ignore lint/suspicious/noExplicitAny: captured callback info
+    let cbInfo: any
+    const run = startResumableChat({
+      sessionId: 'uuid-rl',
+      model: 'm',
+      cwd: '/repo',
+      allowedTools: [],
+      settingSources: ['user'],
+      env: {},
+      resume: false,
+      seed: 'go',
+      emit: (e) => events.push(e),
+      onRateLimit: (info) => {
+        cbInfo = info
+      },
+    })
+    await run.done
+    const emitted = events.find((e) => e.type === 'rate-limit')
+    expect(emitted.resetsAt).toBe(resetsAtSec * 1000)
+    expect(cbInfo.resetsAt).toBe(resetsAtSec * 1000)
+    // utilization is passed through unchanged (clamping is a presentation concern).
+    expect(cbInfo.utilization).toBe(1.02)
+  })
+
   it('passes options.resume when resuming with no seed', async () => {
     // biome-ignore lint/suspicious/noExplicitAny: captured SDK arg
     let captured: any

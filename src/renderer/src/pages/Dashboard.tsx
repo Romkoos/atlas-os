@@ -14,6 +14,7 @@ import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
 import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
 import { UsagePlasmaWidget } from '@renderer/components/dashboard/UsagePlasmaWidget'
+import { WeeklyPlasmaWidget } from '@renderer/components/dashboard/WeeklyPlasmaWidget'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
@@ -129,8 +130,9 @@ function StatusRow() {
         </div>
       </div>
 
-      {/* ── Center: Plasma Ring ─────────────────────────────────────────────── */}
+      {/* ── Center: session (5h) + weekly (7d) plasma rings ─────────────────── */}
       <UsagePlasmaWidget />
+      <WeeklyPlasmaWidget />
 
       {/* ── Right stack: SESSIONS 30D + AGENT RUNS ─────────────────────────── */}
       <div className="kpis-hero-side">

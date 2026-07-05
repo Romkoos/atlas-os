@@ -65,6 +65,15 @@ const GLOW_STOPS: [number, number][] = [
   [1, 1.0],
 ]
 
+/**
+ * How strongly a ring should pulse, 0–1. Pulsation only appears above 50%
+ * utilization and ramps to full at 100% — calmer rings stay steady.
+ */
+export function pulseStrength(utilization: number): number {
+  if (utilization <= 0.5) return 0
+  return Math.min(1, (utilization - 0.5) / 0.5)
+}
+
 /** Continuously-interpolated animation parameters for a given utilization (0–1). */
 export function animParams(utilization: number): AnimParams {
   return {
@@ -103,6 +112,17 @@ export function ringColor(utilization: number, status: string): string {
   const rgb =
     u <= 0.75 ? lerpRgb(C_GOOD, C_WARN, u / 0.75) : lerpRgb(C_WARN, C_BAD, (u - 0.75) / 0.25)
   return `rgb(${rgb.map(Math.round).join(',')})`
+}
+
+// Type-keyed colors for the weekly widget's two concentric rings. Unlike the
+// session ring (amber→red by utilization), these encode the *window type* so the
+// two rings are visually distinct: week (all models) = sky, week (Fable) = violet.
+const C_WEEK: [number, number, number] = [56, 189, 248]
+const C_FABLE: [number, number, number] = [167, 139, 250]
+
+export function typeColor(type: 'week' | 'fable'): string {
+  const c = type === 'fable' ? C_FABLE : C_WEEK
+  return `rgb(${c.join(',')})`
 }
 
 // ── Noise ─────────────────────────────────────────────────────────────────────
