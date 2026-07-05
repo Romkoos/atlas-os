@@ -37,8 +37,12 @@ export function UsagePlasmaWidget() {
   }, [])
 
   const info = snap?.info ?? null
-  const isIdle = info === null
-  const util = info?.utilization ?? 0
+  // utilization is optional in SDKRateLimitInfo — treat its absence the same as
+  // info === null (no data yet). Mapping undefined → 0 would show a broken "0%"
+  // with an empty ring arc instead of the intended idle animation.
+  const rawUtil = info?.utilization
+  const isIdle = info === null || rawUtil === undefined
+  const util = rawUtil ?? 0
   const status = info?.status ?? 'allowed'
   const tone = gaugeTone(util, status)
   const remaining = info?.resetsAt != null ? info.resetsAt - now : null
