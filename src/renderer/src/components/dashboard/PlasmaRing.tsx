@@ -165,7 +165,10 @@ export function PlasmaRing({ utilization, status, isIdle, width, height }: Plasm
           const maxAngle = util * Math.PI * 2
           for (const p of state.particles) {
             p.angle += params.particleSpeed * TRAIL_SPEED * dt
-            if (p.angle > maxAngle) p.angle = 0
+            if (p.angle > maxAngle) {
+              p.angle = 0
+              p.trail.length = 0
+            }
 
             const absAngle = startAngle + p.angle
 

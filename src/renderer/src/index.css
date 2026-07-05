@@ -2558,6 +2558,7 @@
 .plasma-widget {
   position: relative;
   min-height: 220px;
+  min-width: 0;
   background: var(--bg);
   display: flex;
   align-items: stretch;
