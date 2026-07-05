@@ -108,4 +108,26 @@ describe('ChatSessionRegistry auto-continue', () => {
       message: 'Chat run failed and cannot be resumed',
     })
   })
+
+  it('nudgeStalled rebuilds any run still in the running state (system-wake nudge)', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    reg.open(
+      {
+        sessionId: 's5',
+        lastSeq: 0,
+        kickoff: 'do the thing',
+        resumable: true,
+        continuationKind: 'worker',
+        buildRun: f.buildRun,
+      },
+      () => {},
+    )
+    // Still "running" (no awaiting-input/done/error yet) — as if the stream died
+    // silently during sleep without tripping the stall watchdog.
+    expect(f.builds.length).toBe(1)
+    reg.nudgeStalled()
+    expect(f.builds.length).toBe(2)
+    expect(f.builds[1].resume).toBe(true)
+  })
 })

@@ -238,6 +238,17 @@ export class ChatSessionRegistry {
     return Boolean(record)
   }
 
+  // Called on OS wake: a run that was mid-turn when the machine slept may have a
+  // dead stream that has not yet tripped the 90s watchdog. autoContinue() already
+  // disposes the superseded run silently before rebuilding, so no separate
+  // cancel() here — calling cancel() first would also emit a spurious `aborted`
+  // that re-enters handle() and could double-trigger the continuation.
+  nudgeStalled(): void {
+    for (const record of this.records.values()) {
+      if (record.status === 'running') this.autoContinue(record)
+    }
+  }
+
   cancel(sessionId: string): boolean {
     const record = this.records.get(sessionId)
     if (record) {
