@@ -5,6 +5,8 @@ import { buildMenu } from '@main/menu'
 import { appPaths } from '@main/paths'
 import { applySecurity } from '@main/security'
 import { chatRegistry } from '@main/services/chat/registry'
+import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
+import { startUsagePolling } from '@main/services/chat/usagePoll'
 import { ingestAll } from '@main/services/productivity/ingest'
 import {
   backfillRoadmapClaudePrompts,
@@ -57,6 +59,11 @@ app
     buildMenu(win)
 
     ingestProductivity()
+
+    // Keep the usage gauge populated at rest: poll the subscription usage endpoint
+    // (same data as the CLI's `/usage`) so the widget shows real limits without
+    // waiting for a chat run's intermittent rate_limit_event.
+    startUsagePolling((windows) => subscriptionUsage.updateFromPoll(windows, Date.now()))
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

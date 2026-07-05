@@ -12,8 +12,9 @@ import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
-import { SubscriptionWidget } from '@renderer/components/dashboard/SubscriptionWidget'
 import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
+import { UsagePlasmaWidget } from '@renderer/components/dashboard/UsagePlasmaWidget'
+import { WeeklyPlasmaWidget } from '@renderer/components/dashboard/WeeklyPlasmaWidget'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
@@ -98,49 +99,59 @@ function StatusRow() {
   const trend = byDay.length >= 2 ? byDay[byDay.length - 1].kpiSmooth - byDay[0].kpiSmooth : null
 
   return (
-    <div className="kpis bento">
-      <div className="kpi hero">
-        <div className="label">
-          <span className="id">[01]</span>TODAY TOKENS
+    <div className="kpis-hero">
+      {/* ── Left stack: TODAY TOKENS + TOKEN EFFICIENCY ────────────────────── */}
+      <div className="kpis-hero-side">
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[01]</span>TODAY TOKENS
+          </div>
+          <div className="val amber">{t ? <Ticker value={t.totalTokens} /> : '—'}</div>
+          <div className="delta">
+            {t ? `${num(t.turns)} turns · ${num(t.activeHours)} active hrs` : 'no activity yet'}
+          </div>
         </div>
-        <div className="val">{t ? <Ticker value={t.totalTokens} /> : '—'}</div>
-        <div className="delta">
-          {t ? `${num(t.turns)} turns · ${num(t.activeHours)} active hrs` : 'no activity yet'}
+
+        <div className="kpi" style={{ position: 'relative' }}>
+          <div
+            className="fx-gauge"
+            style={{ '--val': Math.max(0, Math.min(140, kpi.data?.overall ?? 0)) } as CSSProperties}
+            aria-hidden
+          />
+          <div className="label">
+            <span className="id">[02]</span>TOKEN EFFICIENCY
+          </div>
+          <div className="val amber">{pct(kpi.data?.overall)}</div>
+          <div className={`delta${trend == null ? '' : trend >= 0 ? ' up' : ' dn'}`}>
+            {trend == null
+              ? 'vs baseline'
+              : `${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(0)} pts · 30d`}
+          </div>
         </div>
       </div>
 
-      <div className="kpi wide">
-        <div
-          className="fx-gauge"
-          style={{ '--val': Math.max(0, Math.min(140, kpi.data?.overall ?? 0)) } as CSSProperties}
-          aria-hidden
-        />
-        <div className="label">
-          <span className="id">[02]</span>TOKEN EFFICIENCY
-        </div>
-        <div className="val amber">{pct(kpi.data?.overall)}</div>
-        <div className={`delta${trend == null ? '' : trend >= 0 ? ' up' : ' dn'}`}>
-          {trend == null
-            ? 'vs baseline'
-            : `${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(0)} pts · 30d`}
-        </div>
-      </div>
+      {/* ── Center: session (5h) + weekly (7d) plasma rings ─────────────────── */}
+      <UsagePlasmaWidget />
+      <WeeklyPlasmaWidget />
 
-      <div className="kpi">
-        <div className="label">
-          <span className="id">[03]</span>SESSIONS · 30D
+      {/* ── Right stack: SESSIONS 30D + AGENT RUNS ─────────────────────────── */}
+      <div className="kpis-hero-side">
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[03]</span>SESSIONS · 30D
+          </div>
+          <div className="val">{kpi.data ? <Ticker value={sessions30d} /> : '—'}</div>
+          <div className="delta">{kpi.data ? `${compact(tokens30d)} tokens` : 'last 30 days'}</div>
         </div>
-        <div className="val">{kpi.data ? <Ticker value={sessions30d} /> : '—'}</div>
-        <div className="delta">{kpi.data ? `${compact(tokens30d)} tokens` : 'last 30 days'}</div>
-      </div>
 
-      <div className="kpi">
-        <div className="label">
-          <span className="id">[04]</span>AGENT RUNS
-        </div>
-        <div className="val">{summary.data ? <Ticker value={summary.data.total} /> : '—'}</div>
-        <div className="delta">
-          {summary.data ? `avg ${fmtDuration(summary.data.avgDurationMs)}` : 'all time'}
+        <div className="kpi">
+          <div className="label">
+            <span className="id">[04]</span>AGENT RUNS
+          </div>
+          <div className="val">{summary.data ? <Ticker value={summary.data.total} /> : '—'}</div>
+          <div className="delta">
+            {summary.data ? `avg ${fmtDuration(summary.data.avgDurationMs)}` : 'all time'}
+          </div>
         </div>
       </div>
     </div>
@@ -462,22 +473,19 @@ export function Dashboard() {
             <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
               <BenchmarkWidget />
             </div>
-            <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
-              <SubscriptionWidget />
-            </div>
           </div>
         </div>
 
         <div className="dash-mid mt-16">
-          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
             <ActivityPanel />
           </div>
-          <div className="dash-reveal" style={{ '--i': 9 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
             <SignalsPanel />
           </div>
         </div>
 
-        <div className="dash-reveal mt-16" style={{ '--i': 10 } as CSSProperties}>
+        <div className="dash-reveal mt-16" style={{ '--i': 9 } as CSSProperties}>
           <ProcessesStrip />
         </div>
 

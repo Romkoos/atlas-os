@@ -85,7 +85,7 @@ export const roadmapChatRouter = router({
                 seed,
                 resume,
                 resumeMessage,
-                onRateLimit: (info) => subscriptionUsage.update(info),
+                onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
                 emit: (event) => {
                   if (event.type === 'done') job.finish('done')
                   if (event.type === 'error' || event.type === 'aborted') job.finish('error')
