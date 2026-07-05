@@ -1,6 +1,15 @@
 # Subscription Usage Gauge — Design Spec
 _2026-07-04_
 
+> **⚠️ SUPERSEDED (2026-07-05)** by
+> [`2026-07-05-durable-chat-runs-design.md`](2026-07-05-durable-chat-runs-design.md).
+> The gauge is folded into the larger "durable chat runs" feature. Its **data
+> layer is replaced**: instead of summing the local `agentTurns` table against a
+> hardcoded plan limit (an estimate that misses non-Atlas usage), the gauge now
+> reads the SDK's authoritative `rate_limit_event` (`utilization` + `resetsAt` +
+> `rateLimitType`). The plan-limit lookup below survives only as a display label
+> / fallback. The visual gauge spec below is still a useful reference.
+
 ## Goal
 
 Add a real-time radial arc gauge to the dashboard KPI row that shows how much of the user's Claude subscription has been consumed in the current 5-hour rolling window, and how long until that window resets.

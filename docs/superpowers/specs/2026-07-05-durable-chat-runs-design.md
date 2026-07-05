@@ -124,6 +124,10 @@ single `query()`, and auto-restarts + re-issues the work on an unexpected stop.
   - `SubscriptionWidget.tsx` on the Dashboard `.dash-rail` — a utilization gauge
     (green / amber / red by `status`), "resets in 2h 14m" countdown, and
     `rateLimitType` label. Shows "Paused — resuming in Xm" when a run is `limited`.
+    **Reuse the worker's already-designed visuals** (270° SVG arc, `HH:MM:SS`
+    client-side countdown, `pulse-glow` at high fill) from
+    `2026-07-04-subscription-usage-gauge-design.md` — only the data source
+    changes (SDK `utilization`/`resetsAt` in place of local-turn summation).
   - Compact inline chip in `ProcessesStrip.tsx` / chat header for the transient
     run states: `reconnecting`, `limited — resumes in Xm`, `resuming`.
   - `Settings.tsx` plan picker (+ custom limit field) using the existing form.

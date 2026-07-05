@@ -1,5 +1,11 @@
 # Subscription Usage Gauge — Implementation Plan
 
+> **⚠️ SUPERSEDED (2026-07-05)** — do NOT execute this plan. The gauge is folded
+> into the "durable chat runs" feature; its data layer changed from local-turn
+> summation to the SDK's `rate_limit_event`. See
+> [`../specs/2026-07-05-durable-chat-runs-design.md`](../specs/2026-07-05-durable-chat-runs-design.md);
+> a fresh implementation plan supersedes this one.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a radial arc gauge to the dashboard KPI row showing real-time Claude subscription token usage for the current 5-hour rolling window, with a live countdown to reset.
