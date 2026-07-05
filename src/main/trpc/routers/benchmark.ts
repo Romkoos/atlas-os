@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { db } from '@main/db/client'
 import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
+import { repoRoot } from '@main/paths'
 import { buildAbSlice, rowToRawRun, summarizeRuns } from '@main/services/benchmark/aggregate'
 import { runAnalysis } from '@main/services/benchmark/analysis'
 import { getLatest, getProgress, startBatch } from '@main/services/benchmark/batch'
@@ -15,7 +16,6 @@ import { TASKS } from '@main/services/benchmark/tasks'
 import { jobRegistry, trackJob } from '@main/services/jobs/registry'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import { desc } from 'drizzle-orm'
-import { app } from 'electron'
 import { z } from 'zod'
 
 const deltaShape = z.object({
@@ -229,7 +229,7 @@ export const benchmarkRouter = router({
           ? await trackJob(
               jobRegistry,
               { kind: 'benchmark.analyze', label: 'Benchmark analysis', model: newest.model },
-              runAnalysis({ slice, model: newest.model, repoRoot: app.getAppPath() }),
+              runAnalysis({ slice, model: newest.model, repoRoot: repoRoot() }),
             )
           : null
       db()

@@ -1,3 +1,4 @@
+import { repoRoot } from '@main/paths'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
 import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
@@ -9,7 +10,6 @@ import { publicProcedure, router } from '@main/trpc/trpc'
 import type { BaseChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { CLAUDE_MODEL_IDS, DEFAULT_MODEL_ID } from '@shared/models'
 import { observable } from '@trpc/server/observable'
-import { app } from 'electron'
 import { z } from 'zod'
 
 const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
@@ -28,7 +28,7 @@ export const generalChatRouter = router({
     .subscription(({ input }) =>
       observable<SeqEnvelope<BaseChatEvent>>((emit) => {
         const model = input.model ?? getSettings().model ?? DEFAULT_MODEL_ID
-        const repoRoot = app.getAppPath()
+        const cwd = repoRoot()
         return chatRegistry.open(
           {
             sessionId: input.sessionId,
@@ -47,7 +47,7 @@ export const generalChatRouter = router({
               return startResumableChat({
                 sessionId: input.sessionId,
                 model,
-                cwd: repoRoot,
+                cwd,
                 allowedTools: CHAT_TOOLS,
                 settingSources: ['user', 'project'],
                 env: subscriptionEnv(),

@@ -1,5 +1,6 @@
 import { db } from '@main/db/client'
 import { logger } from '@main/logger'
+import { repoRoot } from '@main/paths'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
 import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
@@ -15,7 +16,6 @@ import type { RoadmapChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { DEFAULT_MODEL_ID } from '@shared/models'
 import { parseRoadmapProposal } from '@shared/roadmap'
 import { observable } from '@trpc/server/observable'
-import { app } from 'electron'
 import { z } from 'zod'
 
 const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
@@ -33,7 +33,7 @@ export const roadmapChatRouter = router({
     .subscription(({ input }) =>
       observable<SeqEnvelope<RoadmapChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
-        const repoRoot = app.getAppPath()
+        const cwd = repoRoot()
         return chatRegistry.open(
           {
             sessionId: input.sessionId,
@@ -67,7 +67,7 @@ export const roadmapChatRouter = router({
               }
               let seed: string | undefined
               if (kickoff) {
-                const graphContext = getSubgraphContext(loadGraph(db(), repoRoot), {
+                const graphContext = getSubgraphContext(loadGraph(db(), cwd), {
                   query: kickoff,
                   depth: 1,
                   budget: 1000,
@@ -78,7 +78,7 @@ export const roadmapChatRouter = router({
               return startResumableChat({
                 sessionId: input.sessionId,
                 model,
-                cwd: repoRoot,
+                cwd,
                 allowedTools: CHAT_TOOLS,
                 settingSources: ['user', 'project'],
                 env: subscriptionEnv(),
