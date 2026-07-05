@@ -8,6 +8,8 @@ import {
   GALAXY_EDGE_STYLES,
   type GalaxyEdgeStyle,
   LOG_LEVELS,
+  SUBSCRIPTION_PLANS,
+  type SubscriptionPlan,
   settingsSchema,
   THEMES,
 } from '@shared/settings'
@@ -169,6 +171,83 @@ function GraphSettingsCard() {
             }))}
           />
         </div>
+      </div>
+    </div>
+  )
+}
+
+const SUBSCRIPTION_PLAN_LABELS: Record<SubscriptionPlan, string> = {
+  pro: 'Pro',
+  max5x: 'Max 5×',
+  max20x: 'Max 20×',
+  custom: 'Custom',
+}
+
+// Labels the usage gauge and (for Custom) sets a fallback token budget until
+// the SDK reports live utilization. Saves immediately on change, same as
+// GraphSettingsCard above.
+function SubscriptionCard() {
+  const utils = trpc.useUtils()
+  const settingsQuery = trpc.settings.get.useQuery()
+  const setMutation = trpc.settings.set.useMutation({
+    onSuccess: () => {
+      void utils.settings.get.invalidate()
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const plan = settingsQuery.data?.subscriptionPlan ?? 'pro'
+
+  return (
+    <div className="panel mt-16">
+      <div className="panel-head">
+        <span className="ttl">claude subscription</span>
+        <span className="meta">usage gauge · plan</span>
+      </div>
+      <div className="panel-body">
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 12,
+            color: 'var(--fg-3)',
+            marginBottom: 12,
+          }}
+        >
+          Live usage comes from Claude; the plan labels the gauge and sets a fallback limit.
+        </div>
+        <div className="label-block" style={{ maxWidth: 420 }}>
+          <label htmlFor="settings-subscriptionPlan">subscription plan</label>
+          <TermSelect
+            id="settings-subscriptionPlan"
+            value={plan}
+            onValueChange={(next) =>
+              setMutation.mutate({ subscriptionPlan: next as SubscriptionPlan })
+            }
+            style={{ width: '100%' }}
+            options={SUBSCRIPTION_PLANS.map((p) => ({
+              value: p,
+              label: SUBSCRIPTION_PLAN_LABELS[p],
+            }))}
+          />
+        </div>
+        {plan === 'custom' ? (
+          <div className="label-block" style={{ maxWidth: 420 }}>
+            <label htmlFor="settings-subscriptionLimitCustom">token limit / 5h window</label>
+            <input
+              id="settings-subscriptionLimitCustom"
+              type="number"
+              className="input"
+              style={{ width: '100%', fontFamily: 'var(--mono)', padding: '8px 10px' }}
+              value={settingsQuery.data?.subscriptionLimitCustom ?? 50000}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10)
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  setMutation.mutate({ subscriptionLimitCustom: parsed })
+                }
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -487,6 +566,8 @@ export function Settings() {
         <TrackedProjectsCard />
 
         <GraphSettingsCard />
+
+        <SubscriptionCard />
 
         {/* HOTKEYS */}
         <div className="panel mt-16">
