@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { db } from '@main/db/client'
 import { benchmarkAnalysis, benchmarkRuns } from '@main/db/schema'
-import { appPaths } from '@main/paths'
+import { appPaths, repoRoot as resolveRepoRoot } from '@main/paths'
 import { buildAbSlice, rowToRawRun, summarizeRuns } from '@main/services/benchmark/aggregate'
 import { runAnalysis } from '@main/services/benchmark/analysis'
 import { infraFingerprint } from '@main/services/benchmark/fingerprint'
@@ -14,7 +14,7 @@ import type { BenchmarkTask } from '@main/services/benchmark/types'
 import { type JobHandle, jobRegistry } from '@main/services/jobs/registry'
 import { readInfraState } from '@main/services/productivity/infra'
 import { eq } from 'drizzle-orm'
-import { app, Notification } from 'electron'
+import { Notification } from 'electron'
 
 const DEFAULT_K = 5
 const DEFAULT_MODEL = 'claude-sonnet-5'
@@ -88,7 +88,7 @@ async function runLoop(
   try {
     const pushDetail = () =>
       job.update({ detail: `${progress.done}/${progress.total} · ${progress.phase}` })
-    const repoRoot = app.getAppPath()
+    const repoRoot = resolveRepoRoot()
     const commit = repoCommit(repoRoot)
     const p = appPaths()
     const infra = await readInfraState({

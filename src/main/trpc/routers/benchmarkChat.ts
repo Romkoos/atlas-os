@@ -1,6 +1,7 @@
 // src/main/trpc/routers/benchmarkChat.ts
 import { db } from '@main/db/client'
 import { benchmarkAnalysis } from '@main/db/schema'
+import { repoRoot } from '@main/paths'
 import { buildChatSeed } from '@main/services/benchmarkChat/seed'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
@@ -13,7 +14,6 @@ import type { BenchmarkChatEvent, SeqEnvelope } from '@shared/ipc-events'
 import { DEFAULT_MODEL_ID } from '@shared/models'
 import { observable } from '@trpc/server/observable'
 import { eq } from 'drizzle-orm'
-import { app } from 'electron'
 import { z } from 'zod'
 
 const CHAT_TOOLS = ['Read', 'Grep', 'Glob']
@@ -43,7 +43,7 @@ export const benchmarkChatRouter = router({
     .subscription(({ input }) =>
       observable<SeqEnvelope<BenchmarkChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
-        const repoRoot = app.getAppPath()
+        const cwd = repoRoot()
         return chatRegistry.open(
           {
             sessionId: input.sessionId,
@@ -76,7 +76,7 @@ export const benchmarkChatRouter = router({
               return startResumableChat({
                 sessionId: input.sessionId,
                 model,
-                cwd: repoRoot,
+                cwd,
                 allowedTools: CHAT_TOOLS,
                 settingSources: ['user', 'project'],
                 env: subscriptionEnv(),
