@@ -11,7 +11,15 @@ export type ChatEntry =
       status: 'running' | 'done' | 'error'
       resultText?: string
     }
-export type ChatStatus = 'idle' | 'running' | 'awaiting' | 'done' | 'error' | 'aborted'
+export type ChatStatus =
+  | 'idle'
+  | 'running'
+  | 'awaiting'
+  | 'reconnecting'
+  | 'limited'
+  | 'done'
+  | 'error'
+  | 'aborted'
 
 export interface BaseChatRunState {
   sessionId: string | null
@@ -30,6 +38,9 @@ export interface BaseChatRunState {
   pushUserReply: (text: string) => void
   flushTurn: () => void
   setAwaiting: (v: boolean) => void
+  setReconnecting: () => void
+  setLimited: (resumesInMs?: number) => void
+  setResuming: () => void
   bumpSeq: (seq: number) => void
   finish: (status: 'done' | 'error' | 'aborted') => void
   reset: () => void
@@ -137,6 +148,9 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             awaitingInput: false,
           })),
         setAwaiting: (v) => set({ awaitingInput: v, status: v ? 'awaiting' : 'running' }),
+        setReconnecting: () => set({ status: 'reconnecting', awaitingInput: false, running: true }),
+        setLimited: () => set({ status: 'limited', awaitingInput: false, running: true }),
+        setResuming: () => set({ status: 'running', awaitingInput: false, running: true }),
         bumpSeq: (seq) => set((s) => ({ lastSeq: Math.max(s.lastSeq, seq) })),
         finish: (status) =>
           set((s) => ({
