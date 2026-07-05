@@ -5,6 +5,7 @@ import { trpc } from '@renderer/lib/trpc'
 import { Graph3DBoundary } from '@renderer/pages/knowledge/Graph3DBoundary'
 import { colorForNode } from '@renderer/pages/knowledge/graph-colors'
 import { communityKey, filterBySources } from '@renderer/pages/knowledge/source-filter'
+import { useBeamRoam } from '@renderer/store/beamRoam'
 import { useUiStore } from '@renderer/store/ui'
 import type { CodeGraphNode } from '@shared/graph'
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
@@ -25,6 +26,7 @@ export function GalaxyHero() {
   const graphSources = useUiStore((s) => s.graphSources)
   const graph = trpc.graph.getGraph.useQuery({ scope: '__all__' })
   const [failed, setFailed] = useState(false)
+  const beam = useBeamRoam((s) => s.active === 'graph')
 
   const enabled = useMemo(() => new Set(graphSources), [graphSources])
   const data = useMemo(() => {
@@ -67,7 +69,7 @@ export function GalaxyHero() {
 
   return (
     <div className="panel galaxy-hero">
-      <BorderBeam />
+      {beam && <BorderBeam />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="atlas graph" />
@@ -94,10 +96,6 @@ export function GalaxyHero() {
           </div>
         )}
         <div className="galaxy-hud" aria-hidden>
-          <span className="corner tl" />
-          <span className="corner tr" />
-          <span className="corner bl" />
-          <span className="corner br" />
           <div className="galaxy-reticle" />
           <div className="galaxy-scanline" />
           <div className="galaxy-readout">

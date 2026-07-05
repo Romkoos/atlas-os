@@ -2558,6 +2558,18 @@
   font-size: 36px;
 }
 
+/* The heatmap KPI tile hosts its grid below the label — flex so the grid tiles
+   the whole remaining tile height, matching the other tiles' framing exactly. */
+.kpi-heatmap {
+  display: flex;
+  flex-direction: column;
+}
+.kpi-heatmap .heatmap-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+}
+
 /* Center plasma ring container. */
 .plasma-widget {
   position: relative;
@@ -2763,6 +2775,9 @@
   pointer-events: none;
   position: absolute;
   inset: 0;
+  /* Ride above panel content so the travelling light stays visible along the
+     border edge. Masked to the 1px ring only. */
+  z-index: 4;
   border: 1px solid transparent;
   mask-image: linear-gradient(transparent, transparent), linear-gradient(#000, #000);
   mask-clip: padding-box, border-box;
@@ -2771,14 +2786,31 @@
 .fx-border-beam {
   position: absolute;
   aspect-ratio: 1;
-  animation: fx-beam 5s linear infinite;
+  /* Intermittent lightning pass: sprint the full border in the first ~10% of the
+     cycle, then stay invisible until the next one — one quick lap per duration. */
+  animation:
+    fx-beam 5s linear infinite,
+    fx-beam-flash 5s linear infinite;
 }
 @keyframes fx-beam {
-  from {
+  0% {
     offset-distance: 0%;
   }
-  to {
+  10% {
     offset-distance: 100%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+@keyframes fx-beam-flash {
+  0%,
+  10% {
+    opacity: 1;
+  }
+  13%,
+  100% {
+    opacity: 0;
   }
 }
 
@@ -4528,7 +4560,9 @@ textarea.input:focus,
    on the whole canvas — the graph is a poster, not a control. */
 .galaxy-hero {
   position: relative;
-  overflow: hidden;
+  /* No overflow:hidden here — it would clip the panel's own corner reticle
+     (.panel::before, inset -1px). The canvas below clips the 3D scene instead,
+     so the graph's framing matches the neighbouring panels exactly. */
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -4564,37 +4598,6 @@ textarea.input:focus,
   inset: 10px;
   z-index: 2;
   font-family: var(--mono);
-}
-.galaxy-hud .corner {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  border: 0 solid var(--amber-dim);
-  opacity: 0.9;
-}
-.galaxy-hud .tl {
-  top: 0;
-  left: 0;
-  border-top-width: 1px;
-  border-left-width: 1px;
-}
-.galaxy-hud .tr {
-  top: 0;
-  right: 0;
-  border-top-width: 1px;
-  border-right-width: 1px;
-}
-.galaxy-hud .bl {
-  bottom: 0;
-  left: 0;
-  border-bottom-width: 1px;
-  border-left-width: 1px;
-}
-.galaxy-hud .br {
-  bottom: 0;
-  right: 0;
-  border-bottom-width: 1px;
-  border-right-width: 1px;
 }
 .galaxy-reticle {
   position: absolute;
@@ -4702,6 +4705,10 @@ textarea.input:focus,
   font-family: var(--mono);
   font-size: 12px;
   color: var(--fg-2);
+}
+/* The last row closes the list — no trailing divider under it. */
+.nextup-lists .nextup-row:last-child {
+  border-bottom: 0;
 }
 .nextup-row:hover .nextup-title {
   color: var(--amber);
@@ -4935,12 +4942,12 @@ textarea.input:focus,
 }
 
 /* dashboard layout */
-/* Hero band: galaxy square (fixed, sets the band height) · a WIDE NEXT UP · a
-   narrow rail of three stacked widgets. All three columns stretch to the same
+/* Hero band: galaxy square (fixed, sets the band height) · NEXT UP · signals.
+   NEXT UP and signals share equal width; all three columns stretch to the same
    height with aligned bottoms — no ragged empty space below the short ones. */
 .dash-hero-row {
   display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) minmax(240px, 300px);
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -4948,44 +4955,28 @@ textarea.input:focus,
   min-width: 0;
   min-height: 0;
 }
-/* Galaxy (first child) is a self-sizing square; NEXT UP fills the row height. */
-.dash-hero-row > .dash-reveal:nth-child(2) .panel {
+/* Galaxy (first child) is a self-sizing square; NEXT UP + signals fill the row. */
+.dash-hero-row > .dash-reveal:nth-child(2) .panel,
+.dash-hero-row > .dash-reveal:nth-child(3) .panel {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
-.dash-hero-row > .dash-reveal:nth-child(2) .panel-body {
+.dash-hero-row > .dash-reveal:nth-child(2) .panel-body,
+.dash-hero-row > .dash-reveal:nth-child(3) .panel-body {
   flex: 1 1 auto;
   min-height: 0;
-}
-.dash-rail {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  min-height: 0;
-}
-.dash-rail > .dash-reveal {
-  min-height: 0;
-}
-/* Rail widgets fill their equal thirds; the body flexes so the heatmap can tile
-   the full area and the stat widgets center vertically. */
-.dash-rail .panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.dash-rail .panel-body {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.dash-rail .dash-widget:not(.dash-widget-heatmap) .panel-body {
-  justify-content: center;
 }
 .dash-mid {
   display: grid;
-  grid-template-columns: 2fr minmax(0, 1fr);
+  /* Same tracks as the hero row so PROCESSES lines up under — and matches the
+     width of — SIGNALS; ACTIVITY spans the galaxy + next-up columns. */
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
+}
+.dash-mid > .dash-reveal:first-child {
+  grid-column: 1 / 3;
 }
 .dash-mid > .dash-reveal .panel {
   height: 100%;
@@ -4999,22 +4990,15 @@ textarea.input:focus,
   .dash-hero-row {
     grid-template-columns: 1fr;
   }
-  .dash-hero-row > .dash-reveal:nth-child(2) .panel {
+  .dash-hero-row > .dash-reveal:nth-child(2) .panel,
+  .dash-hero-row > .dash-reveal:nth-child(3) .panel {
     height: auto;
-  }
-  .dash-rail {
-    grid-template-rows: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
   }
   .dash-mid {
     grid-template-columns: 1fr;
   }
-}
-@media (max-width: 780px) {
-  .dash-rail {
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
+  .dash-mid > .dash-reveal:first-child {
+    grid-column: auto;
   }
 }
 

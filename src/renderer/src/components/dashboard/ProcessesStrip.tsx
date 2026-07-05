@@ -1,7 +1,9 @@
 import { compact } from '@renderer/components/dashboard/dash-utils'
+import { BorderBeam } from '@renderer/components/fx/BorderBeam'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { formatDuration, useJobs } from '@renderer/hooks/useJobs'
 import { trpc } from '@renderer/lib/trpc'
+import { useBeamRoam } from '@renderer/store/beamRoam'
 import type { JobView } from '@shared/jobs'
 import { useState } from 'react'
 
@@ -12,9 +14,11 @@ export function ProcessesStrip() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const cancel = trpc.jobs.cancel.useMutation()
   const reveal = trpc.jobs.reveal.useMutation()
+  const beam = useBeamRoam((s) => s.active === 'processes')
 
   return (
     <div className="panel">
+      {beam && <BorderBeam />}
       <div className="panel-head">
         <span className="ttl">
           <ScrambleText text="processes" />
