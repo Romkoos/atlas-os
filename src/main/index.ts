@@ -4,6 +4,7 @@ import { initLogger, logger } from '@main/logger'
 import { buildMenu } from '@main/menu'
 import { appPaths } from '@main/paths'
 import { applySecurity } from '@main/security'
+import { chatRegistry } from '@main/services/chat/registry'
 import { ingestAll } from '@main/services/productivity/ingest'
 import {
   backfillRoadmapClaudePrompts,
@@ -13,7 +14,7 @@ import {
 import { getSettings, initStore } from '@main/store'
 import { registerTrpcIpc } from '@main/trpc/ipc'
 import { createMainWindow } from '@main/window'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, powerMonitor } from 'electron'
 
 // Productivity tracker: pull the latest transcripts + hook buffer into the DB.
 // Fire-and-forget so a slow/large scan never blocks the window.
@@ -37,6 +38,10 @@ app
     const settings = getSettings()
     initLogger(settings.logLevel)
     logger.info('Atlas OS starting', { version: app.getVersion() })
+
+    // After the machine wakes, re-establish any chat run whose stream died during
+    // sleep instead of waiting for the per-run stall watchdog.
+    powerMonitor.on('resume', () => chatRegistry.nudgeStalled())
 
     initDb()
     runMigrations()

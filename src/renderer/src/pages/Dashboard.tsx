@@ -12,6 +12,7 @@ import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
+import { SubscriptionWidget } from '@renderer/components/dashboard/SubscriptionWidget'
 import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
@@ -461,19 +462,22 @@ export function Dashboard() {
             <div className="dash-reveal" style={{ '--i': 6 } as CSSProperties}>
               <BenchmarkWidget />
             </div>
+            <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
+              <SubscriptionWidget />
+            </div>
           </div>
         </div>
 
         <div className="dash-mid mt-16">
-          <div className="dash-reveal" style={{ '--i': 7 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
             <ActivityPanel />
           </div>
-          <div className="dash-reveal" style={{ '--i': 8 } as CSSProperties}>
+          <div className="dash-reveal" style={{ '--i': 9 } as CSSProperties}>
             <SignalsPanel />
           </div>
         </div>
 
-        <div className="dash-reveal mt-16" style={{ '--i': 9 } as CSSProperties}>
+        <div className="dash-reveal mt-16" style={{ '--i': 10 } as CSSProperties}>
           <ProcessesStrip />
         </div>
 

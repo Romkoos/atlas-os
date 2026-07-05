@@ -4564,6 +4564,20 @@ textarea.input:focus,
   text-wrap: pretty;
 }
 
+/* High-fill pulse for the subscription gauge when utilization is critical. */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px var(--amber));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px var(--amber));
+  }
+}
+.dash-widget-big.bad {
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
 /* token heatmap */
 .heatmap-grid {
   display: grid;

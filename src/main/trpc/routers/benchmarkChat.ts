@@ -4,6 +4,7 @@ import { benchmarkAnalysis } from '@main/db/schema'
 import { buildChatSeed } from '@main/services/benchmarkChat/seed'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
+import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
 import { jobRegistry } from '@main/services/jobs/registry'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { getSettings } from '@main/store'
@@ -36,6 +37,7 @@ export const benchmarkChatRouter = router({
         lastSeq: z.number().int().nonnegative(),
         // kickoff is the batchId for a brand-new discussion; absent on resume.
         kickoff: z.string().min(1).optional(),
+        continueWork: z.boolean().optional(),
       }),
     )
     .subscription(({ input }) =>
@@ -48,7 +50,9 @@ export const benchmarkChatRouter = router({
             lastSeq: input.lastSeq,
             kickoff: input.kickoff,
             resumable: true,
-            buildRun: ({ resume, kickoff, push }) => {
+            continueWork: input.continueWork,
+            continuationKind: 'plain',
+            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
               const job = jobRegistry.register({
                 kind: 'benchmark.chat',
                 label: 'Benchmark chat',
@@ -61,7 +65,12 @@ export const benchmarkChatRouter = router({
                 if (!seed) {
                   push({ type: 'error', message: 'No analysis found for this batch' })
                   job.finish('error')
-                  return { reply: () => {}, cancel: () => {}, done: Promise.resolve() }
+                  return {
+                    reply: () => {},
+                    cancel: () => {},
+                    dispose: () => {},
+                    done: Promise.resolve(),
+                  }
                 }
               }
               return startResumableChat({
@@ -73,6 +82,8 @@ export const benchmarkChatRouter = router({
                 env: subscriptionEnv(),
                 seed,
                 resume,
+                resumeMessage,
+                onRateLimit: (info) => subscriptionUsage.update(info),
                 emit: (event) => {
                   if (event.type === 'done') job.finish('done')
                   if (event.type === 'error' || event.type === 'aborted') job.finish('error')

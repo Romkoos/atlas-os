@@ -8,6 +8,7 @@ interface OpenInput {
   sessionId: string
   lastSeq: number
   kickoff?: string
+  continueWork?: boolean
 }
 
 interface OpenHandlers {
@@ -38,7 +39,14 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
     if (reattachedRef.current) return
     reattachedRef.current = true
     const s = useRun.getState()
-    if (s.sessionId && (s.status === 'running' || s.status === 'awaiting') && !s.running) {
+    if (
+      s.sessionId &&
+      (s.status === 'running' ||
+        s.status === 'awaiting' ||
+        s.status === 'reconnecting' ||
+        s.status === 'limited') &&
+      !s.running
+    ) {
       s.reattach()
     }
   }, [useRun])
@@ -52,7 +60,14 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
     const s = useRun.getState()
     // kickoff is only sent while the transcript is fresh (new session, seq 0).
     const isFreshStart = s.status === 'running' && s.lastSeq === 0
-    return { sessionId, lastSeq: s.lastSeq, kickoff: isFreshStart ? kickoff : undefined }
+    // A reattach whose last persisted status was mid-work should auto-continue.
+    const continueWork = !isFreshStart && s.status !== 'awaiting'
+    return {
+      sessionId,
+      lastSeq: s.lastSeq,
+      kickoff: isFreshStart ? kickoff : undefined,
+      continueWork,
+    }
   }, [running, sessionId, kickoff, useRun])
 
   useOpenSubscription(subInput, {
@@ -93,6 +108,20 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
           break
         case 'aborted':
           store.finish('aborted')
+          break
+        case 'reconnecting':
+          store.setReconnecting()
+          break
+        case 'rate-limit':
+          // Account-level info is cached in main for the gauge; nothing to do
+          // in the per-chat store beyond ignoring the informational event.
+          break
+        case 'limited':
+          store.flushTurn()
+          store.setLimited((e as { resumesInMs?: number }).resumesInMs)
+          break
+        case 'resuming':
+          store.setResuming()
           break
       }
       onEvent?.(event, useRun.getState())

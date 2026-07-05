@@ -1,5 +1,6 @@
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
+import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
 import { buildGeneralChatSeed } from '@main/services/generalChat/seed'
 import { jobRegistry } from '@main/services/jobs/registry'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
@@ -20,6 +21,7 @@ export const generalChatRouter = router({
         sessionId: z.string().uuid(),
         lastSeq: z.number().int().nonnegative(),
         kickoff: z.string().min(1).optional(),
+        continueWork: z.boolean().optional(),
       }),
     )
     .subscription(({ input }) =>
@@ -32,7 +34,9 @@ export const generalChatRouter = router({
             lastSeq: input.lastSeq,
             kickoff: input.kickoff,
             resumable: true,
-            buildRun: ({ resume, kickoff, push }) => {
+            continueWork: input.continueWork,
+            continuationKind: 'plain',
+            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
               const job = jobRegistry.register({
                 kind: 'general.chat',
                 label: 'General chat',
@@ -48,6 +52,8 @@ export const generalChatRouter = router({
                 env: subscriptionEnv(),
                 seed: kickoff ? buildGeneralChatSeed(kickoff) : undefined,
                 resume,
+                resumeMessage,
+                onRateLimit: (info) => subscriptionUsage.update(info),
                 emit: (event) => {
                   if (event.type === 'done') job.finish('done')
                   if (event.type === 'error' || event.type === 'aborted') job.finish('error')
