@@ -40,7 +40,10 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     build: {
       rollupOptions: {
-        input: { index: resolve('src/renderer/index.html') },
+        input: {
+          index: resolve('src/renderer/index.html'),
+          tray: resolve('src/renderer/tray.html'),
+        },
       },
     },
   },
