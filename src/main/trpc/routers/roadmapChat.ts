@@ -2,6 +2,7 @@ import { db } from '@main/db/client'
 import { logger } from '@main/logger'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
+import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
 import { getSubgraphContext } from '@main/services/graph/context'
 import { loadGraph } from '@main/services/graph/store'
 import { jobRegistry } from '@main/services/jobs/registry'
@@ -26,6 +27,7 @@ export const roadmapChatRouter = router({
         sessionId: z.string().uuid(),
         lastSeq: z.number().int().nonnegative(),
         kickoff: z.string().min(1).optional(),
+        continueWork: z.boolean().optional(),
       }),
     )
     .subscription(({ input }) =>
@@ -38,7 +40,9 @@ export const roadmapChatRouter = router({
             lastSeq: input.lastSeq,
             kickoff: input.kickoff,
             resumable: true,
-            buildRun: ({ resume, kickoff, push }) => {
+            continueWork: input.continueWork,
+            continuationKind: 'plain',
+            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
               const job = jobRegistry.register({
                 kind: 'roadmap.chat',
                 label: 'Roadmap idea chat',
@@ -80,6 +84,8 @@ export const roadmapChatRouter = router({
                 env: subscriptionEnv(),
                 seed,
                 resume,
+                resumeMessage,
+                onRateLimit: (info) => subscriptionUsage.update(info),
                 emit: (event) => {
                   if (event.type === 'done') job.finish('done')
                   if (event.type === 'error' || event.type === 'aborted') job.finish('error')

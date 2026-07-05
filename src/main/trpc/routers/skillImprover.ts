@@ -39,6 +39,7 @@ export const skillImproverRouter = router({
             // The improver owns a transactional workspace torn down on finalize;
             // it cannot be safely resumed after a full app restart.
             resumable: false,
+            continuationKind: 'plain',
             buildRun: ({ kickoff, push }) => {
               const skillId = kickoff as string // resumable:false blocks build without kickoff
               const job = jobRegistry.register({
@@ -79,6 +80,7 @@ export const skillImproverRouter = router({
               return {
                 reply: run.reply,
                 cancel: run.cancel,
+                dispose: () => {},
                 done: run.done.finally(() => improverControls.delete(input.sessionId)),
               }
             },

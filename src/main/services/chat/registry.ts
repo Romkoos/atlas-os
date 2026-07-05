@@ -20,6 +20,7 @@ interface SessionRecord {
   status: Status
   subscriber: Subscriber | null
   // Durable-run state.
+  resumable: boolean
   continuationKind: 'worker' | 'plain'
   buildRun: OpenParams['buildRun']
   userCancelled: boolean
@@ -79,6 +80,7 @@ export class ChatSessionRegistry {
       nextSeq: 1,
       status: 'running',
       subscriber: emit,
+      resumable: params.resumable,
       continuationKind: params.continuationKind,
       buildRun: params.buildRun,
       userCancelled: false,
@@ -150,6 +152,19 @@ export class ChatSessionRegistry {
       this.subscriberEmit(record, {
         type: 'error',
         message: 'Auto-continue gave up after repeated failures',
+      })
+      this.finalize(record, event)
+      return
+    }
+
+    // A non-resumable session type (e.g. the skill improver) cannot be safely
+    // rebuilt via buildRun — its build args require a kickoff that only exists on
+    // the very first open. Treat any unexpected/rate-limited stop as terminal
+    // instead of scheduling an auto-continue that would crash on rebuild.
+    if (!record.resumable) {
+      this.subscriberEmit(record, {
+        type: 'error',
+        message: 'Chat run failed and cannot be resumed',
       })
       this.finalize(record, event)
       return

@@ -85,4 +85,27 @@ describe('ChatSessionRegistry auto-continue', () => {
     f.push({ type: 'awaiting-input' })
     expect(f.builds.length).toBe(1)
   })
+
+  it('finalizes without rebuilding on an unexpected stop when resumable is false', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    const events: unknown[] = []
+    reg.open(
+      {
+        sessionId: 's4',
+        lastSeq: 0,
+        kickoff: 'skill-id',
+        resumable: false,
+        continuationKind: 'plain',
+        buildRun: f.buildRun,
+      },
+      (env) => events.push(env.event),
+    )
+    f.push({ type: 'error', message: 'Chat run failed: boom' })
+    expect(f.builds.length).toBe(1)
+    expect(events).toContainEqual({
+      type: 'error',
+      message: 'Chat run failed and cannot be resumed',
+    })
+  })
 })
