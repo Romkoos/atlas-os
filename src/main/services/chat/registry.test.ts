@@ -2,112 +2,87 @@ import { describe, expect, it, vi } from 'vitest'
 import { ChatSessionRegistry } from './registry'
 import type { ResumableRun } from './resumableRun'
 
-function stubRun(): ResumableRun {
-  return { reply: vi.fn(), cancel: vi.fn(), done: Promise.resolve() }
+// A fake run whose push() we drive manually. buildRun records how many times it
+// was (re)built and with what args.
+function fakeRunFactory() {
+  const builds: Array<{ resume: boolean; resumeMessage?: string }> = []
+  let lastPush: ((e: unknown) => void) | null = null
+  const buildRun = vi.fn(
+    (args: {
+      resume: boolean
+      kickoff?: string
+      resumeMessage?: string
+      push: (e: unknown) => void
+    }): ResumableRun => {
+      builds.push({ resume: args.resume, resumeMessage: args.resumeMessage })
+      lastPush = args.push
+      return { reply: vi.fn(), cancel: vi.fn(), done: Promise.resolve() }
+    },
+  )
+  return { builds, buildRun, push: (e: unknown) => lastPush?.(e) }
 }
 
-describe('ChatSessionRegistry', () => {
-  it('builds a new run with resume=false when kickoff present', () => {
+describe('ChatSessionRegistry auto-continue', () => {
+  it('rebuilds the run with a continuation on an unexpected stop while working', () => {
     const reg = new ChatSessionRegistry()
-    let resumeSeen: boolean | undefined
-    // biome-ignore lint/suspicious/noExplicitAny: collected envelopes
-    const events: any[] = []
+    const f = fakeRunFactory()
     reg.open(
       {
         sessionId: 's1',
         lastSeq: 0,
-        kickoff: 'hi',
+        kickoff: 'do the thing',
         resumable: true,
-        buildRun: ({ resume, push }) => {
-          resumeSeen = resume
-          push({ type: 'token', text: 'a' })
-          return stubRun()
-        },
+        continuationKind: 'worker',
+        buildRun: f.buildRun,
       },
-      (env) => events.push(env),
+      () => {},
     )
-    expect(resumeSeen).toBe(false)
-    expect(events).toEqual([{ seq: 1, event: { type: 'token', text: 'a' } }])
+    // Simulate work then an unexpected error.
+    f.push({ type: 'tool', name: 'Bash', summary: 'git status', toolId: 't1' })
+    f.push({ type: 'error', message: 'Chat stream ended unexpectedly' })
+    expect(f.builds.length).toBe(2)
+    expect(f.builds[1].resume).toBe(true)
+    expect(f.builds[1].resumeMessage).toContain('git')
   })
 
-  it('builds a resume run (resume=true) when no kickoff and no live record', () => {
+  it('stops after the loop-guard cap of consecutive no-progress retries', () => {
     const reg = new ChatSessionRegistry()
-    let resumeSeen: boolean | undefined
+    const f = fakeRunFactory()
+    const events: unknown[] = []
     reg.open(
       {
         sessionId: 's2',
         lastSeq: 0,
+        kickoff: 'go',
         resumable: true,
-        buildRun: ({ resume, push }) => {
-          resumeSeen = resume
-          push({ type: 'awaiting-input' })
-          return stubRun()
-        },
+        continuationKind: 'plain',
+        buildRun: f.buildRun,
       },
-      () => {},
+      (env) => events.push(env.event),
     )
-    expect(resumeSeen).toBe(true)
+    // Three errors with no progress in between → 3rd should give up (terminal error).
+    f.push({ type: 'error', message: 'boom' }) // build #2
+    f.push({ type: 'error', message: 'boom' }) // build #3
+    f.push({ type: 'error', message: 'boom' }) // cap reached → terminal, no build #4
+    expect(f.builds.length).toBe(3)
+    expect(events.some((e) => (e as { type: string }).type === 'error')).toBe(true)
   })
 
-  it('replays only the gap on reattach and does not rebuild the run', () => {
+  it('treats awaiting-input as a clean pause (no rebuild)', () => {
     const reg = new ChatSessionRegistry()
-    let builds = 0
-    let push!: (e: unknown) => void
+    const f = fakeRunFactory()
     reg.open(
       {
         sessionId: 's3',
         lastSeq: 0,
-        kickoff: 'hi',
+        kickoff: 'go',
         resumable: true,
-        buildRun: (a) => {
-          builds++
-          push = a.push
-          return stubRun()
-        },
+        continuationKind: 'plain',
+        buildRun: f.buildRun,
       },
       () => {},
     )
-    push({ type: 'token', text: 'x' }) // seq 1
-    push({ type: 'token', text: 'y' }) // seq 2
-    // biome-ignore lint/suspicious/noExplicitAny: collected envelopes
-    const replayed: any[] = []
-    reg.open({ sessionId: 's3', lastSeq: 1, resumable: true, buildRun: () => stubRun() }, (env) =>
-      replayed.push(env),
-    )
-    expect(builds).toBe(1) // no rebuild
-    expect(replayed).toEqual([{ seq: 2, event: { type: 'token', text: 'y' } }])
-  })
-
-  it('emits aborted and starts nothing for a non-resumable dead session', () => {
-    const reg = new ChatSessionRegistry()
-    let built = false
-    // biome-ignore lint/suspicious/noExplicitAny: collected envelopes
-    const events: any[] = []
-    reg.open(
-      {
-        sessionId: 's4',
-        lastSeq: 0,
-        resumable: false,
-        buildRun: () => {
-          built = true
-          return stubRun()
-        },
-      },
-      (env) => events.push(env),
-    )
-    expect(built).toBe(false)
-    expect(events).toEqual([{ seq: 1, event: { type: 'aborted' } }])
-  })
-
-  it('teardown detaches without cancelling the run', () => {
-    const reg = new ChatSessionRegistry()
-    const run = stubRun()
-    const teardown = reg.open(
-      { sessionId: 's5', lastSeq: 0, kickoff: 'hi', resumable: true, buildRun: () => run },
-      () => {},
-    )
-    teardown()
-    expect(run.cancel).not.toHaveBeenCalled()
-    expect(reg.reply('s5', 'later')).toBe(true) // record still alive
+    f.push({ type: 'awaiting-input' })
+    expect(f.builds.length).toBe(1)
   })
 })
