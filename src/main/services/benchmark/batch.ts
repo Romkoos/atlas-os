@@ -17,7 +17,7 @@ import { eq } from 'drizzle-orm'
 import { app, Notification } from 'electron'
 
 const DEFAULT_K = 5
-const DEFAULT_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_MODEL = 'claude-sonnet-5'
 
 export interface Progress {
   batchId: string

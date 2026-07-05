@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
-import { CLAUDE_MODELS } from '@shared/models'
+import { CLAUDE_MODELS, DEFAULT_MODEL_ID } from '@shared/models'
 import {
   type AppSettings,
   GALAXY_EDGE_STYLES,
@@ -320,7 +320,7 @@ export function Settings() {
   const form = useForm<AppSettings>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      model: CLAUDE_MODELS[0].id,
+      model: DEFAULT_MODEL_ID,
       outputDir: '',
       theme: 'system',
       logLevel: 'info',

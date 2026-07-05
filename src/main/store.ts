@@ -1,4 +1,5 @@
 import { appPaths } from '@main/paths'
+import { DEFAULT_MODEL_ID, isClaudeModelId } from '@shared/models'
 import type { AppSettings } from '@shared/settings'
 import { DEFAULT_SETTINGS } from '@shared/settings'
 import Store from 'electron-store'
@@ -25,7 +26,12 @@ function requireStore(): Store<AppSettings> {
 }
 
 export function getSettings(): AppSettings {
-  return { ...requireStore().store }
+  const settings = { ...requireStore().store }
+  // A model persisted by an older build (e.g. a since-removed model id) is no
+  // longer a valid choice — coerce it to the current default so the SDK and the
+  // Settings selector never operate on a dangling id.
+  if (!isClaudeModelId(settings.model)) settings.model = DEFAULT_MODEL_ID
+  return settings
 }
 
 export function setSettings(patch: Partial<AppSettings>): AppSettings {

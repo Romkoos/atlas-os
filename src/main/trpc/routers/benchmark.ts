@@ -91,7 +91,7 @@ export const benchmarkRouter = router({
       z.object({
         taskIds: z.array(z.string()).optional(),
         k: z.number().int().min(1).max(20).default(5),
-        model: z.string().default('claude-sonnet-4-6'),
+        model: z.string().default('claude-sonnet-5'),
       }),
     )
     .output(z.object({ batchId: z.string(), total: z.number() }))

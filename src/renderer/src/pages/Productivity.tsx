@@ -1956,7 +1956,7 @@ function BenchmarkTab() {
   })
   const [batchId, setBatchId] = useState<string | null>(null)
   const [k, setK] = useState(5)
-  const [model, setModel] = useState('claude-sonnet-4-6')
+  const [model, setModel] = useState('claude-sonnet-5')
 
   // A batch runs in the main process; batchId lives in this component's state and
   // is lost when the tab unmounts. On (re)mount, re-attach to the most recent batch
