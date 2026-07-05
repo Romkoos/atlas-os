@@ -25,6 +25,19 @@ export function repoRoot(): string {
   return app.isPackaged ? PACKAGED_REPO_ROOT : app.getAppPath()
 }
 
+// Absolute path to the Agent SDK's bundled `claude` executable in a packaged
+// build. The SDK's own resolution yields a virtual `app.asar/…` path that spawn
+// rejects (ENOTDIR); the binary is extracted to `app.asar.unpacked`, so point
+// callers there. Returns undefined in dev, where the SDK resolves it from
+// node_modules and the CLI is on the developer's PATH.
+export function claudeCliPath(): string | undefined {
+  if (!app.isPackaged) return undefined
+  return join(
+    process.resourcesPath,
+    `app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/claude`,
+  )
+}
+
 // Must be called after app is ready (depends on app.getPath).
 export function appPaths(): AppPaths {
   const userData = app.getPath('userData')
