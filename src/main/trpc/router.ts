@@ -14,6 +14,7 @@ import { settingsRouter } from '@main/trpc/routers/settings'
 import { skillImproverRouter } from '@main/trpc/routers/skillImprover'
 import { skillsRouter } from '@main/trpc/routers/skills'
 import { statsRouter } from '@main/trpc/routers/stats'
+import { subscriptionUsageRouter } from '@main/trpc/routers/subscriptionUsage'
 import { trendingRouter } from '@main/trpc/routers/trending'
 import { workerChatRouter } from '@main/trpc/routers/workerChat'
 import { router } from '@main/trpc/trpc'
@@ -37,6 +38,7 @@ export const appRouter = router({
   roadmapChat: roadmapChatRouter,
   generalChat: generalChatRouter,
   workerChat: workerChatRouter,
+  subscriptionUsage: subscriptionUsageRouter,
 })
 
 export type AppRouter = typeof appRouter
