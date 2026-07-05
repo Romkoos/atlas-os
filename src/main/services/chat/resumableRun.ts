@@ -6,6 +6,11 @@ import type { BaseChatEvent } from '@shared/ipc-events'
 export interface ResumableRun {
   reply: (text: string) => void
   cancel: () => void
+  // Silent teardown of the underlying SDK child process (abort + close mailbox)
+  // with NO `aborted` emit — used when the registry supersedes this run with an
+  // auto-continue or finalizes, so a late `aborted` cannot re-enter the handler
+  // and spawn yet another continuation.
+  dispose: () => void
   done: Promise<void>
 }
 export type SettingSource = 'user' | 'project' | 'local'
@@ -179,16 +184,27 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
     opts.emit({ type: 'error', message })
   })
 
+  // Shared teardown: stop the loop, disarm the watchdog, close the mailbox, and
+  // abort/interrupt the SDK child process. `cancel()` and `dispose()` differ only
+  // in whether they emit a trailing `aborted`.
+  const teardown = () => {
+    stopped = true
+    clearWatchdog()
+    mailbox?.close()
+    controller.abort()
+    queryRef?.interrupt().catch(() => {})
+  }
+
   return {
     reply: (text: string) => mailbox?.push(text),
     cancel: () => {
       if (stopped) return
-      stopped = true
-      clearWatchdog()
-      mailbox?.close()
-      controller.abort()
-      queryRef?.interrupt().catch(() => {})
+      teardown()
       void done.then(() => opts.emit({ type: 'aborted' }))
+    },
+    dispose: () => {
+      if (stopped) return
+      teardown()
     },
     done,
   }

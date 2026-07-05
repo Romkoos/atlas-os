@@ -16,7 +16,7 @@ function fakeRunFactory() {
     }): ResumableRun => {
       builds.push({ resume: args.resume, resumeMessage: args.resumeMessage })
       lastPush = args.push
-      return { reply: vi.fn(), cancel: vi.fn(), done: Promise.resolve() }
+      return { reply: vi.fn(), cancel: vi.fn(), dispose: vi.fn(), done: Promise.resolve() }
     },
   )
   return { builds, buildRun, push: (e: unknown) => lastPush?.(e) }

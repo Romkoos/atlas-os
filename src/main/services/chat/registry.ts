@@ -23,7 +23,7 @@ interface SessionRecord {
   continuationKind: 'worker' | 'plain'
   buildRun: OpenParams['buildRun']
   userCancelled: boolean
-  noProgressCount: number // consecutive unexpected/rate-limited stops with no new activity since
+  noProgressCount: number // consecutive unexpected/rate-limited stops with no new activity since the last one
   attempt: number // total auto-continues, for backoff
   lastRateLimit: RateLimitInfo | null
   limitTimer: ReturnType<typeof setTimeout> | null
@@ -188,6 +188,9 @@ export class ChatSessionRegistry {
 
   private autoContinue(record: SessionRecord): void {
     if (!this.records.has(record.sessionId)) return
+    // Silently tear down the superseded run's SDK child process before it is
+    // overwritten below — otherwise it stays parked on its mailbox forever.
+    record.run?.dispose()
     record.attempt += 1 // noProgressCount was already bumped in handle() for this stop
     record.status = 'running'
     this.subscriberEmit(record, { type: 'resuming', attempt: record.attempt })
@@ -208,6 +211,9 @@ export class ChatSessionRegistry {
 
   private finalize(record: SessionRecord, _event: unknown): void {
     if (record.limitTimer) clearTimeout(record.limitTimer)
+    // Silent teardown of the live run's SDK child process before dropping the
+    // record (no `aborted` emit — the terminal event was already forwarded).
+    record.run?.dispose()
     this.records.delete(record.sessionId)
   }
 
