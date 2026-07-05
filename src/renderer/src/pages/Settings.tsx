@@ -13,7 +13,7 @@ import {
   settingsSchema,
   THEMES,
 } from '@shared/settings'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -197,6 +197,10 @@ function SubscriptionCard() {
   })
 
   const plan = settingsQuery.data?.subscriptionPlan ?? 'pro'
+  // Local draft buffer for the custom limit input: edits stay here until blur so
+  // per-keystroke mutate→invalidate storms (and cross-card refetches overwriting
+  // an in-progress edit) can't snap the field back mid-type.
+  const [draft, setDraft] = useState<string | null>(null)
 
   return (
     <div className="panel mt-16">
@@ -213,7 +217,7 @@ function SubscriptionCard() {
             marginBottom: 12,
           }}
         >
-          Live usage comes from Claude; the plan labels the gauge and sets a fallback limit.
+          Live usage comes from Claude; the plan just labels the gauge and sets a fallback limit.
         </div>
         <div className="label-block" style={{ maxWidth: 420 }}>
           <label htmlFor="settings-subscriptionPlan">subscription plan</label>
@@ -238,12 +242,14 @@ function SubscriptionCard() {
               type="number"
               className="input"
               style={{ width: '100%', fontFamily: 'var(--mono)', padding: '8px 10px' }}
-              value={settingsQuery.data?.subscriptionLimitCustom ?? 50000}
-              onChange={(e) => {
-                const parsed = Number.parseInt(e.target.value, 10)
+              value={draft ?? String(settingsQuery.data?.subscriptionLimitCustom ?? 50000)}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => {
+                const parsed = Number.parseInt(draft ?? '', 10)
                 if (Number.isFinite(parsed) && parsed > 0) {
                   setMutation.mutate({ subscriptionLimitCustom: parsed })
                 }
+                setDraft(null)
               }}
             />
           </div>
