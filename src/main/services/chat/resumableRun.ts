@@ -1,22 +1,8 @@
-import { join } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { logger } from '@main/logger'
+import { claudeCliPath } from '@main/paths'
 import { createMailbox, type Mailbox } from '@main/services/skillImprover/mailbox'
 import type { BaseChatEvent } from '@shared/ipc-events'
-import { app } from 'electron'
-
-// In a packaged build the SDK's own path resolution points its `claude` binary at
-// a virtual `app.asar/…` path, which `spawn` rejects with ENOTDIR (asar is a file,
-// not a directory). The binary itself is extracted to `app.asar.unpacked` (it is a
-// native executable), so point the SDK straight at that copy. In dev, `undefined`
-// lets the SDK resolve from node_modules as before.
-function packagedCliPath(): string | undefined {
-  if (!app.isPackaged) return undefined
-  return join(
-    process.resourcesPath,
-    `app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/claude`,
-  )
-}
 
 export interface ResumableRun {
   reply: (text: string) => void
@@ -101,7 +87,7 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
         cwd: opts.cwd,
         env: opts.env,
         abortController: controller,
-        ...(packagedCliPath() ? { pathToClaudeCodeExecutable: packagedCliPath() } : {}),
+        ...(claudeCliPath() ? { pathToClaudeCodeExecutable: claudeCliPath() } : {}),
         ...(opts.resume ? { resume: opts.sessionId } : { sessionId: opts.sessionId }),
       },
     })

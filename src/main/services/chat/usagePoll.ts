@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { logger } from '@main/logger'
+import { claudeCliPath } from '@main/paths'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import type { UsageWindow } from '@shared/ipc-events'
 
@@ -90,17 +91,29 @@ export function parseUsageWindows(text: string, now: number): UsageWindow[] {
 
 // Run `claude -p "/usage" --output-format json` and return its `result` text, or
 // null on failure. `/usage` is a local command (no model inference → zero tokens);
-// the only overhead is spawning the CLI. We invoke it through a login shell so the
-// user's PATH resolves `claude` the same way their terminal does (the binary may
-// live outside a GUI app's minimal PATH, e.g. cmux's bundled copy).
+// the only overhead is spawning the CLI.
+//
+// In a packaged build we invoke the Agent SDK's own bundled `claude` by absolute
+// path (claudeCliPath) — a GUI app launched from Finder/Dock gets launchd's minimal
+// PATH, and the user's `claude` may live outside it (e.g. cmux's bundled copy that
+// the login shell never adds to PATH), so relying on the shell to resolve it fails
+// silently. In dev we still go through a login shell, which inherits the developer's
+// full terminal PATH.
 async function runUsageCommand(): Promise<string | null> {
+  const bin = claudeCliPath()
   const shell = process.env.SHELL || '/bin/zsh'
   try {
-    const { stdout } = await execFileP(shell, ['-lc', 'claude -p "/usage" --output-format json'], {
-      timeout: RUN_TIMEOUT_MS,
-      env: subscriptionEnv(),
-      maxBuffer: 4 * 1024 * 1024,
-    })
+    const { stdout } = bin
+      ? await execFileP(bin, ['-p', '/usage', '--output-format', 'json'], {
+          timeout: RUN_TIMEOUT_MS,
+          env: subscriptionEnv(),
+          maxBuffer: 4 * 1024 * 1024,
+        })
+      : await execFileP(shell, ['-lc', 'claude -p "/usage" --output-format json'], {
+          timeout: RUN_TIMEOUT_MS,
+          env: subscriptionEnv(),
+          maxBuffer: 4 * 1024 * 1024,
+        })
     const parsed = JSON.parse(stdout.trim()) as {
       result?: string
       num_turns?: number
@@ -116,7 +129,7 @@ async function runUsageCommand(): Promise<string | null> {
     }
     return typeof parsed.result === 'string' ? parsed.result : null
   } catch (error) {
-    logger.debug('Subscription usage /usage run failed', error)
+    logger.warn('Subscription usage /usage run failed', error)
     return null
   }
 }
