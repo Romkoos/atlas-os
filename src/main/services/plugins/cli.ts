@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { claudeExecutable } from '@main/paths'
 import {
   isSemver,
   type MarketplacePlugin,
@@ -328,7 +329,7 @@ function friendlyError(err: unknown, fallback: string): Error {
 
 export async function listPlugins(): Promise<Plugin[]> {
   try {
-    const { stdout } = await execFileAsync('claude', ['plugin', 'list', '--json'], {
+    const { stdout } = await execFileAsync(claudeExecutable(), ['plugin', 'list', '--json'], {
       timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
     })
@@ -342,7 +343,7 @@ export async function listPlugins(): Promise<Plugin[]> {
 export async function setEnabled(id: string, enabled: boolean): Promise<void> {
   try {
     await execFileAsync(
-      'claude',
+      claudeExecutable(),
       ['plugin', enabled ? 'enable' : 'disable', id, '--scope', 'user'],
       {
         timeout: 30_000,
@@ -357,7 +358,9 @@ export async function setEnabled(id: string, enabled: boolean): Promise<void> {
 // A failed refresh is tolerated — we still report against whatever is on disk.
 export async function checkUpdates(): Promise<UpdateInfo[]> {
   try {
-    await execFileAsync('claude', ['plugin', 'marketplace', 'update'], { timeout: 120_000 })
+    await execFileAsync(claudeExecutable(), ['plugin', 'marketplace', 'update'], {
+      timeout: 120_000,
+    })
   } catch (err) {
     const e = err as NodeJS.ErrnoException
     if (e.code === 'ENOENT') throw friendlyError(err, 'marketplace update failed')
@@ -377,10 +380,14 @@ export async function checkUpdates(): Promise<UpdateInfo[]> {
 
 export async function updatePlugin(id: string): Promise<UpdateResult> {
   try {
-    const { stdout } = await execFileAsync('claude', ['plugin', 'update', id, '--scope', 'user'], {
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+    const { stdout } = await execFileAsync(
+      claudeExecutable(),
+      ['plugin', 'update', id, '--scope', 'user'],
+      {
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    )
     return { id, ok: true, message: stdout.trim() || 'updated' }
   } catch (err) {
     return { id, ok: false, message: friendlyError(err, 'update failed').message }
@@ -405,10 +412,14 @@ export async function browseMarketplace(): Promise<MarketplacePlugin[]> {
 
 export async function installPlugin(id: string): Promise<OpResult> {
   try {
-    const { stdout } = await execFileAsync('claude', ['plugin', 'install', id, '--scope', 'user'], {
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+    const { stdout } = await execFileAsync(
+      claudeExecutable(),
+      ['plugin', 'install', id, '--scope', 'user'],
+      {
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    )
     return { ok: true, message: stdout.trim() || `installed ${id}` }
   } catch (err) {
     return { ok: false, message: friendlyError(err, 'install failed').message }
@@ -418,7 +429,7 @@ export async function installPlugin(id: string): Promise<OpResult> {
 export async function uninstallPlugin(id: string): Promise<OpResult> {
   try {
     const { stdout } = await execFileAsync(
-      'claude',
+      claudeExecutable(),
       ['plugin', 'uninstall', id, '--scope', 'user', '--yes'],
       { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 },
     )
@@ -431,7 +442,7 @@ export async function uninstallPlugin(id: string): Promise<OpResult> {
 export async function addMarketplace(source: string): Promise<OpResult> {
   try {
     const { stdout } = await execFileAsync(
-      'claude',
+      claudeExecutable(),
       ['plugin', 'marketplace', 'add', source, '--scope', 'user'],
       { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
     )
@@ -446,7 +457,7 @@ export async function addMarketplace(source: string): Promise<OpResult> {
 // text rather than throwing.
 export async function pluginDetails(id: string): Promise<PluginDetails> {
   try {
-    const { stdout } = await execFileAsync('claude', ['plugin', 'details', id], {
+    const { stdout } = await execFileAsync(claudeExecutable(), ['plugin', 'details', id], {
       timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
     })
@@ -460,7 +471,7 @@ export async function pluginDetails(id: string): Promise<PluginDetails> {
 // itself and prints one line per server; we parse those into structured rows.
 export async function mcpHealth(): Promise<McpHealth[]> {
   try {
-    const { stdout } = await execFileAsync('claude', ['mcp', 'list'], {
+    const { stdout } = await execFileAsync(claudeExecutable(), ['mcp', 'list'], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
     })

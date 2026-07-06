@@ -3,6 +3,7 @@ import { basename, join } from 'node:path'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { db } from '@main/db/client'
 import { logger } from '@main/logger'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import {
   type CodeGraph,
@@ -177,6 +178,7 @@ export function runGraphifyDeepMap(opts: RunGraphifyOptions): GraphifyDeepMapRun
         cwd: opts.projectPath,
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
         // Headless run: the graphify skill asks the user "which subfolder?" on
         // repos over 200 files via AskUserQuestion — a tool with no one to answer
         // it here. Block it so the skill proceeds on the full path instead of

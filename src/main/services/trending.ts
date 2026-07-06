@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { storeRoot } from '@main/services/knowledge/store'
 
 export interface TrendingRun {
@@ -89,6 +90,7 @@ export function runTrending(opts: RunTrendingOptions): TrendingRun {
         cwd: homedir(),
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
     queryRef = q

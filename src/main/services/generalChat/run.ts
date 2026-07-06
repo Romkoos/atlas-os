@@ -1,6 +1,8 @@
 // src/main/services/generalChat/run.ts
+
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { logger } from '@main/logger'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { createMailbox, type Mailbox } from '@main/services/skillImprover/mailbox'
 import type { GeneralChatEvent } from '@shared/ipc-events'
@@ -44,6 +46,7 @@ export function startGeneralChat(opts: StartGeneralChatOptions): GeneralChatRun 
         cwd: opts.repoRoot,
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
     queryRef = q

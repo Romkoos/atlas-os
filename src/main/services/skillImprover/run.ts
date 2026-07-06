@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { basename } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { logger } from '@main/logger'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { createMailbox, type Mailbox } from '@main/services/skillImprover/mailbox'
 import { buildImproverPrompt, REPORT_SENTINEL } from '@main/services/skillImprover/prompt'
 import { findSkillCreatorPath } from '@main/services/skillImprover/skillCreator'
@@ -126,6 +127,7 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
         cwd: homedir(),
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
     queryRef = q

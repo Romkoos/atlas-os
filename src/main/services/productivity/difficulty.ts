@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeSdkExecutableOption } from '@main/paths'
 
 const RUBRIC = `You rate the intrinsic difficulty of a software task from the FIRST user request only.
 Rate 1–10 based on what was ASKED, not how it was done.
@@ -56,6 +57,7 @@ export async function estimateDifficulty(firstPrompt: string): Promise<number | 
         cwd: homedir(),
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
 
