@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { storeRoot } from '@main/services/knowledge/store'
 
 export interface NewsRun {
@@ -79,6 +80,7 @@ export function runNews(opts: RunNewsOptions): NewsRun {
         cwd: homedir(),
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
     queryRef = q

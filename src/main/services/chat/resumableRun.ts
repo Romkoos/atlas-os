@@ -1,6 +1,6 @@
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { logger } from '@main/logger'
-import { claudeCliPath } from '@main/paths'
+import { claudeSdkExecutableOption } from '@main/paths'
 import { createMailbox, type Mailbox } from '@main/services/skillImprover/mailbox'
 import type { BaseChatEvent } from '@shared/ipc-events'
 
@@ -87,7 +87,7 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
         cwd: opts.cwd,
         env: opts.env,
         abortController: controller,
-        ...(claudeCliPath() ? { pathToClaudeCodeExecutable: claudeCliPath() } : {}),
+        ...claudeSdkExecutableOption(),
         ...(opts.resume ? { resume: opts.sessionId } : { sessionId: opts.sessionId }),
       },
     })

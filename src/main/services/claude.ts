@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import { claudeSdkExecutableOption } from '@main/paths'
 
 export interface ClaudeResult {
   text: string
@@ -47,6 +48,7 @@ export function runClaude(opts: RunClaudeOptions): ClaudeRun {
         cwd: homedir(),
         env: subscriptionEnv(),
         abortController: controller,
+        ...claudeSdkExecutableOption(),
       },
     })
     queryRef = q

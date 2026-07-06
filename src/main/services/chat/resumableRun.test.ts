@@ -5,7 +5,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({ query: queryMock }))
 vi.mock('@main/services/llm/subscriptionEnv', () => ({ subscriptionEnv: () => ({}) }))
 // paths reaches into electron's `app`, absent under vitest; stub it as dev (no
 // packaged CLI path override) so the unit runs without an Electron runtime.
-vi.mock('@main/paths', () => ({ claudeCliPath: () => undefined }))
+vi.mock('@main/paths', () => ({ claudeSdkExecutableOption: () => ({}) }))
 
 import { startResumableChat } from './resumableRun'
 
