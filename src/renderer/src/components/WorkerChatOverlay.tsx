@@ -33,10 +33,14 @@ export function WorkerChatOverlay() {
   const clearPrefill = useWorkerPrefill((s) => s.clearPrefill)
   useEffect(() => {
     if (!pending || status !== 'idle') return
-    setDraft(pending.prompt)
-    setModel(pending.model)
+    if (pending.autoStart) {
+      startSession(pending.prompt, pending.model)
+    } else {
+      setDraft(pending.prompt)
+      setModel(pending.model)
+    }
     clearPrefill()
-  }, [pending, status, clearPrefill])
+  }, [pending, status, startSession, clearPrefill])
 
   const started = status !== 'idle'
   const startWorker = () => draft.trim() && startSession(draft.trim(), model)
