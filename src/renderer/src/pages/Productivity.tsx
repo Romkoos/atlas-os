@@ -2286,12 +2286,6 @@ export function Productivity() {
       <PageHeader
         num="04"
         title="PRODUCTIVITY"
-        description={
-          <>
-            Agent token use, complexity, and ecosystem changes. Hover any bar in{' '}
-            <span style={{ color: 'var(--amber)' }}>tokens/day</span> for the breakdown.
-          </>
-        }
         action={
           <>
             <TermSelect

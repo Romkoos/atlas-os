@@ -35,11 +35,7 @@ const ANCHORS: NavAnchor[] = [
 export function Info() {
   return (
     <>
-      <PageHeader
-        num="07"
-        title="INFO"
-        description="Token Efficiency — методика, данные, формулы"
-      />
+      <PageHeader num="07" title="INFO" />
       <div className="scroll">
         <div className="info-grid">
           <nav className="info-nav">

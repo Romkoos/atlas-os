@@ -293,17 +293,6 @@ export function Skills() {
       <PageHeader
         num="08"
         title="SKILLS"
-        description={
-          <>
-            Skills in your global <span style={{ color: 'var(--amber)' }}>~/.claude/skills</span>{' '}
-            folder.{' '}
-            {allItems.length > 0 ? (
-              <span style={{ color: 'var(--fg-3)' }}>
-                {allItems.length} available · auto-loaded on start.
-              </span>
-            ) : null}
-          </>
-        }
         action={
           <input
             className="input"

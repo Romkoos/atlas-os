@@ -416,11 +416,7 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader
-        num="01"
-        title="DASHBOARD"
-        description="Mission overview — the whole system at a glance."
-      />
+      <PageHeader num="01" title="DASHBOARD" />
       <TelemetryMarquee />
       <div className="scroll">
         <div className="dash-reveal" style={{ '--i': 0 } as CSSProperties}>
