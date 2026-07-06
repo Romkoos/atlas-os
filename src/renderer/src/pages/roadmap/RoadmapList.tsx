@@ -5,7 +5,7 @@ import {
   type RoadmapPriority,
   type RoadmapStatus,
 } from '@shared/roadmap'
-import { Copy, Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Rocket, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 // Segmented status switch — order + display labels + state-color class.
@@ -55,14 +55,14 @@ function ItemRow({
   onEdit,
   onStatus,
   onDelete,
-  onCopy,
+  onStartDev,
 }: {
   item: RoadmapItem
   index: number
   onEdit: () => void
   onStatus: (status: RoadmapStatus) => void
   onDelete: () => void
-  onCopy: () => void
+  onStartDev: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const idx = String(index).padStart(2, '0')
@@ -103,11 +103,11 @@ function ItemRow({
               <button
                 type="button"
                 className="rm-icon"
-                onClick={onCopy}
-                aria-label="Copy Claude Code prompt"
-                title="Copy Claude Code prompt"
+                onClick={onStartDev}
+                aria-label="Start development"
+                title="Start development"
               >
-                <Copy size={14} />
+                <Rocket size={14} />
               </button>
             ) : null}
             <button type="button" className="rm-icon" onClick={onEdit} aria-label="Edit item">
@@ -138,7 +138,7 @@ interface RoadmapListProps {
   onEdit: (item: RoadmapItem) => void
   onStatus: (id: string, status: RoadmapStatus) => void
   onDelete: (id: string) => void
-  onCopy: (text: string) => void
+  onStartDev: (item: RoadmapItem) => void
 }
 
 export function RoadmapList({
@@ -147,7 +147,7 @@ export function RoadmapList({
   onEdit,
   onStatus,
   onDelete,
-  onCopy,
+  onStartDev,
 }: RoadmapListProps) {
   const byCategory = ROADMAP_CATEGORIES.map((cat) => ({
     cat,
@@ -208,7 +208,7 @@ export function RoadmapList({
                     onEdit={() => onEdit(item)}
                     onStatus={(status) => onStatus(item.id, status)}
                     onDelete={() => onDelete(item.id)}
-                    onCopy={() => onCopy(item.claudePrompt)}
+                    onStartDev={() => onStartDev(item)}
                   />
                 )
               })}

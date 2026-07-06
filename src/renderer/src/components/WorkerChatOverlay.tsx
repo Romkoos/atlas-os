@@ -3,8 +3,9 @@ import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
 import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
 import { trpc } from '@renderer/lib/trpc'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
+import { useWorkerPrefill } from '@renderer/store/workerPrefill'
 import type { ClaudeModelId } from '@shared/models'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 // Body of the worker chat session — a full-access coding agent. Same shape as
 // GeneralChatOverlay but with write access framed in the intro.
@@ -21,6 +22,18 @@ export function WorkerChatOverlay() {
   const [draft, setDraft] = useState('')
   // null → the global default model (resolved in ChatModelSelect / on the server).
   const [model, setModel] = useState<ClaudeModelId | null>(null)
+
+  // One-shot hand-off from callers like the Roadmap "start development" button:
+  // seed the intro composer with the idea's prompt + preselected model, then
+  // consume it. Runs only while the intro is shown (status === 'idle').
+  const pending = useWorkerPrefill((s) => s.pending)
+  const clearPrefill = useWorkerPrefill((s) => s.clearPrefill)
+  useEffect(() => {
+    if (!pending || status !== 'idle') return
+    setDraft(pending.prompt)
+    setModel(pending.model)
+    clearPrefill()
+  }, [pending, status, clearPrefill])
 
   const started = status !== 'idle'
   const startWorker = () => draft.trim() && startSession(draft.trim(), model)

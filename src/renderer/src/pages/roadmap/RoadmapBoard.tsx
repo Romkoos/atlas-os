@@ -18,7 +18,7 @@ import {
   type RoadmapStatus,
   STATUS_LABELS,
 } from '@shared/roadmap'
-import { Copy } from 'lucide-react'
+import { Rocket } from 'lucide-react'
 import { type KeyboardEvent, type ReactNode, useState } from 'react'
 import {
   CATEGORY_SHORT,
@@ -51,7 +51,7 @@ const categoryFilterOptions = [
 function CardBody({
   item,
   onClick,
-  onCopy,
+  onStartDev,
   className,
   cardRef,
   dragProps,
@@ -59,7 +59,7 @@ function CardBody({
 }: {
   item: RoadmapItem
   onClick?: () => void
-  onCopy?: () => void
+  onStartDev?: () => void
   className: string
   cardRef?: (node: HTMLElement | null) => void
   dragProps?: Record<string, unknown>
@@ -78,16 +78,16 @@ function CardBody({
           <button
             type="button"
             className="rm-icon rm-card-copy"
-            aria-label="Copy Claude Code prompt"
-            title="Copy Claude Code prompt"
+            aria-label="Start development"
+            title="Start development"
             // Stop the drag/click-open handlers from also firing.
             onClick={(e) => {
               e.stopPropagation()
-              onCopy?.()
+              onStartDev?.()
             }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <Copy size={13} />
+            <Rocket size={13} />
           </button>
         ) : null}
       </div>
@@ -98,11 +98,11 @@ function CardBody({
 function Card({
   item,
   onClick,
-  onCopy,
+  onStartDev,
 }: {
   item: RoadmapItem
   onClick?: () => void
-  onCopy?: () => void
+  onStartDev?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -114,7 +114,7 @@ function Card({
     <CardBody
       item={item}
       onClick={onClick}
-      onCopy={onCopy}
+      onStartDev={onStartDev}
       className={`rm-card ${PRIO_CLASS[item.priority]}${isDragging ? ' dragging' : ''}`}
       cardRef={setNodeRef}
       dragProps={{ ...attributes, ...listeners }}
@@ -161,7 +161,7 @@ export interface RoadmapBoardProps {
   hideDone: boolean
   onCardClick: (item: RoadmapItem) => void
   onStatusChange: (id: string, status: RoadmapStatus) => void
-  onCopy: (text: string) => void
+  onStartDev: (item: RoadmapItem) => void
 }
 
 export function RoadmapBoard({
@@ -169,7 +169,7 @@ export function RoadmapBoard({
   hideDone,
   onCardClick,
   onStatusChange,
-  onCopy,
+  onStartDev,
 }: RoadmapBoardProps) {
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -214,7 +214,7 @@ export function RoadmapBoard({
                     key={item.id}
                     item={item}
                     onClick={() => onCardClick(item)}
-                    onCopy={() => onCopy(item.claudePrompt)}
+                    onStartDev={() => onStartDev(item)}
                   />
                 ))}
               </Column>

@@ -2,6 +2,8 @@ import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
 import { useUiStore } from '@renderer/store/ui'
+import { useWorkerChatRun } from '@renderer/store/workerChatRun'
+import { useWorkerPrefill } from '@renderer/store/workerPrefill'
 import type { RoadmapItem } from '@shared/roadmap'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -46,10 +48,24 @@ export function Roadmap() {
     onError: (err) => toast.error(err.message),
   })
 
-  const copyText = trpc.roadmap.copyText.useMutation({
-    onSuccess: () => toast.success('Claude Code prompt copied'),
-    onError: (err) => toast.error(err.message),
-  })
+  // Kick off a worker chat pre-loaded with this idea's Claude Code prompt on the
+  // latest Opus. Non-destructive: if a worker is actively busy we surface it
+  // rather than clobber its run; otherwise reset it and seed the fresh intro.
+  const BUSY_STATUSES = ['running', 'awaiting', 'reconnecting', 'limited']
+  const startDevelopment = (item: RoadmapItem) => {
+    if (!item.claudePrompt) return
+    if (BUSY_STATUSES.includes(useWorkerChatRun.getState().status)) {
+      useChatDrawer.getState().openSession({ type: 'worker' })
+      toast.error('Worker is busy — finish or close it first')
+      return
+    }
+    useWorkerChatRun.getState().reset()
+    useWorkerPrefill.getState().setPrefill({
+      prompt: item.claudePrompt,
+      model: 'claude-opus-4-8',
+    })
+    useChatDrawer.getState().openSession({ type: 'worker' })
+  }
 
   const items = list.data ?? []
   const visibleItems = hideDoneFilter(items, hideDone) // list uses this; board gets full items + hideDone flag
@@ -108,7 +124,7 @@ export function Roadmap() {
             hideDone={hideDone}
             onCardClick={(item) => setEditing(item)}
             onStatusChange={(id, status) => update.mutate({ id, status })}
-            onCopy={(text) => copyText.mutate({ text })}
+            onStartDev={startDevelopment}
           />
         ) : (
           <RoadmapList
@@ -117,7 +133,7 @@ export function Roadmap() {
             onEdit={(item) => setEditing(item)}
             onStatus={(id, status) => update.mutate({ id, status })}
             onDelete={(id) => remove.mutate({ id })}
-            onCopy={(text) => copyText.mutate({ text })}
+            onStartDev={startDevelopment}
           />
         )}
       </div>
