@@ -10,6 +10,9 @@ export interface WorkerPrefill {
   prompt: string
   // Model to preselect. null → the global default model.
   model: ClaudeModelId | null
+  // When true, the overlay starts the session immediately (used by the roadmap
+  // rocket) instead of only seeding the intro composer draft.
+  autoStart?: boolean
 }
 
 export interface WorkerPrefillState {

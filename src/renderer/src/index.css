@@ -4277,6 +4277,21 @@ textarea.input:focus,
   height: 100%;
   min-height: 0;
 }
+.dev-binding-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line, #2a2a2a);
+  font-size: 12px;
+}
+.dev-binding-label {
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .chat-log {
   flex: 1 1 auto;
   min-height: 0;

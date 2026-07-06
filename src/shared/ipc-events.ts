@@ -105,6 +105,12 @@ export type GeneralChatEvent = BaseChatEvent
 // parsed from the stream and persisted; it carries the created item.
 export type RoadmapChatEvent = BaseChatEvent | { type: 'saved'; item: RoadmapItem }
 
+// Events streamed from main → renderer during a worker chat (tRPC
+// subscription). `deployed` fires when the agent's assistant text contains
+// the deploy sentinel and the pending dev binding was in the `building`
+// phase; it carries the roadmap item id that was flipped to `done`.
+export type WorkerChatEvent = BaseChatEvent | { type: 'deployed'; itemId: string }
+
 // Events streamed from main → renderer during a graphify deep-map run (tRPC
 // subscription). `done` carries how many graphify nodes/edges were merged.
 export type GraphDeepMapEvent =

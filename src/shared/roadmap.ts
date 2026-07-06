@@ -107,3 +107,72 @@ export const roadmapUpdateSchema = z.object({
   claudePrompt: z.string().optional(),
 })
 export type RoadmapUpdate = z.infer<typeof roadmapUpdateSchema>
+
+// ── Dev pipeline (rocket → plan → build → deploy) ──────────────────────────────
+
+// Pinned label the brainstorm agent must use as its approve option; the renderer
+// matches it exactly to flip planned → in-progress and start the build.
+export const APPROVE_BUILD_LABEL = '✓ Approve & start building'
+
+// Own-line token the worker emits after a completed deploy (merge to main).
+export const DEPLOY_SENTINEL = '<<ATLAS_DEPLOYED>>'
+
+// True when the accumulated assistant text contains the sentinel alone on a line
+// (tolerant of surrounding whitespace). A prose mention on a shared line does
+// NOT count — mirrors the precision of the roadmap idea sentinel.
+export function parseDeploySentinel(text: string): boolean {
+  return text.split('\n').some((line) => line.trim() === DEPLOY_SENTINEL)
+}
+
+// The worker's binding to the roadmap item it is currently developing.
+export const devBindingSchema = z.object({
+  itemId: z.string().min(1),
+  phase: z.enum(['planning', 'building']),
+})
+export type DevBinding = z.infer<typeof devBindingSchema>
+
+// Whether a picked chip / typed reply should trigger the approve → build flip.
+// Only while planning, and only for the exact pinned label.
+//
+// Accepted fragility: this depends on the agent emitting APPROVE_BUILD_LABEL
+// VERBATIM as its option-chip line (see buildDevPlanKickoff, which pins the
+// exact string in the kickoff prompt). If the agent paraphrases the label
+// instead of quoting it, the chip click falls through to a normal chat reply
+// — `shouldApproveBuild` returns false, the item stays in `planned`, and the
+// later deploy sentinel (guarded on `binding.phase === 'building'`) never
+// fires either. We accept this trade-off rather than fuzzy-matching the
+// label, since pinning an exact string in the prompt is simple and the
+// planning turn gives the user a chance to notice/retry if it doesn't stick.
+export function shouldApproveBuild(binding: DevBinding | null, pickedText: string): boolean {
+  return binding?.phase === 'planning' && pickedText === APPROVE_BUILD_LABEL
+}
+
+// First message for the PLANNING phase. Wrapped again by the worker seed on the
+// server, so it only needs the feature brief + brainstorm contract. It forbids
+// code and pins the approve-option label.
+export function buildDevPlanKickoff(item: Pick<RoadmapItem, 'title' | 'claudePrompt'>): string {
+  return [
+    `We are planning a new Atlas OS feature: "${item.title}".`,
+    'Feature brief:',
+    item.claudePrompt,
+    '',
+    'This is the PLANNING phase. Brainstorm the design and implementation plan with me:',
+    'ask one question at a time, propose 2-3 approaches with trade-offs, and converge on a plan.',
+    'Do NOT write code, edit files, or run mutating commands yet.',
+    'When the plan is agreed, end that turn with a fenced options block whose FIRST line is',
+    `exactly "${APPROVE_BUILD_LABEL}", followed by any refine options. English only.`,
+  ].join('\n')
+}
+
+// The continuation sent when the user approves the plan. Kicks off the
+// autonomous build; the worker waits for the user's "deploy" before shipping and
+// emits the sentinel only after the merge lands.
+export function buildDevBuildPrompt(): string {
+  return [
+    'The plan is approved. Implement it autonomously now:',
+    'follow the agreed plan, use TDD, and work until the feature is complete and verified.',
+    'Do NOT push or merge. When you are done building, stop and wait for me.',
+    'When I type "deploy", do squash → PR → merge per the deploy protocol; once the merge',
+    `has landed on main, emit ${DEPLOY_SENTINEL} on its own line and write nothing after it.`,
+  ].join('\n')
+}

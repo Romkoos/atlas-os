@@ -32,6 +32,7 @@ import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
 import { MotionConfig } from 'motion/react'
 import { type ComponentType, useEffect } from 'react'
+import { toast } from 'sonner'
 
 const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
@@ -50,6 +51,7 @@ export function App() {
   const section = useUiStore((s) => s.section)
   const setSection = useUiStore((s) => s.setSection)
   const theme = useResolvedTheme()
+  const utils = trpc.useUtils()
 
   // Native menu (Cmd+,) asks the renderer to switch sections.
   useEffect(() => window.atlas.onNavigate((next) => setSection(next as Section)), [setSection])
@@ -107,6 +109,14 @@ export function App() {
           useRun={useWorkerChatRun}
           useOpenSubscription={trpc.workerChat.open.useSubscription}
           kickoff={workerKickoff}
+          onEvent={(event) => {
+            const e = event as { type: string; itemId?: string }
+            if (e.type === 'deployed') {
+              utils.roadmap.list.invalidate()
+              utils.roadmap.getDevBinding.invalidate()
+              toast.success('Shipped — moved to done')
+            }
+          }}
         />
         <ChatHost
           useRun={useRoadmapChatRun}

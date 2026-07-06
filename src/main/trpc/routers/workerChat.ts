@@ -1,14 +1,17 @@
+import { logger } from '@main/logger'
 import { repoRoot } from '@main/paths'
 import { chatRegistry } from '@main/services/chat/registry'
 import { startResumableChat } from '@main/services/chat/resumableRun'
 import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
 import { jobRegistry } from '@main/services/jobs/registry'
 import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
+import { clearDevBinding, getDevBinding, updateRoadmapItem } from '@main/services/roadmap/store'
 import { buildWorkerChatSeed } from '@main/services/workerChat/seed'
 import { getSettings } from '@main/store'
 import { publicProcedure, router } from '@main/trpc/trpc'
-import type { BaseChatEvent, SeqEnvelope } from '@shared/ipc-events'
+import type { SeqEnvelope, WorkerChatEvent } from '@shared/ipc-events'
 import { CLAUDE_MODEL_IDS, DEFAULT_MODEL_ID } from '@shared/models'
+import { parseDeploySentinel } from '@shared/roadmap'
 import { observable } from '@trpc/server/observable'
 import { z } from 'zod'
 
@@ -27,7 +30,7 @@ export const workerChatRouter = router({
       }),
     )
     .subscription(({ input }) =>
-      observable<SeqEnvelope<BaseChatEvent>>((emit) => {
+      observable<SeqEnvelope<WorkerChatEvent>>((emit) => {
         const model = input.model ?? getSettings().model ?? DEFAULT_MODEL_ID
         const cwd = repoRoot()
         return chatRegistry.open(
@@ -45,6 +48,38 @@ export const workerChatRouter = router({
                 model,
                 abort: () => chatRegistry.cancel(input.sessionId),
               })
+              let flipped = false
+              // Separate one-shot guard for the error toast: the flip itself is only
+              // marked done on success, so a transient failure retries on the next
+              // onAssistantText/onTurnComplete callback (the sentinel stays in
+              // `accumulated`); this guard just keeps a persistent failure from
+              // spamming the user with a duplicate error on every retry.
+              let flipErrored = false
+              const checkDeployed = (accumulated: string) => {
+                if (flipped) return
+                if (!parseDeploySentinel(accumulated)) return
+                const binding = getDevBinding()
+                if (binding?.phase !== 'building') return
+                try {
+                  updateRoadmapItem({ id: binding.itemId, status: 'done' })
+                  clearDevBinding()
+                  push({ type: 'deployed', itemId: binding.itemId })
+                  flipped = true
+                } catch (error) {
+                  logger.error(
+                    'Dev deploy flip failed',
+                    error instanceof Error ? error.message : String(error),
+                  )
+                  if (!flipErrored) {
+                    flipErrored = true
+                    push({
+                      type: 'error',
+                      message:
+                        'Deploy succeeded but marking the roadmap item done failed — set it to done manually.',
+                    })
+                  }
+                }
+              }
               return startResumableChat({
                 sessionId: input.sessionId,
                 model,
@@ -61,10 +96,12 @@ export const workerChatRouter = router({
                   if (event.type === 'error' || event.type === 'aborted') job.finish('error')
                   push(event)
                 },
+                onAssistantText: (_delta, accumulated) => checkDeployed(accumulated),
+                onTurnComplete: (accumulated) => checkDeployed(accumulated),
               })
             },
           },
-          (env) => emit.next(env as SeqEnvelope<BaseChatEvent>),
+          (env) => emit.next(env as SeqEnvelope<WorkerChatEvent>),
         )
       }),
     ),
