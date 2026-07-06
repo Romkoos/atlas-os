@@ -1,10 +1,12 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
 import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
+import { DevBindingBanner } from '@renderer/components/DevBindingBanner'
 import { trpc } from '@renderer/lib/trpc'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import { useWorkerPrefill } from '@renderer/store/workerPrefill'
 import type { ClaudeModelId } from '@shared/models'
+import { buildDevBuildPrompt, shouldApproveBuild } from '@shared/roadmap'
 import { useEffect, useState } from 'react'
 
 // Body of the worker chat session — a full-access coding agent. Same shape as
@@ -22,6 +24,14 @@ export function WorkerChatOverlay() {
   const freshStart = useWorkerChatRun((s) => s.freshStart)
 
   const reply = trpc.workerChat.reply.useMutation()
+  const utils = trpc.useUtils()
+  const binding = trpc.roadmap.getDevBinding.useQuery()
+  const setBinding = trpc.roadmap.setDevBinding.useMutation({
+    onSuccess: () => utils.roadmap.getDevBinding.invalidate(),
+  })
+  const updateItem = trpc.roadmap.update.useMutation({
+    onSuccess: () => utils.roadmap.list.invalidate(),
+  })
   const [draft, setDraft] = useState('')
   // null → the global default model (resolved in ChatModelSelect / on the server).
   const [model, setModel] = useState<ClaudeModelId | null>(null)
@@ -47,6 +57,19 @@ export function WorkerChatOverlay() {
 
   const send = (text: string) => {
     if (!sessionId || !awaitingInput) return
+    const b = binding.data ?? null
+    if (shouldApproveBuild(b, text)) {
+      // Approve → build: flip status + phase, then send the build prompt (not
+      // the literal chip label). Guard on b for the type-narrowing.
+      if (b) {
+        updateItem.mutate({ id: b.itemId, status: 'in-progress' })
+        setBinding.mutate({ itemId: b.itemId, phase: 'building' })
+      }
+      const buildPrompt = buildDevBuildPrompt()
+      pushUserReply(buildPrompt)
+      reply.mutate({ sessionId, text: buildPrompt })
+      return
+    }
     pushUserReply(text)
     reply.mutate({ sessionId, text })
   }
@@ -88,6 +111,7 @@ export function WorkerChatOverlay() {
 
   return (
     <div className="chat-body-flex">
+      <DevBindingBanner />
       <TimelineChatBody
         sessionId={sessionId}
         transcript={transcript}
