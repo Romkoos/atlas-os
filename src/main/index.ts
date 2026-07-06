@@ -1,7 +1,6 @@
 import { db, initDb } from '@main/db/client'
 import { runMigrations } from '@main/db/migrate'
 import { initLogger, logger } from '@main/logger'
-import { buildMenu } from '@main/menu'
 import { appPaths } from '@main/paths'
 import { applySecurity } from '@main/security'
 import { chatRegistry } from '@main/services/chat/registry'
@@ -14,9 +13,10 @@ import {
   seedRoadmapIfNeeded,
 } from '@main/services/roadmap/store'
 import { getSettings, initStore } from '@main/store'
+import { createTray } from '@main/tray'
 import { registerTrpcIpc } from '@main/trpc/ipc'
-import { createMainWindow } from '@main/window'
-import { app, BrowserWindow, powerMonitor } from 'electron'
+import { ensureMainWindow } from '@main/window'
+import { app, powerMonitor } from 'electron'
 
 // Productivity tracker: pull the latest transcripts + hook buffer into the DB.
 // Fire-and-forget so a slow/large scan never blocks the window.
@@ -55,8 +55,8 @@ app
     applySecurity()
     registerTrpcIpc()
 
-    const win = createMainWindow()
-    buildMenu(win)
+    ensureMainWindow()
+    createTray(ensureMainWindow)
 
     ingestProductivity()
 
@@ -69,9 +69,9 @@ app
     startUsagePolling((windows) => subscriptionUsage.updateFromPoll(windows, Date.now()))
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        buildMenu(createMainWindow())
-      }
+      const win = ensureMainWindow()
+      win.show()
+      win.focus()
     })
   })
   .catch((error) => {
