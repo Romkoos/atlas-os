@@ -7,7 +7,7 @@ import { useWorkerPrefill } from '@renderer/store/workerPrefill'
 import type { RoadmapItem } from '@shared/roadmap'
 import { buildDevPlanKickoff } from '@shared/roadmap'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { hideDoneFilter } from './roadmap/board-utils'
 import { RoadmapBoard } from './roadmap/RoadmapBoard'
@@ -19,6 +19,7 @@ export function Roadmap() {
   const utils = trpc.useUtils()
   const list = trpc.roadmap.list.useQuery()
   const [editing, setEditing] = useState<RoadmapItem | null | undefined>(undefined)
+  const startingDevRef = useRef(false)
 
   const view = useUiStore((s) => s.tabsBySection.roadmap) ?? 'list'
   const setTab = useUiStore((s) => s.setTab)
@@ -59,22 +60,30 @@ export function Roadmap() {
   const BUSY_STATUSES = ['running', 'awaiting', 'reconnecting', 'limited']
   const startDevelopment = async (item: RoadmapItem) => {
     if (!item.claudePrompt) return
-    const existing = await utils.roadmap.getDevBinding.fetch()
-    const busy = BUSY_STATUSES.includes(useWorkerChatRun.getState().status)
-    if (existing || busy) {
+    if (startingDevRef.current) return
+    startingDevRef.current = true
+    try {
+      const existing = await utils.roadmap.getDevBinding.fetch()
+      const busy = BUSY_STATUSES.includes(useWorkerChatRun.getState().status)
+      if (existing || busy) {
+        useChatDrawer.getState().openSession({ type: 'worker' })
+        toast.error('Worker is busy — finish or stop the current development first')
+        return
+      }
+      update.mutate({ id: item.id, status: 'planned' })
+      setBinding.mutate({ itemId: item.id, phase: 'planning' })
+      useWorkerChatRun.getState().reset()
+      useWorkerPrefill.getState().setPrefill({
+        prompt: buildDevPlanKickoff(item),
+        model: 'claude-opus-4-8',
+        autoStart: true,
+      })
       useChatDrawer.getState().openSession({ type: 'worker' })
-      toast.error('Worker is busy — finish or stop the current development first')
-      return
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to start development')
+    } finally {
+      startingDevRef.current = false
     }
-    update.mutate({ id: item.id, status: 'planned' })
-    setBinding.mutate({ itemId: item.id, phase: 'planning' })
-    useWorkerChatRun.getState().reset()
-    useWorkerPrefill.getState().setPrefill({
-      prompt: buildDevPlanKickoff(item),
-      model: 'claude-opus-4-8',
-      autoStart: true,
-    })
-    useChatDrawer.getState().openSession({ type: 'worker' })
   }
 
   const items = list.data ?? []

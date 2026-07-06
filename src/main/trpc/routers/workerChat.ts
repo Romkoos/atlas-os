@@ -49,21 +49,35 @@ export const workerChatRouter = router({
                 abort: () => chatRegistry.cancel(input.sessionId),
               })
               let flipped = false
+              // Separate one-shot guard for the error toast: the flip itself is only
+              // marked done on success, so a transient failure retries on the next
+              // onAssistantText/onTurnComplete callback (the sentinel stays in
+              // `accumulated`); this guard just keeps a persistent failure from
+              // spamming the user with a duplicate error on every retry.
+              let flipErrored = false
               const checkDeployed = (accumulated: string) => {
                 if (flipped) return
                 if (!parseDeploySentinel(accumulated)) return
                 const binding = getDevBinding()
                 if (binding?.phase !== 'building') return
-                flipped = true
                 try {
                   updateRoadmapItem({ id: binding.itemId, status: 'done' })
                   clearDevBinding()
                   push({ type: 'deployed', itemId: binding.itemId })
+                  flipped = true
                 } catch (error) {
                   logger.error(
                     'Dev deploy flip failed',
                     error instanceof Error ? error.message : String(error),
                   )
+                  if (!flipErrored) {
+                    flipErrored = true
+                    push({
+                      type: 'error',
+                      message:
+                        'Deploy succeeded but marking the roadmap item done failed — set it to done manually.',
+                    })
+                  }
                 }
               }
               return startResumableChat({

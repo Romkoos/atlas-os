@@ -133,6 +133,16 @@ export type DevBinding = z.infer<typeof devBindingSchema>
 
 // Whether a picked chip / typed reply should trigger the approve → build flip.
 // Only while planning, and only for the exact pinned label.
+//
+// Accepted fragility: this depends on the agent emitting APPROVE_BUILD_LABEL
+// VERBATIM as its option-chip line (see buildDevPlanKickoff, which pins the
+// exact string in the kickoff prompt). If the agent paraphrases the label
+// instead of quoting it, the chip click falls through to a normal chat reply
+// — `shouldApproveBuild` returns false, the item stays in `planned`, and the
+// later deploy sentinel (guarded on `binding.phase === 'building'`) never
+// fires either. We accept this trade-off rather than fuzzy-matching the
+// label, since pinning an exact string in the prompt is simple and the
+// planning turn gives the user a chance to notice/retry if it doesn't stick.
 export function shouldApproveBuild(binding: DevBinding | null, pickedText: string): boolean {
   return binding?.phase === 'planning' && pickedText === APPROVE_BUILD_LABEL
 }
