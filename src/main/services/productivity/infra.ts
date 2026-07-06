@@ -4,6 +4,7 @@ import type { AppDatabase } from '@main/db/client'
 import { ecosystemChanges } from '@main/db/schema'
 import { ecosystemId } from '@main/services/productivity/ids'
 import type { EcosystemChange } from '@main/services/productivity/jsonl'
+import { recordSignal } from '@main/services/signals/registry'
 
 // Polling watcher for Claude Code infra changes. Each ingest run snapshots the
 // live ~/.claude state (enabled plugins, MCP servers, user skills) and diffs it
@@ -170,7 +171,22 @@ export async function detectInfraChanges(
     const prev = await readSnapshot(paths.snapshotPath)
     const changes = diffInfraState(prev, curr, Date.now())
     for (const row of changes) {
-      database.insert(ecosystemChanges).values(row).onConflictDoNothing().run()
+      const inserted = database.insert(ecosystemChanges).values(row).onConflictDoNothing().run()
+      // Only surface genuinely new changes as signals (skip idempotent re-inserts).
+      if (inserted.changes > 0) {
+        recordSignal(
+          {
+            source: 'infra',
+            type: 'infra.ecosystem_change',
+            severity: 'info',
+            title: row.note ?? row.type.replace(/_/g, ' '),
+            detail: row.target,
+            link: 'productivity',
+            linkKind: 'section',
+          },
+          database,
+        )
+      }
     }
     await writeSnapshot(paths.snapshotPath, curr)
     return changes.length

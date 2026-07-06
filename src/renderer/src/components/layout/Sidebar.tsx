@@ -2,6 +2,7 @@ import { Ticker } from '@renderer/components/fx/Ticker'
 import { NAV } from '@renderer/components/layout/nav'
 import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
+import { useSignalsStore } from '@renderer/store/signals'
 import { useUiStore } from '@renderer/store/ui'
 import gsap from 'gsap'
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
@@ -28,6 +29,7 @@ function scrambleLabel(e: MouseEvent<HTMLButtonElement>) {
 export function Sidebar() {
   const section = useUiStore((s) => s.section)
   const setSection = useUiStore((s) => s.setSection)
+  const unreadSignals = useSignalsStore((s) => s.unreadCount)
 
   const health = trpc.health.ping.useQuery()
   const settings = trpc.settings.get.useQuery()
@@ -66,7 +68,11 @@ export function Sidebar() {
             )}
             <span className="k">{n.key}</span>
             <span>{n.label}</span>
-            <span className="badge" />
+            {n.id === 'signals' && unreadSignals > 0 ? (
+              <span className="nav-badge">{unreadSignals > 99 ? '99+' : unreadSignals}</span>
+            ) : (
+              <span className="badge" />
+            )}
           </button>
         ))}
       </nav>

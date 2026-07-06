@@ -11,6 +11,7 @@ import { productivityRouter } from '@main/trpc/routers/productivity'
 import { roadmapRouter } from '@main/trpc/routers/roadmap'
 import { roadmapChatRouter } from '@main/trpc/routers/roadmapChat'
 import { settingsRouter } from '@main/trpc/routers/settings'
+import { signalsRouter } from '@main/trpc/routers/signals'
 import { skillImproverRouter } from '@main/trpc/routers/skillImprover'
 import { skillsRouter } from '@main/trpc/routers/skills'
 import { statsRouter } from '@main/trpc/routers/stats'
@@ -34,6 +35,7 @@ export const appRouter = router({
   graph: graphRouter,
   news: newsRouter,
   trending: trendingRouter,
+  signals: signalsRouter,
   plugins: pluginsRouter,
   roadmap: roadmapRouter,
   roadmapChat: roadmapChatRouter,

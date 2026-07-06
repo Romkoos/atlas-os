@@ -8,6 +8,7 @@ export type Section =
   | 'productivity'
   | 'knowledge'
   | 'news'
+  | 'signals'
   | 'info'
   | 'skills'
   | 'plugins'
@@ -20,6 +21,7 @@ export const SECTIONS: readonly Section[] = [
   'productivity',
   'knowledge',
   'news',
+  'signals',
   'info',
   'skills',
   'plugins',
