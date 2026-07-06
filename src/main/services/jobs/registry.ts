@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
+import { recordSignal } from '@main/services/signals/registry'
 import type { JobStatus, JobsSnapshot, JobView } from '@shared/jobs'
 
 // Keep the last N completed jobs (in-memory; lost on restart).
@@ -98,6 +99,25 @@ export class JobRegistry extends EventEmitter {
     })
     if (this.recent.length > MAX_RECENT) this.recent.length = MAX_RECENT
     this.emit('change')
+    this.recordSignal(status, meta, job)
+  }
+
+  // Land a finished job in the Signals event log. `benchmark` batches emit their
+  // own richer batch-level signal (done/failed counts), so they're skipped here
+  // to avoid a duplicate. recordSignal is defensive — a db-less test env is a
+  // no-op, never a throw.
+  private recordSignal(status: JobStatus, meta: FinishMeta | undefined, job: ActiveJob): void {
+    if (job.kind === 'benchmark') return
+    const resultPath = meta?.resultPath ?? null
+    recordSignal({
+      source: 'jobs',
+      type: status === 'done' ? 'job.completed' : 'job.failed',
+      severity: status === 'done' ? 'success' : 'error',
+      title: status === 'done' ? job.label : `${job.label} failed`,
+      detail: meta?.error ?? meta?.detail ?? job.detail,
+      link: resultPath,
+      linkKind: resultPath ? 'path' : null,
+    })
   }
 
   // Fires the abort callback only; the job is not removed from active here. The

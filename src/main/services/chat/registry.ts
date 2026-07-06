@@ -1,3 +1,4 @@
+import { recordSignal } from '@main/services/signals/registry'
 import type { RateLimitInfo, SeqEnvelope } from '@shared/ipc-events'
 import type { ResumableRun } from './resumableRun'
 import {
@@ -175,6 +176,15 @@ export class ChatSessionRegistry {
           ? 'Chat connection lost'
           : 'Auto-continue gave up after repeated failures'
       this.subscriberEmit(record, { type: 'error', message })
+      // Persist the terminal failure to the Signals log. Defensive recordSignal:
+      // a db-less unit-test env is a no-op, never a throw.
+      recordSignal({
+        source: 'chat',
+        type: 'chat.error',
+        severity: 'error',
+        title: 'Chat run failed',
+        detail: message,
+      })
       this.finalize(record, event)
       return
     }

@@ -5069,3 +5069,119 @@ textarea.input:focus,
 .tl-bar-error { outline: 1px solid var(--color-destructive); }
 .tl-axis { display: flex; justify-content: space-between; margin-top: 6px; color: var(--color-muted-foreground); font-size: 10px; }
 @keyframes tl-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.85; } }
+
+/* ── Signals: sidebar unread badge ──────────────────────────────────── */
+.sb-nav button .nav-badge {
+  z-index: 1;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--amber);
+  border-radius: 8px;
+  line-height: 1;
+}
+
+/* ── Signals: dashboard feed rows ───────────────────────────────────── */
+.sig-feed-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed var(--line-dim);
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--fg-3);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.sig-feed-row:last-child { border-bottom: 0; }
+.sig-feed-row:hover { color: var(--fg); }
+.sig-feed-ico { display: inline-flex; align-items: center; justify-content: center; }
+.sig-feed-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sig-feed-row.unread .sig-feed-title { color: var(--fg); font-weight: 500; }
+.sig-feed-time { font-family: var(--mono); font-size: 11px; color: var(--fg-4); white-space: nowrap; }
+
+/* ── Signals: page ──────────────────────────────────────────────────── */
+.sig-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 20px 60px;
+  gap: 16px;
+}
+.sig-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.sig-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.sig-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.sig-chip:hover { color: var(--fg-2); }
+.sig-chip.on { color: var(--amber); border-color: var(--amber); }
+.sig-search { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--fg-4); }
+.sig-search .input { width: 220px; }
+.sig-empty { font-family: var(--mono); font-size: 12px; color: var(--fg-4); padding: 16px 0; }
+.sig-list { display: flex; flex-direction: column; }
+.sig-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-dim);
+  cursor: pointer;
+  padding: 12px 4px;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.sig-row:hover { background: var(--bg-2); }
+.sig-ico { display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
+.sig-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sig-title-row { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
+.sig-title { font-size: 13px; color: var(--fg-2); }
+.sig-row.unread .sig-title { color: var(--fg); font-weight: 500; }
+.sig-time { font-family: var(--mono); font-size: 11px; color: var(--fg-4); white-space: nowrap; }
+.sig-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-4);
+}
+.sig-tag {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--amber-dim);
+  border: 1px solid var(--line);
+  padding: 1px 6px;
+}
+.sig-type { color: var(--fg-3); }
+.sig-detail { color: var(--fg-4); overflow: hidden; text-overflow: ellipsis; }
+.sig-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; }

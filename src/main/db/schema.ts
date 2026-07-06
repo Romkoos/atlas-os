@@ -262,3 +262,33 @@ export type GraphNodeRow = typeof graphNodes.$inferSelect
 export type NewGraphNodeRow = typeof graphNodes.$inferInsert
 export type GraphEdgeRow = typeof graphEdges.$inferSelect
 export type NewGraphEdgeRow = typeof graphEdges.$inferInsert
+
+// ── Unified Signals Event Log ───────────────────────────────────────────────
+// One row per notable cross-subsystem event (job finished, benchmark batch done,
+// infra/ecosystem change, roadmap edit, chat error). Written via
+// recordSignal() (src/main/services/signals/registry.ts) — services never insert
+// here directly. Drives the dashboard SignalsPanel feed and the Signals page.
+// See docs/superpowers/specs/2026-07-06-unified-signals-event-log-design.md.
+export const signals = sqliteTable(
+  'signals',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    source: text('source').notNull(), // jobs | benchmark | infra | roadmap | chat | news
+    type: text('type').notNull(), // namespaced source.event, e.g. job.completed
+    severity: text('severity').notNull(), // info | success | warning | error
+    title: text('title').notNull(),
+    detail: text('detail'),
+    // Navigation target. linkKind='section' → an in-app Section id (SPA nav);
+    // linkKind='path' → a filesystem path revealed in Finder. Both nullable.
+    link: text('link'),
+    linkKind: text('link_kind'), // 'section' | 'path' | null
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    readAt: integer('read_at', { mode: 'timestamp_ms' }),
+  },
+  (t) => [index('idx_signals_created').on(t.createdAt), index('idx_signals_source').on(t.source)],
+)
+
+export type SignalRow = typeof signals.$inferSelect
+export type NewSignalRow = typeof signals.$inferInsert

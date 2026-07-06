@@ -18,31 +18,19 @@ import { BorderBeam } from '@renderer/components/fx/BorderBeam'
 import { ScrambleText } from '@renderer/components/fx/ScrambleText'
 import { Ticker } from '@renderer/components/fx/Ticker'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
+import { SEVERITY_META } from '@renderer/lib/signalStyle'
 import { trpc } from '@renderer/lib/trpc'
+import { useOpenSignal } from '@renderer/lib/useOpenSignal'
 import { useBeamRoam } from '@renderer/store/beamRoam'
 import { useChatDrawer } from '@renderer/store/chatDrawer'
 import { useGraphBuildRun } from '@renderer/store/graphBuildRun'
 import { useNewsRun } from '@renderer/store/newsRun'
+import { useSignalsStore } from '@renderer/store/signals'
 import { useTrendingRun } from '@renderer/store/trendingRun'
-import { type Section, useUiStore } from '@renderer/store/ui'
+import { useUiStore } from '@renderer/store/ui'
+import type { SignalView } from '@shared/signals'
 import { type CSSProperties, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-
-// First couple of meaningful lines of a digest, with frontmatter + leading
-// markdown heading marks stripped, for the signal-card preview.
-function digestSnippet(raw: string): string {
-  const noFm = raw.replace(/^---\n[\s\S]*?\n---\n?/, '')
-  const lines = noFm
-    .split('\n')
-    .map((l) =>
-      l
-        .replace(/^#{1,6}\s*/, '')
-        .replace(/^[*->\s]+/, '')
-        .trim(),
-    )
-    .filter((l) => l.length > 0)
-  return lines.slice(0, 2).join(' — ').slice(0, 160)
-}
 
 // ── TELEMETRY MARQUEE ──────────────────────────────────────────────────────
 // A thin, endlessly scrolling strip of live readouts (all real data; the
@@ -326,59 +314,31 @@ function QuickActions() {
 }
 
 // ── SIGNALS ────────────────────────────────────────────────────────────────
-// External digest freshness only — the skills/plugins/system counters are gone.
-function SignalCard({
-  label,
-  to,
-  updatedAt,
-  raw,
-}: {
-  label: string
-  to: Section
-  updatedAt: string | null | undefined
-  raw: string | undefined
-}) {
-  const go = useUiStore((s) => s.setSection)
-  const snippet = raw ? digestSnippet(raw) : ''
+// Live cross-subsystem event feed (jobs, benchmark, infra, roadmap, chat). Reads
+// the signals store fed by the app-wide SignalsHost subscription — no fetch here.
+function SignalFeedRow({ sig, onOpen }: { sig: SignalView; onOpen: (s: SignalView) => void }) {
+  const { icon: Icon, color } = SEVERITY_META[sig.severity]
+  const unread = sig.readAt === null
   return (
     <button
       type="button"
-      onClick={() => go(to)}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        textAlign: 'left',
-        background: 'none',
-        border: 'none',
-        borderBottom: '1px dashed var(--line-dim)',
-        cursor: 'pointer',
-        padding: '10px 0',
-      }}
+      className={`sig-feed-row${unread ? ' unread' : ''}`}
+      onClick={() => onOpen(sig)}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 12,
-          fontFamily: 'var(--mono)',
-          fontSize: 12,
-        }}
-      >
-        <span style={{ color: 'var(--fg-2)' }}>{label}</span>
-        <span style={{ color: 'var(--fg-4)' }}>{timeAgo(updatedAt)}</span>
-      </div>
-      <span className="line-clamp-2" style={{ fontSize: 13, color: 'var(--fg-3)' }}>
-        {snippet || 'no digest yet'}
+      <span className="sig-feed-ico" style={{ color }}>
+        <Icon size={14} />
       </span>
+      <span className="sig-feed-title">{sig.title}</span>
+      <span className="sig-feed-time">{timeAgo(sig.createdAt)}</span>
     </button>
   )
 }
 
 function SignalsPanel() {
-  const news = trpc.news.read.useQuery()
-  const trending = trpc.trending.read.useQuery()
+  const signals = useSignalsStore((s) => s.signals)
   const beam = useBeamRoam((s) => s.active === 'signals')
+  const open = useOpenSignal()
+  const top = signals.slice(0, 6)
   return (
     <div className="panel">
       {beam && <BorderBeam duration={5} />}
@@ -386,21 +346,14 @@ function SignalsPanel() {
         <span className="ttl">
           <ScrambleText text="signals" />
         </span>
-        <DrillLink to="news" label="news" />
+        <DrillLink to="signals" label="view all" />
       </div>
       <div className="panel-body">
-        <SignalCard
-          label="AI NEWS"
-          to="news"
-          updatedAt={news.data?.updatedAt}
-          raw={news.data?.raw}
-        />
-        <SignalCard
-          label="GITHUB TRENDING"
-          to="news"
-          updatedAt={trending.data?.updatedAt}
-          raw={trending.data?.raw}
-        />
+        {top.length === 0 ? (
+          <Note>no signals yet</Note>
+        ) : (
+          top.map((sig) => <SignalFeedRow key={sig.id} sig={sig} onOpen={open} />)
+        )}
       </div>
     </div>
   )

@@ -7,6 +7,7 @@ import {
   setDevBinding,
   updateRoadmapItem,
 } from '@main/services/roadmap/store'
+import { recordSignal } from '@main/services/signals/registry'
 import { publicProcedure, router } from '@main/trpc/trpc'
 import {
   devBindingSchema,
@@ -23,12 +24,40 @@ export const roadmapRouter = router({
   create: publicProcedure
     .input(roadmapCreateSchema)
     .output(roadmapItemSchema)
-    .mutation(({ input }) => createRoadmapItem(input)),
+    .mutation(({ input }) => {
+      const item = createRoadmapItem(input)
+      recordSignal({
+        source: 'roadmap',
+        type: 'roadmap.card_added',
+        severity: 'info',
+        title: `New idea: ${item.title}`,
+        detail: item.category,
+        link: 'roadmap',
+        linkKind: 'section',
+      })
+      return item
+    }),
 
   update: publicProcedure
     .input(roadmapUpdateSchema)
     .output(roadmapItemSchema)
-    .mutation(({ input }) => updateRoadmapItem(input)),
+    .mutation(({ input }) => {
+      const item = updateRoadmapItem(input)
+      // Only a status transition is signal-worthy (drag/edit of other fields is
+      // noise). `input.status` is present only when the caller changed it.
+      if (input.status) {
+        recordSignal({
+          source: 'roadmap',
+          type: 'roadmap.status_changed',
+          severity: input.status === 'done' ? 'success' : 'info',
+          title: `${item.title} → ${input.status}`,
+          detail: null,
+          link: 'roadmap',
+          linkKind: 'section',
+        })
+      }
+      return item
+    }),
 
   remove: publicProcedure
     .input(z.object({ id: z.string().min(1) }))

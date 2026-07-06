@@ -13,6 +13,7 @@ import { TASKS } from '@main/services/benchmark/tasks'
 import type { BenchmarkTask } from '@main/services/benchmark/types'
 import { type JobHandle, jobRegistry } from '@main/services/jobs/registry'
 import { readInfraState } from '@main/services/productivity/infra'
+import { recordSignal } from '@main/services/signals/registry'
 import { eq } from 'drizzle-orm'
 import { Notification } from 'electron'
 
@@ -229,6 +230,17 @@ async function runLoop(
     job.finish(progress.error ? 'error' : 'done', {
       detail: `${progress.done}/${progress.total} runs${progress.failed ? ` · ${progress.failed} failed` : ''}`,
       error: progress.error ?? undefined,
+    })
+    // Batch-level Signals entry (richer than the generic job signal, which is
+    // suppressed for kind='benchmark'). Warning when any run failed or the batch
+    // crashed; success on a clean sweep.
+    recordSignal({
+      source: 'benchmark',
+      type: 'benchmark.batch_done',
+      severity: progress.error || progress.failed > 0 ? 'warning' : 'success',
+      title: 'Benchmark batch complete',
+      detail:
+        progress.error ?? `${progress.done}/${progress.total} runs · ${progress.failed} failed`,
     })
     progress.running = false
     progress.phase = 'done'

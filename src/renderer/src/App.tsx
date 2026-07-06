@@ -7,6 +7,7 @@ import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { NewsRunHost } from '@renderer/components/NewsRunHost'
+import { SignalsHost } from '@renderer/components/SignalsHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
 import { Toaster } from '@renderer/components/ui/sonner'
@@ -19,6 +20,7 @@ import { Plugins } from '@renderer/pages/Plugins'
 import { Productivity } from '@renderer/pages/Productivity'
 import { Roadmap } from '@renderer/pages/Roadmap'
 import { Settings } from '@renderer/pages/Settings'
+import { Signals } from '@renderer/pages/Signals'
 import { Skills } from '@renderer/pages/Skills'
 import { Stats } from '@renderer/pages/Stats'
 import { useResolvedTheme } from '@renderer/providers/ThemeProvider'
@@ -41,6 +43,7 @@ const PAGES: Record<Section, ComponentType> = {
   productivity: Productivity,
   knowledge: Knowledge,
   news: News,
+  signals: Signals,
   info: Info,
   skills: Skills,
   plugins: Plugins,
@@ -99,6 +102,7 @@ export function App() {
         </div>
         <NewsRunHost />
         <TrendingRunHost />
+        <SignalsHost />
         <GraphBuildRunHost />
         <ChatHost
           useRun={useGeneralChatRun}
