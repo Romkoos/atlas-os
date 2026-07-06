@@ -1,6 +1,6 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
-import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
+import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
 import { trpc } from '@renderer/lib/trpc'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import { useWorkerPrefill } from '@renderer/store/workerPrefill'
@@ -17,6 +17,9 @@ export function WorkerChatOverlay() {
   const awaitingInput = useWorkerChatRun((s) => s.awaitingInput)
   const startSession = useWorkerChatRun((s) => s.start)
   const pushUserReply = useWorkerChatRun((s) => s.pushUserReply)
+  const timelineEvents = useWorkerChatRun((s) => s.timelineEvents)
+  const running = useWorkerChatRun((s) => s.running)
+  const freshStart = useWorkerChatRun((s) => s.freshStart)
 
   const reply = trpc.workerChat.reply.useMutation()
   const [draft, setDraft] = useState('')
@@ -81,10 +84,14 @@ export function WorkerChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript
+      <TimelineChatBody
+        sessionId={sessionId}
         transcript={transcript}
         streaming={streaming}
         awaitingInput={awaitingInput}
+        timelineEvents={timelineEvents}
+        running={running}
+        freshStart={freshStart}
         onPickOption={send}
       />
       <ChatComposer

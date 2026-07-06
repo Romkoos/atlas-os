@@ -1,6 +1,6 @@
 // src/renderer/src/components/BenchmarkChatOverlay.tsx
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
-import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
+import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 
@@ -14,6 +14,9 @@ export function BenchmarkChatOverlay() {
   const streaming = useBenchmarkChatRun((s) => s.streaming)
   const awaitingInput = useBenchmarkChatRun((s) => s.awaitingInput)
   const pushUserReply = useBenchmarkChatRun((s) => s.pushUserReply)
+  const timelineEvents = useBenchmarkChatRun((s) => s.timelineEvents)
+  const running = useBenchmarkChatRun((s) => s.running)
+  const freshStart = useBenchmarkChatRun((s) => s.freshStart)
 
   const reply = trpc.benchmarkChat.reply.useMutation()
 
@@ -27,10 +30,14 @@ export function BenchmarkChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript
+      <TimelineChatBody
+        sessionId={sessionId}
         transcript={transcript}
         streaming={streaming}
         awaitingInput={awaitingInput}
+        timelineEvents={timelineEvents}
+        running={running}
+        freshStart={freshStart}
         onPickOption={send}
       />
       <ChatComposer

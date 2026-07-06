@@ -1,6 +1,6 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
-import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
+import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
 import { trpc } from '@renderer/lib/trpc'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import type { ClaudeModelId } from '@shared/models'
@@ -17,6 +17,9 @@ export function GeneralChatOverlay() {
   const awaitingInput = useGeneralChatRun((s) => s.awaitingInput)
   const startSession = useGeneralChatRun((s) => s.start)
   const pushUserReply = useGeneralChatRun((s) => s.pushUserReply)
+  const timelineEvents = useGeneralChatRun((s) => s.timelineEvents)
+  const running = useGeneralChatRun((s) => s.running)
+  const freshStart = useGeneralChatRun((s) => s.freshStart)
 
   const reply = trpc.generalChat.reply.useMutation()
   const [draft, setDraft] = useState('')
@@ -71,10 +74,14 @@ export function GeneralChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript
+      <TimelineChatBody
+        sessionId={sessionId}
         transcript={transcript}
         streaming={streaming}
         awaitingInput={awaitingInput}
+        timelineEvents={timelineEvents}
+        running={running}
+        freshStart={freshStart}
         onPickOption={send}
       />
       <ChatComposer

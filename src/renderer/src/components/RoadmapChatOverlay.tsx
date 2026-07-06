@@ -1,5 +1,5 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
-import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
+import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
 import { trpc } from '@renderer/lib/trpc'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { CheckCircle2 } from 'lucide-react'
@@ -18,6 +18,9 @@ export function RoadmapChatOverlay() {
   const savedItem = useRoadmapSaved((s) => s.savedItem)
   const startSession = useRoadmapChatRun((s) => s.start)
   const pushUserReply = useRoadmapChatRun((s) => s.pushUserReply)
+  const timelineEvents = useRoadmapChatRun((s) => s.timelineEvents)
+  const running = useRoadmapChatRun((s) => s.running)
+  const freshStart = useRoadmapChatRun((s) => s.freshStart)
 
   const reply = trpc.roadmapChat.reply.useMutation()
   const [draft, setDraft] = useState('')
@@ -77,10 +80,14 @@ export function RoadmapChatOverlay() {
 
   return (
     <div className="chat-body-flex">
-      <ChatTranscript
+      <TimelineChatBody
+        sessionId={sessionId}
         transcript={transcript}
         streaming={streaming}
         awaitingInput={awaitingInput}
+        timelineEvents={timelineEvents}
+        running={running}
+        freshStart={freshStart}
         onPickOption={send}
       />
       {savedItem ? (

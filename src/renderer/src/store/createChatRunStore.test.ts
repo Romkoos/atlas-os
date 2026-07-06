@@ -69,4 +69,28 @@ describe('createChatRunStore', () => {
       })
     })
   })
+
+  it('accumulates timelineEvents and clears them on reset/start', () => {
+    const useRun = createChatRunStore('test-timeline')
+    useRun.getState().start('hi')
+    expect(useRun.getState().timelineEvents).toEqual([])
+    useRun
+      .getState()
+      .pushTimelineEvent({ type: 'tool', toolId: 't1', name: 'Read', summary: 'Read', ts: 1 })
+    expect(useRun.getState().timelineEvents).toHaveLength(1)
+    useRun.getState().reset()
+    expect(useRun.getState().timelineEvents).toEqual([])
+  })
+
+  it('freshStart is true only for a session started in this app session', () => {
+    const useRun = createChatRunStore('test-fresh-start')
+    useRun.getState().start('hi')
+    expect(useRun.getState().freshStart).toBe(true)
+
+    useRun.getState().reattach()
+    expect(useRun.getState().freshStart).toBe(false)
+
+    useRun.getState().reset()
+    expect(useRun.getState().freshStart).toBe(false)
+  })
 })

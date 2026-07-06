@@ -1,4 +1,5 @@
 import type { ClaudeModelId } from '@shared/models'
+import type { TimelineEvent } from '@shared/timeline'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -29,6 +30,14 @@ export interface BaseChatRunState {
   awaitingInput: boolean
   status: ChatStatus
   lastSeq: number
+  // Non-persisted log of enriched timeline events for the live waterfall. Not
+  // persisted: after an app restart it is empty, so the Timeline tab falls back
+  // to the on-disk transcript (replay).
+  timelineEvents: TimelineEvent[]
+  // True only for a session started fresh in this app session; false after a
+  // reattach/restart, so the Timeline view prefers the complete on-disk
+  // transcript over the partial live buffer.
+  freshStart: boolean
   running: boolean
   // Model chosen for this chat. null = fall back to the global default model.
   // Fixed for the life of a session (captured at start / reused on reattach).
@@ -46,6 +55,7 @@ export interface BaseChatRunState {
   setLimited: (resumesInMs?: number) => void
   setResuming: () => void
   bumpSeq: (seq: number) => void
+  pushTimelineEvent: (ev: TimelineEvent) => void
   finish: (status: 'done' | 'error' | 'aborted') => void
   reset: () => void
 }
@@ -97,6 +107,8 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
         awaitingInput: false,
         status: 'idle',
         lastSeq: 0,
+        timelineEvents: [],
+        freshStart: false,
         running: false,
         model: null,
         start: (message, model) =>
@@ -107,6 +119,8 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             awaitingInput: false,
             status: 'running',
             lastSeq: 0,
+            timelineEvents: [],
+            freshStart: true,
             running: true,
             model: model !== undefined ? model : s.model,
           })),
@@ -120,10 +134,12 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             awaitingInput: false,
             status: 'running',
             lastSeq: 0,
+            timelineEvents: [],
+            freshStart: true,
             running: true,
             model: model !== undefined ? model : s.model,
           })),
-        reattach: () => set({ running: true }),
+        reattach: () => set({ running: true, freshStart: false }),
         appendToken: (text) =>
           set((s) => ({ streaming: s.streaming + text, awaitingInput: false })),
         flushTurn: () =>
@@ -159,6 +175,7 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
         setLimited: () => set({ status: 'limited', awaitingInput: false, running: true }),
         setResuming: () => set({ status: 'running', awaitingInput: false, running: true }),
         bumpSeq: (seq) => set((s) => ({ lastSeq: Math.max(s.lastSeq, seq) })),
+        pushTimelineEvent: (ev) => set((s) => ({ timelineEvents: [...s.timelineEvents, ev] })),
         finish: (status) =>
           set((s) => ({
             running: false,
@@ -174,6 +191,8 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             awaitingInput: false,
             status: 'idle',
             lastSeq: 0,
+            timelineEvents: [],
+            freshStart: false,
             running: false,
             model: null,
           }),
