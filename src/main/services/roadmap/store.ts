@@ -4,7 +4,7 @@ import { db } from '@main/db/client'
 import { roadmapItems } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { ROADMAP_SEED } from '@main/services/roadmap/seed'
-import type { RoadmapCreate, RoadmapItem, RoadmapUpdate } from '@shared/roadmap'
+import type { DevBinding, RoadmapCreate, RoadmapItem, RoadmapUpdate } from '@shared/roadmap'
 import { and, asc, eq } from 'drizzle-orm'
 import Store from 'electron-store'
 
@@ -26,6 +26,33 @@ function meta(): Store<RoadmapMeta> {
     })
   }
   return metaStore
+}
+
+// The worker's current development binding (which roadmap item it is building,
+// and whether we are still planning or actively building). Its own store so it
+// survives restart independently of the seed/meta flags.
+interface DevBindingStore {
+  binding: DevBinding | null
+}
+let devStore: Store<DevBindingStore> | null = null
+function devBindingStoreInstance(): Store<DevBindingStore> {
+  if (!devStore) {
+    devStore = new Store<DevBindingStore>({
+      name: 'roadmap-dev-binding',
+      defaults: { binding: null },
+    })
+  }
+  return devStore
+}
+
+export function getDevBinding(): DevBinding | null {
+  return devBindingStoreInstance().get('binding')
+}
+export function setDevBinding(binding: DevBinding): void {
+  devBindingStoreInstance().set('binding', binding)
+}
+export function clearDevBinding(): void {
+  devBindingStoreInstance().set('binding', null)
 }
 
 // Serialize a DB row (Date timestamps) into the wire shape (epoch ms).
