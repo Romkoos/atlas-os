@@ -12,6 +12,7 @@ export interface AppPaths {
   claudeDir: string // ~/.claude — infra watcher root (settings.json, skills/)
   claudeJson: string // ~/.claude.json — MCP server config
   infraSnapshot: string // userData/infra-snapshot.json — last seen infra state
+  usageSnapshot: string // userData/usage-snapshot.json — last known subscription usage
 }
 
 // Working directory for spawned agent runs (worker/general/roadmap/benchmark
@@ -38,6 +39,23 @@ export function claudeCliPath(): string | undefined {
   )
 }
 
+// Executable to pass to `execFile`/`spawn` when shelling out to the Claude Code
+// CLI (plugins, /usage). Packaged: the bundled binary's absolute path (launchd's
+// minimal PATH has no `claude`). Dev: the bare name, resolved off the developer's
+// PATH like their terminal.
+export function claudeExecutable(): string {
+  return claudeCliPath() ?? 'claude'
+}
+
+// Spread into an Agent SDK `query()` options object so it spawns the bundled
+// `claude` in a packaged build instead of the SDK's own asar-relative resolution
+// (which `spawn` rejects with ENOTDIR). Empty in dev — the SDK resolves it from
+// node_modules as before.
+export function claudeSdkExecutableOption(): { pathToClaudeCodeExecutable?: string } {
+  const path = claudeCliPath()
+  return path ? { pathToClaudeCodeExecutable: path } : {}
+}
+
 // Must be called after app is ready (depends on app.getPath).
 export function appPaths(): AppPaths {
   const userData = app.getPath('userData')
@@ -55,5 +73,6 @@ export function appPaths(): AppPaths {
     claudeDir: join(home, '.claude'),
     claudeJson: join(home, '.claude.json'),
     infraSnapshot: join(userData, 'infra-snapshot.json'),
+    usageSnapshot: join(userData, 'usage-snapshot.json'),
   }
 }

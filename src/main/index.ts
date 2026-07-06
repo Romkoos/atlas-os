@@ -60,9 +60,12 @@ app
 
     ingestProductivity()
 
-    // Keep the usage gauge populated at rest: poll the subscription usage endpoint
-    // (same data as the CLI's `/usage`) so the widget shows real limits without
-    // waiting for a chat run's intermittent rate_limit_event.
+    // Show the last known usage immediately (survives restarts and a throttled
+    // `/usage` endpoint), then keep the gauge populated at rest: poll the
+    // subscription usage endpoint (same data as the CLI's `/usage`) so the widget
+    // shows real limits without waiting for a chat run's intermittent
+    // rate_limit_event.
+    subscriptionUsage.restore(appPaths().usageSnapshot)
     startUsagePolling((windows) => subscriptionUsage.updateFromPoll(windows, Date.now()))
 
     app.on('activate', () => {
