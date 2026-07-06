@@ -504,11 +504,7 @@ export function Plugins() {
 
   return (
     <>
-      <PageHeader
-        num="09"
-        title="PLUGINS"
-        description="Browse, install and health-check your global Claude Code plugins & MCP servers."
-      />
+      <PageHeader num="09" title="PLUGINS" />
 
       <div className="tabs">
         {TABS.map((t) => (

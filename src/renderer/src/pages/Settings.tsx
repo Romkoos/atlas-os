@@ -367,11 +367,7 @@ export function Settings() {
 
   return (
     <>
-      <PageHeader
-        num="10"
-        title="SETTINGS"
-        description={<>Model, output folder, theme, logging.</>}
-      />
+      <PageHeader num="10" title="SETTINGS" />
       <div className="scroll">
         {/* AUTH banner */}
         <div className="panel" style={{ borderColor: 'var(--amber-dim)', borderStyle: 'solid' }}>

@@ -67,7 +67,6 @@ export function Stats() {
       <PageHeader
         num="03"
         title="STATS"
-        description="Usage over the last 30 days."
         action={
           <button type="button" className="btn" onClick={refresh} disabled={refreshing}>
             {refreshing ? '↻ REFRESHING…' : '↻ REFRESH'}

@@ -94,7 +94,6 @@ export function Roadmap() {
       <PageHeader
         num="02"
         title="ROADMAP"
-        description="Candidate features for Atlas OS. Track, prioritize, and evolve the build manifest."
         action={
           <div className="rm-head-actions">
             <div className="tabs rm-view-tabs">

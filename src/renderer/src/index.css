@@ -453,14 +453,6 @@
       var(--panel);
     font-variant-numeric: tabular-nums;
   }
-  .page-head .desc {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--fg-3);
-    margin-top: 6px;
-    max-width: 64ch;
-    line-height: 1.5;
-  }
   .page-head .right {
     display: flex;
     align-items: center;
@@ -3071,23 +3063,10 @@ textarea.input:focus,
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Page title rises in; the description fades up just behind it.
+  /* Page title rises in.
      (The title text itself scramble-decrypts via <ScrambleText>.) */
   .page-head h2 {
     animation: fx-rise 0.3s var(--ease-out) both;
-  }
-  .page-head .desc {
-    animation: atlas-fade-up 0.45s 0.14s var(--ease-out) both;
-  }
-  @keyframes atlas-fade-up {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
   }
 
   /* Sidebar nav items stagger in from the left on mount. */

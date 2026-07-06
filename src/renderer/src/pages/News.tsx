@@ -79,7 +79,6 @@ export function News() {
       <PageHeader
         num="06"
         title="NEWS"
-        description={copy.description}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {updatedAt && !run.running && (

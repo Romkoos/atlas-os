@@ -68,7 +68,6 @@ export function Knowledge() {
       <PageHeader
         num="05"
         title="KNOWLEDGE"
-        description="Per-project knowledge base — read-only."
         action={
           hasProjects ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
