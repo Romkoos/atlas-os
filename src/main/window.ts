@@ -1,5 +1,9 @@
 import { join } from 'node:path'
+import { buildMenu } from '@main/menu'
 import { BrowserWindow, ipcMain, shell } from 'electron'
+
+// The single primary window. Tracked so the tray/dock can reopen it after close.
+let mainWindow: BrowserWindow | null = null
 
 // The renderer draws its own terminal title bar (frame: false), so window
 // controls come back over IPC. Registered once for all windows.
@@ -37,6 +41,11 @@ export function createMainWindow(): BrowserWindow {
     },
   })
 
+  mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+  })
+
   // Launch filling the screen. Maximize (not fullscreen) so the custom title
   // bar and window controls stay visible; the width/height above are the
   // restore-down size.
@@ -57,5 +66,20 @@ export function createMainWindow(): BrowserWindow {
     void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  return win
+}
+
+// The live primary window, or null if it has been closed/destroyed.
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+}
+
+// The primary window, recreated (with its menu) if it was closed. Used by the
+// tray and the dock 'activate' handler so the window always comes back.
+export function ensureMainWindow(): BrowserWindow {
+  const existing = getMainWindow()
+  if (existing) return existing
+  const win = createMainWindow()
+  buildMenu(win)
   return win
 }
