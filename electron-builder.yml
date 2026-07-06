@@ -27,9 +27,13 @@ mac:
   target:
     - dmg
   artifactName: ${productName}-${version}-${arch}.dmg
-  # No Developer ID / notarization configured. electron-builder ad-hoc signs the
-  # bundle so it runs on Apple Silicon; Gatekeeper still warns on other Macs.
-  # See README → TODO before distributing outside your own machine.
+  # Sign with a local self-signed identity (see scripts/create-signing-cert.sh)
+  # instead of ad-hoc. A stable signing identity gives the app a stable TCC
+  # "designated requirement", so a one-time Full Disk Access grant survives
+  # rebuilds (ad-hoc's cdhash changes every build and re-triggers prompts).
+  # Not for distribution — Gatekeeper still warns on other Macs (no Developer ID
+  # / notarization). `identity` is matched against the login keychain by name.
+  identity: Atlas OS Local
 
 dmg:
   artifactName: ${productName}-${version}-${arch}.dmg
