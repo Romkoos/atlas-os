@@ -5,6 +5,7 @@ import { useUiStore } from '@renderer/store/ui'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import { useWorkerPrefill } from '@renderer/store/workerPrefill'
 import type { RoadmapItem } from '@shared/roadmap'
+import { buildDevPlanKickoff } from '@shared/roadmap'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -48,21 +49,30 @@ export function Roadmap() {
     onError: (err) => toast.error(err.message),
   })
 
-  // Kick off a worker chat pre-loaded with this idea's Claude Code prompt on the
-  // latest Opus. Non-destructive: if a worker is actively busy we surface it
-  // rather than clobber its run; otherwise reset it and seed the fresh intro.
+  const setBinding = trpc.roadmap.setDevBinding.useMutation({
+    onSuccess: () => utils.roadmap.getDevBinding.invalidate(),
+  })
+
+  // Rocket: begin the plan → build → deploy lifecycle for one item. Moves the
+  // item to `planned`, binds the worker to it, and auto-starts an interactive
+  // brainstorm. Refuses if the worker is already bound/busy (non-destructive).
   const BUSY_STATUSES = ['running', 'awaiting', 'reconnecting', 'limited']
-  const startDevelopment = (item: RoadmapItem) => {
+  const startDevelopment = async (item: RoadmapItem) => {
     if (!item.claudePrompt) return
-    if (BUSY_STATUSES.includes(useWorkerChatRun.getState().status)) {
+    const existing = await utils.roadmap.getDevBinding.fetch()
+    const busy = BUSY_STATUSES.includes(useWorkerChatRun.getState().status)
+    if (existing || busy) {
       useChatDrawer.getState().openSession({ type: 'worker' })
-      toast.error('Worker is busy — finish or close it first')
+      toast.error('Worker is busy — finish or stop the current development first')
       return
     }
+    update.mutate({ id: item.id, status: 'planned' })
+    setBinding.mutate({ itemId: item.id, phase: 'planning' })
     useWorkerChatRun.getState().reset()
     useWorkerPrefill.getState().setPrefill({
-      prompt: item.claudePrompt,
+      prompt: buildDevPlanKickoff(item),
       model: 'claude-opus-4-8',
+      autoStart: true,
     })
     useChatDrawer.getState().openSession({ type: 'worker' })
   }
