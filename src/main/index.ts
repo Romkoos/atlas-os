@@ -6,6 +6,7 @@ import { applySecurity } from '@main/security'
 import { chatRegistry } from '@main/services/chat/registry'
 import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
 import { startUsagePolling } from '@main/services/chat/usagePoll'
+import { initShellPath } from '@main/services/llm/shellPath'
 import { ingestAll } from '@main/services/productivity/ingest'
 import {
   backfillRoadmapClaudePrompts,
@@ -40,6 +41,14 @@ app
     const settings = getSettings()
     initLogger(settings.logLevel)
     logger.info('Atlas OS starting', { version: app.getVersion() })
+
+    // Resolve the user's real login-shell PATH so spawned agents (and their Bash
+    // tool → graphify/uv) escape launchd's minimal PATH in a packaged build.
+    // Fire-and-forget: fallback bin dirs (incl. ~/.local/bin) already cover the
+    // common tools, so early spawns work even before this resolves. No-op in dev.
+    initShellPath({ isPackaged: app.isPackaged })
+      .then(() => logger.info('Shell PATH resolved for spawned agents'))
+      .catch((error) => logger.warn('Shell PATH resolution failed; using fallback dirs', error))
 
     // After the machine wakes, re-establish any chat run whose stream died during
     // sleep instead of waiting for the per-run stall watchdog.
