@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
+import { enrichedPath } from '@main/services/llm/shellPath'
 import {
   type ArticleDoc,
   type ArticleKind,
@@ -234,7 +235,7 @@ export async function runQuery(root: string, project: string, q: string): Promis
       'uv',
       ['run', '--directory', engine, 'python', 'scripts/query.py', q],
       {
-        env: { ...process.env, ATLAS_KB_ROOT: projRoot },
+        env: { ...process.env, PATH: enrichedPath(), ATLAS_KB_ROOT: projRoot },
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
       },
@@ -285,7 +286,7 @@ export async function compileProject(root: string, project: string): Promise<Com
       'uv',
       ['run', '--directory', engine, 'python', 'scripts/compile.py'],
       {
-        env: { ...process.env, ATLAS_KB_ROOT: projRoot },
+        env: { ...process.env, PATH: enrichedPath(), ATLAS_KB_ROOT: projRoot },
         timeout: 15 * 60_000,
         maxBuffer: 10 * 1024 * 1024,
       },
