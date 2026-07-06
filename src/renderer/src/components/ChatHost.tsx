@@ -87,6 +87,10 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
         toolId?: string
         resultText?: string
         isError?: boolean
+        ts?: number
+        subagentType?: string
+        inputTokens?: number
+        outputTokens?: number
       }
       switch (e.type) {
         case 'token':
@@ -94,23 +98,48 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
           break
         case 'tool':
           store.pushTool(e.toolId ?? '', e.name ?? '', e.summary ?? '')
+          store.pushTimelineEvent({
+            type: 'tool',
+            toolId: e.toolId ?? '',
+            name: e.name ?? '',
+            summary: e.summary ?? '',
+            ts: e.ts ?? Date.now(),
+            subagentType: e.subagentType,
+          })
           break
         case 'tool-result':
           store.resolveTool(e.toolId ?? '', e.resultText ?? '', e.isError === true)
+          store.pushTimelineEvent({
+            type: 'tool-result',
+            toolId: e.toolId ?? '',
+            ts: e.ts ?? Date.now(),
+            isError: e.isError === true,
+          })
+          break
+        case 'usage':
+          store.pushTimelineEvent({
+            type: 'usage',
+            ts: e.ts ?? Date.now(),
+            inputTokens: e.inputTokens ?? 0,
+            outputTokens: e.outputTokens ?? 0,
+          })
           break
         case 'awaiting-input':
           store.flushTurn()
           store.setAwaiting(true)
           break
         case 'done':
+          store.pushTimelineEvent({ type: 'end', ts: Date.now() })
           store.flushTurn()
           store.finish('done')
           break
         case 'error':
+          store.pushTimelineEvent({ type: 'end', ts: Date.now() })
           store.finish('error')
           if (e.message) toast.error(e.message)
           break
         case 'aborted':
+          store.pushTimelineEvent({ type: 'end', ts: Date.now() })
           store.finish('aborted')
           break
         case 'reconnecting':

@@ -119,4 +119,46 @@ describe('startResumableChat', () => {
     expect(captured.options.resume).toBe('uuid-2')
     expect(captured.options.sessionId).toBeUndefined()
   })
+
+  it('stamps tool/tool-result ts and emits cumulative usage', async () => {
+    queryMock.mockImplementation(() =>
+      fakeQuery([
+        {
+          type: 'assistant',
+          message: {
+            content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: 'a.ts' } }],
+            usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 2 },
+          },
+        },
+        {
+          type: 'user',
+          message: {
+            content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok', is_error: false }],
+          },
+        },
+        { type: 'result', subtype: 'success' },
+      ]),
+    )
+    // biome-ignore lint/suspicious/noExplicitAny: collected events
+    const events: any[] = []
+    const run = startResumableChat({
+      sessionId: 'uuid-tl',
+      model: 'm',
+      cwd: '/repo',
+      allowedTools: ['Read'],
+      settingSources: ['user'],
+      env: {},
+      seed: 'go',
+      resume: false,
+      now: () => 1000,
+      emit: (e) => events.push(e),
+    })
+    await run.done
+    const tool = events.find((e) => e.type === 'tool')
+    expect(tool).toMatchObject({ toolId: 't1', name: 'Read', ts: 1000 })
+    const result = events.find((e) => e.type === 'tool-result')
+    expect(result).toMatchObject({ toolId: 't1', ts: 1000 })
+    const usage = events.find((e) => e.type === 'usage')
+    expect(usage).toMatchObject({ inputTokens: 12, outputTokens: 5, ts: 1000 })
+  })
 })

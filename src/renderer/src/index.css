@@ -5050,3 +5050,28 @@ textarea.input:focus,
     display: none;
   }
 }
+
+/* ── Session timeline (flame/waterfall) ─────────────────────────────── */
+.chat-view-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.chat-view-toggle { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--color-border); }
+.chat-view-toggle button {
+  font: inherit; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 3px 10px; border: 1px solid var(--color-border); border-radius: 4px;
+  background: transparent; color: var(--color-muted-foreground); cursor: pointer;
+}
+.chat-view-toggle button.active { color: var(--color-chart-1); border-color: var(--color-chart-1); }
+.tl-wrap { flex: 1; overflow: auto; padding: 10px 12px; font-size: 11px; }
+.tl-empty { flex: 1; display: grid; place-items: center; color: var(--color-muted-foreground); font-size: 12px; }
+.tl-spark { position: relative; height: 40px; margin-bottom: 8px; border-bottom: 1px dashed var(--color-border); }
+.tl-spark svg { width: 100%; height: 100%; display: block; }
+.tl-spark-cap { position: absolute; top: 2px; right: 2px; color: var(--color-muted-foreground); font-size: 10px; }
+.tl-rows { display: flex; flex-direction: column; gap: 3px; }
+.tl-row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 8px; }
+.tl-row-child .tl-label { padding-left: 12px; opacity: 0.8; }
+.tl-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-muted-foreground); }
+.tl-track { position: relative; height: 14px; background: color-mix(in srgb, var(--color-border) 40%, transparent); border-radius: 3px; }
+.tl-bar { position: absolute; top: 0; height: 100%; border-radius: 3px; min-width: 2px; }
+.tl-bar-running { opacity: 0.55; animation: tl-pulse 1s ease-in-out infinite; }
+.tl-bar-error { outline: 1px solid var(--color-destructive); }
+.tl-axis { display: flex; justify-content: space-between; margin-top: 6px; color: var(--color-muted-foreground); font-size: 10px; }
+@keyframes tl-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.85; } }

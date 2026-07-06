@@ -39,6 +39,8 @@ export interface StartResumableChatOptions {
   }) => void
   onAssistantText?: (delta: string, accumulated: string) => void
   onTurnComplete?: (accumulated: string) => void
+  // Injected clock so event timestamps are deterministic in tests. Defaults to Date.now.
+  now?: () => number
 }
 
 // Generic streaming-input chat run. On a new session we assign our own stable
@@ -50,6 +52,9 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
   let mailbox: Mailbox | null = null
   let stopped = false
   let accumulated = ''
+  const now = opts.now ?? Date.now
+  let cumIn = 0
+  let cumOut = 0
 
   const STALL_MS = 90_000
   let watchdog: ReturnType<typeof setTimeout> | null = null
@@ -104,13 +109,25 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
           opts.onAssistantText?.(event.delta.text, accumulated)
         }
       } else if (message.type === 'assistant') {
+        const usage = (message.message as { usage?: Record<string, number> }).usage
+        if (usage) {
+          cumOut += usage.output_tokens ?? 0
+          cumIn += (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0)
+          opts.emit({ type: 'usage', ts: now(), inputTokens: cumIn, outputTokens: cumOut })
+        }
         for (const block of message.message.content) {
           if (block.type === 'tool_use') {
+            const input = block.input as Record<string, unknown> | undefined
             opts.emit({
               type: 'tool',
               name: block.name,
               summary: summarizeTool(block),
               toolId: block.id,
+              ts: now(),
+              subagentType:
+                block.name === 'Task' && typeof input?.subagent_type === 'string'
+                  ? (input.subagent_type as string)
+                  : undefined,
             })
           }
         }
@@ -124,6 +141,7 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
                 toolId: block.tool_use_id,
                 resultText: toolResultText(block.content),
                 isError: block.is_error === true,
+                ts: now(),
               })
             }
           }
