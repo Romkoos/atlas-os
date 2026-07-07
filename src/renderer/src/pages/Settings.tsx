@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
+import { useRebuildRun } from '@renderer/store/rebuildRun'
 import { CLAUDE_MODELS, DEFAULT_MODEL_ID } from '@shared/models'
 import {
   type AppSettings,
@@ -307,6 +308,72 @@ function RuntimeStatusCard({ model }: { model: string }) {
   )
 }
 
+// Build-from-prod → swap the installed app → relaunch, in one button. The run,
+// streaming log, and confirm-before-swap all live in RebuildRunHost (App level);
+// this card only starts a run (or re-opens the modal for an in-flight one).
+function RebuildCard() {
+  const open = useRebuildRun((s) => s.open)
+  const state = useRebuildRun((s) => s.state)
+  const setOpen = useRebuildRun((s) => s.setOpen)
+  const reset = useRebuildRun((s) => s.reset)
+  const start = trpc.rebuild.start.useMutation({
+    onError: (e) => toast.error(e.message),
+  })
+
+  const active = state !== 'idle' && state !== 'error'
+  const label = active ? 'VIEW REBUILD…' : '⟳ REBUILD & UPDATE'
+
+  const onClick = () => {
+    if (active) {
+      setOpen(true)
+      return
+    }
+    reset()
+    setOpen(true)
+    start.mutate()
+  }
+
+  return (
+    <div className="panel" style={{ borderColor: 'var(--line)', borderStyle: 'solid' }}>
+      <div
+        style={{
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 13,
+              color: 'var(--fg)',
+              marginBottom: 4,
+            }}
+          >
+            Rebuild &amp; Update
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-4)' }}>
+            Builds Atlas OS from the prod branch (
+            <code style={{ color: 'var(--amber)' }}>main</code>
+            ), then replaces the installed app and relaunches. You confirm before the swap.
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn primary"
+          onClick={onClick}
+          disabled={start.isPending && !open}
+        >
+          {label}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const HOTKEYS: ReadonlyArray<readonly [label: string, key: string]> = [
   ['run agent', '⌘ + ENTER'],
   ['switch screens', '⌘ + 1..5'],
@@ -369,8 +436,14 @@ export function Settings() {
     <>
       <PageHeader num="10" title="SETTINGS" />
       <div className="scroll">
+        {/* REBUILD & UPDATE — build from prod, swap the installed app, relaunch */}
+        <RebuildCard />
+
         {/* AUTH banner */}
-        <div className="panel" style={{ borderColor: 'var(--amber-dim)', borderStyle: 'solid' }}>
+        <div
+          className="panel mt-16"
+          style={{ borderColor: 'var(--amber-dim)', borderStyle: 'solid' }}
+        >
           <div
             style={{
               padding: '12px 16px',
