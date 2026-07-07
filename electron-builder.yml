@@ -24,6 +24,7 @@ asarUnpack:
 
 mac:
   category: public.app-category.developer-tools
+  icon: build/icon.icns
   target:
     - dmg
   artifactName: ${productName}-${version}-${arch}.dmg
