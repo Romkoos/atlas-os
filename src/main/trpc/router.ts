@@ -8,6 +8,7 @@ import { knowledgeRouter } from '@main/trpc/routers/knowledge'
 import { newsRouter } from '@main/trpc/routers/news'
 import { pluginsRouter } from '@main/trpc/routers/plugins'
 import { productivityRouter } from '@main/trpc/routers/productivity'
+import { rebuildRouter } from '@main/trpc/routers/rebuild'
 import { roadmapRouter } from '@main/trpc/routers/roadmap'
 import { roadmapChatRouter } from '@main/trpc/routers/roadmapChat'
 import { settingsRouter } from '@main/trpc/routers/settings'
@@ -25,6 +26,7 @@ export const appRouter = router({
   health: healthRouter,
   jobs: jobsRouter,
   settings: settingsRouter,
+  rebuild: rebuildRouter,
   stats: statsRouter,
   skills: skillsRouter,
   skillImprover: skillImproverRouter,

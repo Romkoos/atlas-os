@@ -7,6 +7,7 @@ import { NAV } from '@renderer/components/layout/nav'
 import { Sidebar } from '@renderer/components/layout/Sidebar'
 import { TitleBar } from '@renderer/components/layout/TitleBar'
 import { NewsRunHost } from '@renderer/components/NewsRunHost'
+import { RebuildRunHost } from '@renderer/components/RebuildRunHost'
 import { SignalsHost } from '@renderer/components/SignalsHost'
 import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
@@ -101,6 +102,7 @@ export function App() {
           </div>
         </div>
         <NewsRunHost />
+        <RebuildRunHost />
         <TrendingRunHost />
         <SignalsHost />
         <GraphBuildRunHost />
