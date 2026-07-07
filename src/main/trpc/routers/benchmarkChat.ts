@@ -44,6 +44,16 @@ export const benchmarkChatRouter = router({
       observable<SeqEnvelope<BenchmarkChatEvent>>((emit) => {
         const model = getSettings().model ?? DEFAULT_MODEL_ID
         const cwd = repoRoot()
+        // A fresh discussion needs its batch analysis on disk. Validate up front so
+        // we never open a session (or register a job) for a batch with no analysis.
+        const seed = input.kickoff ? seedForBatch(input.kickoff) : undefined
+        if (input.kickoff && !seed) {
+          emit.next({
+            seq: 1,
+            event: { type: 'error', message: 'No analysis found for this batch' },
+          })
+          return () => {}
+        }
         return chatRegistry.open(
           {
             sessionId: input.sessionId,
@@ -52,45 +62,30 @@ export const benchmarkChatRouter = router({
             resumable: true,
             continueWork: input.continueWork,
             continuationKind: 'plain',
-            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
-              const job = jobRegistry.register({
+            // One job for the whole session; the registry finishes it on
+            // finalize/cancel, so auto-continues never orphan a running job.
+            registerJob: () =>
+              jobRegistry.register({
                 kind: 'benchmark.chat',
                 label: 'Benchmark chat',
                 model,
                 abort: () => chatRegistry.cancel(input.sessionId),
-              })
-              let seed: string | undefined
-              if (kickoff) {
-                seed = seedForBatch(kickoff)
-                if (!seed) {
-                  push({ type: 'error', message: 'No analysis found for this batch' })
-                  job.finish('error')
-                  return {
-                    reply: () => {},
-                    cancel: () => {},
-                    dispose: () => {},
-                    done: Promise.resolve(),
-                  }
-                }
-              }
-              return startResumableChat({
+              }),
+            buildRun: ({ resume, kickoff, resumeMessage, push }) =>
+              startResumableChat({
                 sessionId: input.sessionId,
                 model,
                 cwd,
                 allowedTools: CHAT_TOOLS,
                 settingSources: ['user', 'project'],
                 env: subscriptionEnv(),
-                seed,
+                // seed only applies to the fresh run (kickoff present); resumes idle.
+                seed: kickoff ? seed : undefined,
                 resume,
                 resumeMessage,
                 onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
-                emit: (event) => {
-                  if (event.type === 'done') job.finish('done')
-                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-                  push(event)
-                },
-              })
-            },
+                emit: (event) => push(event),
+              }),
           },
           (env) => emit.next(env as SeqEnvelope<BenchmarkChatEvent>),
         )

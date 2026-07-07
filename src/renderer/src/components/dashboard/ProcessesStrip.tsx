@@ -66,8 +66,12 @@ export function ProcessesStrip() {
             ) : (
               recent.map((j: JobView) => (
                 <div key={j.id} className="procstrip-row" title={j.error ?? j.detail ?? ''}>
-                  <span className={j.status === 'done' ? 'ok' : 'err'}>
-                    {j.status === 'done' ? '✓' : '✗'}
+                  <span
+                    className={
+                      j.status === 'done' ? 'ok' : j.status === 'cancelled' ? 'muted' : 'err'
+                    }
+                  >
+                    {j.status === 'done' ? '✓' : j.status === 'cancelled' ? '⊘' : '✗'}
                   </span>
                   <span className="procstrip-label">{j.label}</span>
                   <span className="procstrip-meta">

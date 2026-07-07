@@ -3664,6 +3664,9 @@ textarea.input:focus,
 .jobs-row.error .jobs-icon {
   color: var(--warn);
 }
+.jobs-row.cancelled .jobs-icon {
+  color: var(--fg-3);
+}
 .jobs-row .jobs-name {
   flex: 1;
   overflow: hidden;
@@ -4909,6 +4912,9 @@ textarea.input:focus,
 }
 .procstrip-row .err {
   color: #ff6b74;
+}
+.procstrip-row .muted {
+  color: var(--color-muted-fg);
 }
 .procstrip-label {
   overflow: hidden;

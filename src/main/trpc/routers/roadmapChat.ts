@@ -42,13 +42,16 @@ export const roadmapChatRouter = router({
             resumable: true,
             continueWork: input.continueWork,
             continuationKind: 'plain',
-            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
-              const job = jobRegistry.register({
+            // One job for the whole session; the registry finishes it on
+            // finalize/cancel, so auto-continues never orphan a running job.
+            registerJob: () =>
+              jobRegistry.register({
                 kind: 'roadmap.chat',
                 label: 'Roadmap idea chat',
                 model,
                 abort: () => chatRegistry.cancel(input.sessionId),
-              })
+              }),
+            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
               let saved = false
               const checkProposal = (accumulated: string) => {
                 if (saved) return
@@ -86,11 +89,7 @@ export const roadmapChatRouter = router({
                 resume,
                 resumeMessage,
                 onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
-                emit: (event) => {
-                  if (event.type === 'done') job.finish('done')
-                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-                  push(event)
-                },
+                emit: (event) => push(event),
                 onAssistantText: (_delta, accumulated) => checkProposal(accumulated),
                 onTurnComplete: (accumulated) => checkProposal(accumulated),
               })

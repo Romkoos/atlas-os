@@ -1,5 +1,9 @@
 import { JobRegistry, trackJob } from '@main/services/jobs/registry'
-import { describe, expect, it, vi } from 'vitest'
+import { recordSignal } from '@main/services/signals/registry'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@main/services/signals/registry', () => ({ recordSignal: vi.fn() }))
+const mockedRecordSignal = vi.mocked(recordSignal)
 
 describe('JobRegistry', () => {
   it('exposes a registered job as running, with cancellable from abort', () => {
@@ -67,6 +71,28 @@ describe('JobRegistry', () => {
     off()
     reg.register({ kind: 'k', label: 'y' })
     expect(seen).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('JobRegistry Signals', () => {
+  beforeEach(() => mockedRecordSignal.mockClear())
+
+  it('records a job.failed Signal on error', () => {
+    const reg = new JobRegistry()
+    reg.register({ kind: 'general.chat', label: 'General chat' }).finish('error')
+    expect(mockedRecordSignal).toHaveBeenCalledTimes(1)
+    expect(mockedRecordSignal.mock.calls[0][0]).toMatchObject({
+      type: 'job.failed',
+      title: 'General chat failed',
+    })
+  })
+
+  it('records NO Signal on a user-initiated cancel', () => {
+    const reg = new JobRegistry()
+    reg.register({ kind: 'general.chat', label: 'General chat' }).finish('cancelled')
+    expect(mockedRecordSignal).not.toHaveBeenCalled()
+    // still lands in recent, so the panel can show it neutrally
+    expect(reg.snapshot().recent[0].status).toBe('cancelled')
   })
 })
 

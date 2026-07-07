@@ -37,14 +37,17 @@ export const generalChatRouter = router({
             resumable: true,
             continueWork: input.continueWork,
             continuationKind: 'plain',
-            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
-              const job = jobRegistry.register({
+            // One job for the whole session; the registry finishes it on
+            // finalize/cancel, so auto-continues never orphan a running job.
+            registerJob: () =>
+              jobRegistry.register({
                 kind: 'general.chat',
                 label: 'General chat',
                 model,
                 abort: () => chatRegistry.cancel(input.sessionId),
-              })
-              return startResumableChat({
+              }),
+            buildRun: ({ resume, kickoff, resumeMessage, push }) =>
+              startResumableChat({
                 sessionId: input.sessionId,
                 model,
                 cwd,
@@ -55,13 +58,8 @@ export const generalChatRouter = router({
                 resume,
                 resumeMessage,
                 onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
-                emit: (event) => {
-                  if (event.type === 'done') job.finish('done')
-                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-                  push(event)
-                },
-              })
-            },
+                emit: (event) => push(event),
+              }),
           },
           (env) => emit.next(env as SeqEnvelope<BaseChatEvent>),
         )
