@@ -21,6 +21,7 @@ export function RoadmapChatOverlay() {
   const timelineEvents = useRoadmapChatRun((s) => s.timelineEvents)
   const running = useRoadmapChatRun((s) => s.running)
   const freshStart = useRoadmapChatRun((s) => s.freshStart)
+  const subagents = useRoadmapChatRun((s) => s.subagents)
 
   const reply = trpc.roadmapChat.reply.useMutation()
   const [draft, setDraft] = useState('')
@@ -89,6 +90,7 @@ export function RoadmapChatOverlay() {
         running={running}
         freshStart={freshStart}
         onPickOption={send}
+        subagents={subagents}
       />
       {savedItem ? (
         <div className="rm-chat-saved">

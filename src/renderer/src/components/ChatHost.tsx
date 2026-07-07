@@ -94,12 +94,24 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
         subagentType?: string
         inputTokens?: number
         outputTokens?: number
+        // Set on subagent-forwarded events; names the parent Task's tool_use id.
+        parentToolId?: string
       }
       switch (e.type) {
         case 'token':
+          // A subagent-tagged token goes to that Task's nested transcript; the
+          // Timeline stays top-level, so no timeline push for nested events.
+          if (e.parentToolId) {
+            store.appendSubToken(e.parentToolId, e.text ?? '')
+            break
+          }
           store.appendToken(e.text ?? '')
           break
         case 'tool':
+          if (e.parentToolId) {
+            store.pushSubTool(e.parentToolId, e.toolId ?? '', e.name ?? '', e.summary ?? '')
+            break
+          }
           store.pushTool(e.toolId ?? '', e.name ?? '', e.summary ?? '')
           store.pushTimelineEvent({
             type: 'tool',
@@ -111,6 +123,15 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
           })
           break
         case 'tool-result':
+          if (e.parentToolId) {
+            store.resolveSubTool(
+              e.parentToolId,
+              e.toolId ?? '',
+              e.resultText ?? '',
+              e.isError === true,
+            )
+            break
+          }
           store.resolveTool(e.toolId ?? '', e.resultText ?? '', e.isError === true)
           store.pushTimelineEvent({
             type: 'tool-result',

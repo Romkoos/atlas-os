@@ -20,6 +20,7 @@ export function GeneralChatOverlay() {
   const timelineEvents = useGeneralChatRun((s) => s.timelineEvents)
   const running = useGeneralChatRun((s) => s.running)
   const freshStart = useGeneralChatRun((s) => s.freshStart)
+  const subagents = useGeneralChatRun((s) => s.subagents)
 
   const reply = trpc.generalChat.reply.useMutation()
   const [draft, setDraft] = useState('')
@@ -83,6 +84,7 @@ export function GeneralChatOverlay() {
         running={running}
         freshStart={freshStart}
         onPickOption={send}
+        subagents={subagents}
       />
       <ChatComposer
         disabled={!awaitingInput}

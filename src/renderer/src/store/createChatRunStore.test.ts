@@ -56,6 +56,115 @@ describe('createChatRunStore', () => {
     expect(useStore.getState().transcript.at(-1)).toEqual({ kind: 'assistant', text: 'partial' })
   })
 
+  describe('segment-flush (readability)', () => {
+    it('pushTool commits pending streaming as its own assistant entry, before the tool', () => {
+      const useRun = createChatRunStore('test-seg-1')
+      useRun.getState().start('q')
+      useRun.getState().appendToken('Let me look at the file.')
+      useRun.getState().pushTool('t1', 'Read', 'Read: store.ts')
+      const t = useRun.getState().transcript
+      // user, assistant-segment, tool — in that order
+      expect(t).toEqual([
+        { kind: 'user', text: 'q' },
+        { kind: 'assistant', text: 'Let me look at the file.' },
+        { kind: 'tool', id: 't1', name: 'Read', text: 'Read: store.ts', status: 'running' },
+      ])
+      expect(useRun.getState().streaming).toBe('')
+    })
+
+    it('produces two ordered assistant segments split by an intervening tool', () => {
+      const useRun = createChatRunStore('test-seg-2')
+      useRun.getState().start('q')
+      useRun.getState().appendToken('First segment.')
+      useRun.getState().pushTool('t1', 'Read', 'Read: x')
+      useRun.getState().resolveTool('t1', 'ok', false)
+      useRun.getState().appendToken('Second segment.')
+      useRun.getState().flushTurn()
+      const kinds = useRun.getState().transcript.map((e) => e.kind)
+      expect(kinds).toEqual(['user', 'assistant', 'tool', 'assistant'])
+      const assistants = useRun
+        .getState()
+        .transcript.filter((e) => e.kind === 'assistant')
+        .map((e) => (e as { text: string }).text)
+      expect(assistants).toEqual(['First segment.', 'Second segment.'])
+    })
+
+    it('pushTool with no pending streaming adds no spurious assistant entry', () => {
+      const useRun = createChatRunStore('test-seg-3')
+      useRun.getState().start('q')
+      useRun.getState().pushTool('t1', 'Read', 'Read: x')
+      useRun.getState().pushTool('t2', 'Grep', 'Grep: y')
+      expect(useRun.getState().transcript.filter((e) => e.kind === 'assistant')).toHaveLength(0)
+    })
+  })
+
+  describe('subagent nested activity', () => {
+    it('appendSubToken accumulates streaming under the parent Task id', () => {
+      const useRun = createChatRunStore('test-sub-1')
+      useRun.getState().start('q')
+      useRun.getState().appendSubToken('task1', 'sub ')
+      useRun.getState().appendSubToken('task1', 'text')
+      expect(useRun.getState().subagents.task1).toEqual({ transcript: [], streaming: 'sub text' })
+      // Top-level streaming is untouched.
+      expect(useRun.getState().streaming).toBe('')
+    })
+
+    it('pushSubTool segment-flushes sub-streaming then adds a running sub-tool', () => {
+      const useRun = createChatRunStore('test-sub-2')
+      useRun.getState().start('q')
+      useRun.getState().appendSubToken('task1', 'Working on it.')
+      useRun.getState().pushSubTool('task1', 's1', 'Grep', 'Grep: foo')
+      const sub = useRun.getState().subagents.task1
+      expect(sub.transcript).toEqual([
+        { kind: 'assistant', text: 'Working on it.' },
+        { kind: 'tool', id: 's1', name: 'Grep', text: 'Grep: foo', status: 'running' },
+      ])
+      expect(sub.streaming).toBe('')
+    })
+
+    it('resolveSubTool completes the matching sub-tool', () => {
+      const useRun = createChatRunStore('test-sub-3')
+      useRun.getState().start('q')
+      useRun.getState().pushSubTool('task1', 's1', 'Grep', 'Grep: foo')
+      useRun.getState().resolveSubTool('task1', 's1', 'match', false)
+      expect(
+        useRun.getState().subagents.task1.transcript.find((e) => e.kind === 'tool'),
+      ).toMatchObject({ id: 's1', status: 'done', resultText: 'match' })
+    })
+
+    it('resolveTool on the Task sweeps trailing sub-streaming and settles running sub-tools', () => {
+      const useRun = createChatRunStore('test-sub-4')
+      useRun.getState().start('q')
+      useRun.getState().pushTool('task1', 'Task', 'Task: explore')
+      useRun.getState().pushSubTool('task1', 's1', 'Read', 'Read: a')
+      // s1 never resolves; subagent leaves trailing prose.
+      useRun.getState().appendSubToken('task1', 'Done exploring.')
+      useRun.getState().resolveTool('task1', 'summary', false)
+      const sub = useRun.getState().subagents.task1
+      expect(sub.streaming).toBe('')
+      // trailing prose committed, and the dangling sub-tool settled to done
+      expect(sub.transcript).toEqual([
+        { kind: 'tool', id: 's1', name: 'Read', text: 'Read: a', status: 'done' },
+        { kind: 'assistant', text: 'Done exploring.' },
+      ])
+      // the Task's own top-level row is resolved
+      expect(useRun.getState().transcript.find((e) => e.kind === 'tool')).toMatchObject({
+        id: 'task1',
+        status: 'done',
+        resultText: 'summary',
+      })
+    })
+
+    it('start and reset clear the subagents map', () => {
+      const useRun = createChatRunStore('test-sub-5')
+      useRun.getState().start('q')
+      useRun.getState().appendSubToken('task1', 'x')
+      expect(Object.keys(useRun.getState().subagents)).toHaveLength(1)
+      useRun.getState().reset()
+      expect(useRun.getState().subagents).toEqual({})
+    })
+  })
+
   it('bumpSeq advances lastSeq monotonically', () => {
     const useStore = createChatRunStore('atlas-chat-run-test3')
     useStore.getState().bumpSeq(3)

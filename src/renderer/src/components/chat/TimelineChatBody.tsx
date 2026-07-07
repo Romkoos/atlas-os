@@ -1,6 +1,6 @@
 import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
 import { SessionTimelineView } from '@renderer/components/chat/SessionTimelineView'
-import type { ChatEntry } from '@renderer/store/createChatRunStore'
+import type { ChatEntry, SubagentRun } from '@renderer/store/createChatRunStore'
 import type { TimelineEvent } from '@shared/timeline'
 import { useState } from 'react'
 
@@ -16,6 +16,7 @@ export function TimelineChatBody({
   running,
   freshStart,
   onPickOption,
+  subagents,
 }: {
   sessionId: string | null
   transcript: ChatEntry[]
@@ -25,6 +26,7 @@ export function TimelineChatBody({
   running: boolean
   freshStart: boolean
   onPickOption: (text: string) => void
+  subagents?: Record<string, SubagentRun>
 }) {
   const [view, setView] = useState<'transcript' | 'timeline'>('transcript')
   return (
@@ -55,6 +57,7 @@ export function TimelineChatBody({
           streaming={streaming}
           awaitingInput={awaitingInput}
           onPickOption={onPickOption}
+          subagents={subagents}
         />
       ) : (
         <SessionTimelineView

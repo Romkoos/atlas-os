@@ -17,6 +17,7 @@ export function BenchmarkChatOverlay() {
   const timelineEvents = useBenchmarkChatRun((s) => s.timelineEvents)
   const running = useBenchmarkChatRun((s) => s.running)
   const freshStart = useBenchmarkChatRun((s) => s.freshStart)
+  const subagents = useBenchmarkChatRun((s) => s.subagents)
 
   const reply = trpc.benchmarkChat.reply.useMutation()
 
@@ -39,6 +40,7 @@ export function BenchmarkChatOverlay() {
         running={running}
         freshStart={freshStart}
         onPickOption={send}
+        subagents={subagents}
       />
       <ChatComposer
         disabled={!awaitingInput}
