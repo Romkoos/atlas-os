@@ -182,3 +182,71 @@ describe('ChatSessionRegistry auto-continue', () => {
     expect(f.builds.length).toBe(1) // skipped — non-resumable must not be rebuilt
   })
 })
+
+// The session-lifecycle job is registered once and reused across every
+// auto-continue, then finished exactly once — so a supersede (dispose + rebuild)
+// can never leave a phantom "running" job behind in the Processes panel.
+describe('ChatSessionRegistry session job', () => {
+  function fakeJob() {
+    const finish = vi.fn()
+    return { finish, register: vi.fn(() => ({ id: 'job-1', update: vi.fn(), finish })) }
+  }
+
+  function openWithJob(
+    reg: ChatSessionRegistry,
+    sessionId: string,
+    f: ReturnType<typeof fakeRunFactory>,
+    j: ReturnType<typeof fakeJob>,
+  ) {
+    reg.open(
+      {
+        sessionId,
+        lastSeq: 0,
+        kickoff: 'go',
+        resumable: true,
+        continuationKind: 'plain',
+        registerJob: j.register,
+        buildRun: f.buildRun,
+      },
+      () => {},
+    )
+  }
+
+  it('registers the job once and keeps it across auto-continues (no orphan)', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    const j = fakeJob()
+    openWithJob(reg, 'j1', f, j)
+    f.push({ type: 'error', message: 'boom' }) // auto-continue #1 (dispose + rebuild)
+    f.push({ type: 'tool', name: 'Bash', summary: 'x', toolId: 't1' }) // progress resets guard
+    f.push({ type: 'error', message: 'boom' }) // auto-continue #2
+    expect(f.builds.length).toBe(3) // three runs...
+    expect(j.register).toHaveBeenCalledTimes(1) // ...but a single job
+    expect(j.finish).not.toHaveBeenCalled() // still running through the retries
+  })
+
+  it('finishes the job as cancelled on user cancel (no Signal), only once', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    const j = fakeJob()
+    openWithJob(reg, 'j2', f, j)
+    reg.cancel('j2')
+    expect(j.finish).toHaveBeenCalledTimes(1)
+    expect(j.finish).toHaveBeenCalledWith('cancelled')
+    // A trailing async `aborted` re-entering finalize must not double-finish.
+    f.push({ type: 'aborted' })
+    expect(j.finish).toHaveBeenCalledTimes(1)
+  })
+
+  it('finishes the job as error when auto-continue gives up', () => {
+    const reg = new ChatSessionRegistry()
+    const f = fakeRunFactory()
+    const j = fakeJob()
+    openWithJob(reg, 'j3', f, j)
+    f.push({ type: 'error', message: 'boom' })
+    f.push({ type: 'error', message: 'boom' })
+    f.push({ type: 'error', message: 'boom' }) // cap → give up
+    expect(j.finish).toHaveBeenCalledTimes(1)
+    expect(j.finish).toHaveBeenCalledWith('error')
+  })
+})

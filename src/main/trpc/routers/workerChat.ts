@@ -41,13 +41,16 @@ export const workerChatRouter = router({
             resumable: true,
             continueWork: input.continueWork,
             continuationKind: 'worker',
-            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
-              const job = jobRegistry.register({
+            // One job for the whole session; the registry finishes it on
+            // finalize/cancel, so auto-continues never orphan a running job.
+            registerJob: () =>
+              jobRegistry.register({
                 kind: 'worker.chat',
                 label: 'Worker chat',
                 model,
                 abort: () => chatRegistry.cancel(input.sessionId),
-              })
+              }),
+            buildRun: ({ resume, kickoff, resumeMessage, push }) => {
               let flipped = false
               // Separate one-shot guard for the error toast: the flip itself is only
               // marked done on success, so a transient failure retries on the next
@@ -91,11 +94,7 @@ export const workerChatRouter = router({
                 resume,
                 resumeMessage,
                 onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
-                emit: (event) => {
-                  if (event.type === 'done') job.finish('done')
-                  if (event.type === 'error' || event.type === 'aborted') job.finish('error')
-                  push(event)
-                },
+                emit: (event) => push(event),
                 onAssistantText: (_delta, accumulated) => checkDeployed(accumulated),
                 onTurnComplete: (accumulated) => checkDeployed(accumulated),
               })

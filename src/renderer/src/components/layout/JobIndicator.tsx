@@ -6,7 +6,14 @@ import type { JobView } from '@shared/jobs'
 function JobRow({ job, now }: { job: JobView; now: number }) {
   const cancel = trpc.jobs.cancel.useMutation()
   const elapsed = (job.endedAt ?? now) - job.startedAt
-  const icon = job.status === 'running' ? '◐' : job.status === 'done' ? '✓' : '✗'
+  const icon =
+    job.status === 'running'
+      ? '◐'
+      : job.status === 'done'
+        ? '✓'
+        : job.status === 'cancelled'
+          ? '⊘'
+          : '✗'
   return (
     <div className={`jobs-row ${job.status}`}>
       <span className="jobs-icon">{icon}</span>

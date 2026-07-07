@@ -1,3 +1,4 @@
+import type { JobHandle } from '@main/services/jobs/registry'
 import { recordSignal } from '@main/services/signals/registry'
 import type { RateLimitInfo, SeqEnvelope } from '@shared/ipc-events'
 import type { ResumableRun } from './resumableRun'
@@ -16,6 +17,11 @@ type Status = 'running' | 'awaiting' | 'limited' | 'done' | 'error'
 interface SessionRecord {
   sessionId: string
   run: ResumableRun
+  // A single job tracking the whole SESSION lifecycle (null if the caller opted
+  // out). Registered once when the record is created and finished exactly once on
+  // finalize/cancel. Auto-continues reuse this same job, so a supersede (silent
+  // run dispose + rebuild) can never orphan a "running" job in the Processes panel.
+  job: JobHandle | null
   buffer: SeqEnvelope<unknown>[]
   nextSeq: number
   status: Status
@@ -40,6 +46,9 @@ export interface OpenParams {
   // (persisted status was 'running'); if false/absent, resume-and-idle.
   continueWork?: boolean
   continuationKind: 'worker' | 'plain'
+  // Registers the session-lifecycle job (see SessionRecord.job). Called at most
+  // once, when a brand-new record is created — never on reattach or auto-continue.
+  registerJob?: () => JobHandle
   buildRun: (args: {
     resume: boolean
     kickoff?: string
@@ -77,6 +86,7 @@ export class ChatSessionRegistry {
     const record: SessionRecord = {
       sessionId: params.sessionId,
       run: undefined as unknown as ResumableRun,
+      job: params.registerJob?.() ?? null,
       buffer: [],
       nextSeq: 1,
       status: 'running',
@@ -134,7 +144,7 @@ export class ChatSessionRegistry {
       return
     } else if (type === 'done') {
       this.subscriberEmit(record, event)
-      this.finalize(record, event)
+      this.finalize(record, 'done')
       return
     }
 
@@ -146,7 +156,7 @@ export class ChatSessionRegistry {
     const kind = classifyStop(event as { type: string; status?: string }, record.userCancelled)
     if (kind === 'clean') {
       this.subscriberEmit(record, event)
-      if (type === 'aborted') this.finalize(record, event)
+      if (type === 'aborted') this.finalize(record, 'cancelled')
       return
     }
 
@@ -185,7 +195,7 @@ export class ChatSessionRegistry {
         title: 'Chat run failed',
         detail: message,
       })
-      this.finalize(record, event)
+      this.finalize(record, 'error')
       return
     }
 
@@ -249,12 +259,20 @@ export class ChatSessionRegistry {
     record.subscriber?.(env)
   }
 
-  private finalize(record: SessionRecord, _event: unknown): void {
+  private finalize(record: SessionRecord, status: 'done' | 'error' | 'cancelled'): void {
     if (record.limitTimer) clearTimeout(record.limitTimer)
+    this.endJob(record, status)
     // Silent teardown of the live run's SDK child process before dropping the
     // record (no `aborted` emit — the terminal event was already forwarded).
     record.run?.dispose()
     this.records.delete(record.sessionId)
+  }
+
+  // Finish the session-lifecycle job exactly once. Nulled after so the async
+  // `aborted` that trails a user cancel (which re-enters finalize) is a no-op.
+  private endJob(record: SessionRecord, status: 'done' | 'error' | 'cancelled'): void {
+    record.job?.finish(status)
+    record.job = null
   }
 
   reply(sessionId: string, text: string): boolean {
@@ -279,6 +297,10 @@ export class ChatSessionRegistry {
     if (record) {
       record.userCancelled = true
       if (record.limitTimer) clearTimeout(record.limitTimer)
+      // Finish the job immediately (cancelled → no Signal). The trailing async
+      // `aborted` still routes to finalize, but endJob has nulled the handle so
+      // it won't double-finish.
+      this.endJob(record, 'cancelled')
     }
     record?.run.cancel()
     this.records.delete(sessionId)

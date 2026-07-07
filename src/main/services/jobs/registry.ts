@@ -27,7 +27,7 @@ export interface JobHandle {
   id: string
   // Push live progress on a running job (e.g. benchmark done/total · phase).
   update(patch: { detail?: string | null; tokens?: number | null }): void
-  finish(status: 'done' | 'error', meta?: FinishMeta): void
+  finish(status: 'done' | 'error' | 'cancelled', meta?: FinishMeta): void
 }
 
 interface ActiveJob {
@@ -108,6 +108,9 @@ export class JobRegistry extends EventEmitter {
   // no-op, never a throw.
   private recordSignal(status: JobStatus, meta: FinishMeta | undefined, job: ActiveJob): void {
     if (job.kind === 'benchmark') return
+    // A user-initiated cancel (× on a chat tab, abort button) is not a failure —
+    // don't pollute the Signals log with a `job.failed`/error event for it.
+    if (status === 'cancelled') return
     const resultPath = meta?.resultPath ?? null
     recordSignal({
       source: 'jobs',

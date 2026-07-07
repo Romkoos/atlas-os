@@ -70,7 +70,9 @@ export const skillImproverRouter = router({
                       tokens: event.tokens,
                       durationMs: event.durationMs,
                     })
-                    job.finish(event.type === 'done' ? 'done' : 'error', { tokens: event.tokens })
+                    job.finish(event.type === 'done' ? 'done' : 'cancelled', {
+                      tokens: event.tokens,
+                    })
                   }
                   if (event.type === 'error') job.finish('error')
                   push(event)
