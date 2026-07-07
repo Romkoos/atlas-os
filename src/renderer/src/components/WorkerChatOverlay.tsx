@@ -1,3 +1,4 @@
+import { AutonomousBanner } from '@renderer/components/AutonomousBanner'
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatModelSelect } from '@renderer/components/chat/ChatModelSelect'
 import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
@@ -22,6 +23,7 @@ export function WorkerChatOverlay() {
   const timelineEvents = useWorkerChatRun((s) => s.timelineEvents)
   const running = useWorkerChatRun((s) => s.running)
   const freshStart = useWorkerChatRun((s) => s.freshStart)
+  const autonomous = useWorkerChatRun((s) => s.autonomous)
 
   const reply = trpc.workerChat.reply.useMutation()
   const utils = trpc.useUtils()
@@ -35,6 +37,9 @@ export function WorkerChatOverlay() {
   const [draft, setDraft] = useState('')
   // null → the global default model (resolved in ChatModelSelect / on the server).
   const [model, setModel] = useState<ClaudeModelId | null>(null)
+  // Autonomous mode for the session about to be started. Off by default; captured
+  // at start() and immutable thereafter (mirrors `model`).
+  const [autonomousDraft, setAutonomousDraft] = useState(false)
 
   // One-shot hand-off from callers like the Roadmap "start development" button:
   // seed the intro composer with the idea's prompt + preselected model, then
@@ -53,7 +58,7 @@ export function WorkerChatOverlay() {
   }, [pending, status, startSession, clearPrefill])
 
   const started = status !== 'idle'
-  const startWorker = () => draft.trim() && startSession(draft.trim(), model)
+  const startWorker = () => draft.trim() && startSession(draft.trim(), model, autonomousDraft)
 
   const send = (text: string) => {
     if (!sessionId || !awaitingInput) return
@@ -95,6 +100,17 @@ export function WorkerChatOverlay() {
         />
         <div className="rm-chat-hint">The worker can read and modify this repo. ⌘↵ to start.</div>
         <ChatModelSelect value={model} onChange={setModel} />
+        <label className="autonomous-toggle">
+          <input
+            type="checkbox"
+            checked={autonomousDraft}
+            onChange={(e) => setAutonomousDraft(e.target.checked)}
+          />
+          <span className="autonomous-toggle-label">Autonomous mode</span>
+          <span className="autonomous-toggle-hint">
+            Finish end-to-end — commit, push, merge & deploy without asking.
+          </span>
+        </label>
         <div className="rm-chat-intro-foot">
           <button
             type="button"
@@ -111,6 +127,7 @@ export function WorkerChatOverlay() {
 
   return (
     <div className="chat-body-flex">
+      <AutonomousBanner autonomous={autonomous} />
       <DevBindingBanner />
       <TimelineChatBody
         sessionId={sessionId}

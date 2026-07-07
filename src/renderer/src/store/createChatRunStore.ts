@@ -42,7 +42,12 @@ export interface BaseChatRunState {
   // Model chosen for this chat. null = fall back to the global default model.
   // Fixed for the life of a session (captured at start / reused on reattach).
   model: ClaudeModelId | null
-  start: (message: string, model?: ClaudeModelId | null) => void
+  // Autonomous end-to-end mode (worker chat only). When true the session's seed
+  // authorizes commit/push/merge/deploy without confirmation. Fixed for the life
+  // of the session, exactly like `model`. Default false; other chat types never
+  // set it true.
+  autonomous: boolean
+  start: (message: string, model?: ClaudeModelId | null, autonomous?: boolean) => void
   startBlank: (model?: ClaudeModelId | null) => void
   reattach: () => void
   appendToken: (text: string) => void
@@ -73,7 +78,7 @@ const noopStorage: Storage = {
 
 type Persisted = Pick<
   BaseChatRunState,
-  'sessionId' | 'transcript' | 'status' | 'awaitingInput' | 'lastSeq' | 'model'
+  'sessionId' | 'transcript' | 'status' | 'awaitingInput' | 'lastSeq' | 'model' | 'autonomous'
 >
 
 // Builds a persisted zustand store for one chat type. `running` (transient) and
@@ -111,7 +116,8 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
         freshStart: false,
         running: false,
         model: null,
-        start: (message, model) =>
+        autonomous: false,
+        start: (message, model, autonomous) =>
           set((s) => ({
             sessionId: crypto.randomUUID(),
             transcript: [{ kind: 'user', text: message }],
@@ -123,6 +129,7 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             freshStart: true,
             running: true,
             model: model !== undefined ? model : s.model,
+            autonomous: autonomous !== undefined ? autonomous : s.autonomous,
           })),
         // For chats whose kickoff is not a user-visible message (benchmark
         // batchId, improver skillId): mint the session with an empty transcript.
@@ -195,12 +202,20 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
             freshStart: false,
             running: false,
             model: null,
+            autonomous: false,
           }),
       }),
       {
         name: key,
-        version: 1,
+        version: 2,
         storage,
+        // v1 → v2 added `autonomous`; old persisted sessions default to false so
+        // a resumed pre-feature session is never silently autonomous.
+        migrate: (persisted, version) => {
+          const p = (persisted ?? {}) as Partial<Persisted>
+          if (version < 2) return { ...p, autonomous: false } as Persisted
+          return p as Persisted
+        },
         partialize: (s): Persisted => ({
           sessionId: s.sessionId,
           transcript: s.transcript,
@@ -208,6 +223,7 @@ export function createChatRunStore(key: string, opts: ChatRunStoreOptions = {}) 
           awaitingInput: s.awaitingInput,
           lastSeq: s.lastSeq,
           model: s.model,
+          autonomous: s.autonomous,
         }),
       },
     ),
