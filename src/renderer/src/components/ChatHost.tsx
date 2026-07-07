@@ -12,6 +12,8 @@ interface OpenInput {
   continueWork?: boolean
   // Per-chat model override; omitted → the router uses the global default.
   model?: ClaudeModelId
+  // Autonomous end-to-end mode (worker chat only); other routers ignore it.
+  autonomous?: boolean
 }
 
 interface OpenHandlers {
@@ -71,6 +73,7 @@ export function ChatHost({ useRun, useOpenSubscription, kickoff, onEvent }: Chat
       kickoff: isFreshStart ? kickoff : undefined,
       continueWork,
       model: s.model ?? undefined,
+      autonomous: s.autonomous || undefined,
     }
   }, [running, sessionId, kickoff, useRun])
 

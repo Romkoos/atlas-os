@@ -12,6 +12,39 @@ describe('createChatRunStore', () => {
     expect(s.status).toBe('running')
   })
 
+  describe('autonomous flag', () => {
+    it('defaults to false on a fresh store', () => {
+      const useStore = createChatRunStore('atlas-chat-run-auto-default')
+      expect(useStore.getState().autonomous).toBe(false)
+    })
+
+    it('start defaults autonomous to false when the arg is omitted', () => {
+      const useStore = createChatRunStore('atlas-chat-run-auto-omit')
+      useStore.getState().start('hi')
+      expect(useStore.getState().autonomous).toBe(false)
+    })
+
+    it('start captures an explicit autonomous flag', () => {
+      const useStore = createChatRunStore('atlas-chat-run-auto-set')
+      useStore.getState().start('hi', null, true)
+      expect(useStore.getState().autonomous).toBe(true)
+    })
+
+    it('start with autonomous omitted keeps the current value (like model)', () => {
+      const useStore = createChatRunStore('atlas-chat-run-auto-keep')
+      useStore.getState().start('one', null, true)
+      useStore.getState().start('two')
+      expect(useStore.getState().autonomous).toBe(true)
+    })
+
+    it('reset clears autonomous back to false', () => {
+      const useStore = createChatRunStore('atlas-chat-run-auto-reset')
+      useStore.getState().start('hi', null, true)
+      useStore.getState().reset()
+      expect(useStore.getState().autonomous).toBe(false)
+    })
+  })
+
   it('appendToken accumulates streaming and flushTurn commits it', () => {
     const useStore = createChatRunStore('atlas-chat-run-test2')
     useStore.getState().start('q')

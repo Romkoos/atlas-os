@@ -27,6 +27,10 @@ export const workerChatRouter = router({
         kickoff: z.string().min(1).optional(),
         continueWork: z.boolean().optional(),
         model: z.enum(CLAUDE_MODEL_IDS).optional(),
+        // Autonomous end-to-end mode: authorizes the worker to commit/push/merge/
+        // deploy without confirmation. Threaded into the seed directive. Fixed per
+        // session (mirrors `model`); the seed only carries it on the fresh kickoff.
+        autonomous: z.boolean().optional(),
       }),
     )
     .subscription(({ input }) =>
@@ -90,7 +94,9 @@ export const workerChatRouter = router({
                 allowedTools: CHAT_TOOLS,
                 settingSources: ['user', 'project'],
                 env: subscriptionEnv(),
-                seed: kickoff ? buildWorkerChatSeed(kickoff) : undefined,
+                seed: kickoff
+                  ? buildWorkerChatSeed(kickoff, { autonomous: input.autonomous })
+                  : undefined,
                 resume,
                 resumeMessage,
                 onRateLimit: (info) => subscriptionUsage.updateFromEvent(info, Date.now()),
