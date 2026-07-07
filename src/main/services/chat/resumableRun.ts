@@ -89,6 +89,10 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
         permissionMode: 'bypassPermissions',
         settingSources: opts.settingSources,
         includePartialMessages: true,
+        // Forward each subagent's own text/thinking/tool_use/tool_result tagged
+        // with parent_tool_use_id so the renderer can show a live nested Task
+        // transcript instead of just the final result.
+        forwardSubagentText: true,
         cwd: opts.cwd,
         env: opts.env,
         abortController: controller,
@@ -104,13 +108,25 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
       if (message.type === 'stream_event') {
         const event = message.event
         if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          accumulated += event.delta.text
-          opts.emit({ type: 'token', text: event.delta.text })
-          opts.onAssistantText?.(event.delta.text, accumulated)
+          // Subagent text (parent_tool_use_id set) is forwarded verbatim to its
+          // nested transcript — it must NOT accrue to the top-level `accumulated`
+          // (which drives sentinel detection and the committed turn text).
+          const parentToolId = message.parent_tool_use_id ?? undefined
+          if (parentToolId) {
+            opts.emit({ type: 'token', text: event.delta.text, parentToolId })
+          } else {
+            accumulated += event.delta.text
+            opts.emit({ type: 'token', text: event.delta.text })
+            opts.onAssistantText?.(event.delta.text, accumulated)
+          }
         }
       } else if (message.type === 'assistant') {
+        const parentToolId = message.parent_tool_use_id ?? undefined
         const usage = (message.message as { usage?: Record<string, number> }).usage
-        if (usage) {
+        // Only meter top-level assistant usage; the parent Task's result already
+        // reflects subagent cost, so counting forwarded subagent usage too would
+        // double-count against the gauge.
+        if (usage && !parentToolId) {
           cumOut += usage.output_tokens ?? 0
           cumIn += (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0)
           opts.emit({ type: 'usage', ts: now(), inputTokens: cumIn, outputTokens: cumOut })
@@ -128,10 +144,12 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
                 block.name === 'Task' && typeof input?.subagent_type === 'string'
                   ? (input.subagent_type as string)
                   : undefined,
+              parentToolId,
             })
           }
         }
       } else if (message.type === 'user') {
+        const parentToolId = message.parent_tool_use_id ?? undefined
         const content = message.message.content
         if (Array.isArray(content)) {
           for (const block of content) {
@@ -142,6 +160,7 @@ export function startResumableChat(opts: StartResumableChatOptions): ResumableRu
                 resultText: toolResultText(block.content),
                 isError: block.is_error === true,
                 ts: now(),
+                parentToolId,
               })
             }
           }

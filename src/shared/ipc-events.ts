@@ -2,8 +2,12 @@ import type { RoadmapItem } from '@shared/roadmap'
 import type { ImproverReport } from '@shared/skillImprover'
 
 // Common events shared by every drawer chat's transport layer.
+// `parentToolId`, when present, tags an event as belonging to a subagent (Task)
+// whose tool_use id it names, rather than the top-level conversation. The SDK
+// forwards these when `forwardSubagentText` is enabled. Consumers route tagged
+// events into a nested per-Task transcript; untagged events are top-level.
 export type BaseChatEvent =
-  | { type: 'token'; text: string }
+  | { type: 'token'; text: string; parentToolId?: string }
   | {
       type: 'tool'
       name: string
@@ -11,8 +15,16 @@ export type BaseChatEvent =
       toolId: string
       ts?: number
       subagentType?: string
+      parentToolId?: string
     }
-  | { type: 'tool-result'; toolId: string; resultText: string; isError: boolean; ts?: number }
+  | {
+      type: 'tool-result'
+      toolId: string
+      resultText: string
+      isError: boolean
+      ts?: number
+      parentToolId?: string
+    }
   // Cumulative-to-date token totals, harvested from each assistant message's
   // usage. Feeds the timeline's token-burn line. See docs/.../session-flame-waterfall.
   | { type: 'usage'; ts: number; inputTokens: number; outputTokens: number }

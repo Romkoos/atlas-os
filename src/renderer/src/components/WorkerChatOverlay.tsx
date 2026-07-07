@@ -24,6 +24,7 @@ export function WorkerChatOverlay() {
   const running = useWorkerChatRun((s) => s.running)
   const freshStart = useWorkerChatRun((s) => s.freshStart)
   const autonomous = useWorkerChatRun((s) => s.autonomous)
+  const subagents = useWorkerChatRun((s) => s.subagents)
 
   const reply = trpc.workerChat.reply.useMutation()
   const utils = trpc.useUtils()
@@ -138,6 +139,7 @@ export function WorkerChatOverlay() {
         running={running}
         freshStart={freshStart}
         onPickOption={send}
+        subagents={subagents}
       />
       <ChatComposer
         disabled={!awaitingInput}

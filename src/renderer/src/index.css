@@ -4418,6 +4418,36 @@ textarea.input:focus,
 .chat-activity.has-error {
   border-color: var(--warn);
 }
+/* A Task (subagent) row: a collapsible header over a nested live transcript. */
+.chat-subagent {
+  border-color: var(--line);
+}
+.chat-subagent-count {
+  flex: 0 0 auto;
+  color: var(--fg-4);
+  font-size: 11px;
+}
+.chat-subagent-mini {
+  flex: 0 0 auto;
+  color: var(--fg-4);
+}
+.chat-subagent-body {
+  max-height: 340px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line-dim);
+  background: var(--bg);
+}
+/* Inset the nested transcript so its depth reads as "inside" the Task. */
+.chat-subagent-body .chat-log {
+  padding: 8px 10px;
+  gap: 8px;
+}
+.chat-subagent-empty {
+  padding: 8px 10px;
+  color: var(--fg-4);
+  font-family: var(--mono);
+  font-size: 12px;
+}
 .chat-activity-head {
   display: flex;
   align-items: center;
