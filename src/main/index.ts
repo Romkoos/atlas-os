@@ -1,7 +1,8 @@
+import { join } from 'node:path'
 import { db, initDb } from '@main/db/client'
 import { runMigrations } from '@main/db/migrate'
 import { initLogger, logger } from '@main/logger'
-import { appPaths } from '@main/paths'
+import { appPaths, repoRoot } from '@main/paths'
 import { applySecurity } from '@main/security'
 import { chatRegistry } from '@main/services/chat/registry'
 import { subscriptionUsage } from '@main/services/chat/subscriptionUsage'
@@ -17,7 +18,7 @@ import { getSettings, initStore } from '@main/store'
 import { createTray } from '@main/tray'
 import { registerTrpcIpc } from '@main/trpc/ipc'
 import { ensureMainWindow } from '@main/window'
-import { app, powerMonitor } from 'electron'
+import { app, nativeImage, powerMonitor } from 'electron'
 
 // Productivity tracker: pull the latest transcripts + hook buffer into the DB.
 // Fire-and-forget so a slow/large scan never blocks the window.
@@ -41,6 +42,14 @@ app
     const settings = getSettings()
     initLogger(settings.logLevel)
     logger.info('Atlas OS starting', { version: app.getVersion() })
+
+    // Dock icon. A packaged build gets its icon from the bundle (build/icon.icns),
+    // but in dev macOS shows the prebuilt Electron binary's icon — set it explicitly
+    // so the real app icon appears in the dock while developing too.
+    if (process.platform === 'darwin' && app.dock) {
+      const dockIcon = nativeImage.createFromPath(join(repoRoot(), 'build', 'icon.png'))
+      if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon)
+    }
 
     // Resolve the user's real login-shell PATH so spawned agents (and their Bash
     // tool → graphify/uv) escape launchd's minimal PATH in a packaged build.
