@@ -11,11 +11,17 @@ export const useRoadmapChatRun = createChatRunStore('atlas-chat-run-roadmap')
 // event, so it resets on reload.
 interface RoadmapSavedState {
   savedItem: RoadmapItem | null
+  savedItems: RoadmapItem[]
   setSaved: (item: RoadmapItem) => void
   clearSaved: () => void
 }
 export const useRoadmapSaved = create<RoadmapSavedState>((set) => ({
   savedItem: null,
-  setSaved: (savedItem) => set({ savedItem }),
-  clearSaved: () => set({ savedItem: null }),
+  savedItems: [],
+  setSaved: (savedItem) =>
+    set((s) => ({
+      savedItem,
+      savedItems: [savedItem, ...s.savedItems.filter((x) => x.id !== savedItem.id)],
+    })),
+  clearSaved: () => set({ savedItem: null, savedItems: [] }),
 }))

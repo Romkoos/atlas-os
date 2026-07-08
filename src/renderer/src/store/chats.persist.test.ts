@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { type ChatDrawerState, mergePersistedChatDrawer } from './chatDrawer'
+import { type ChatsState, mergePersistedChats } from './chats'
 
-const base: ChatDrawerState = {
+const base: ChatsState = {
   open: false,
   sessions: [],
   activeSessionId: null,
@@ -9,11 +9,15 @@ const base: ChatDrawerState = {
   closeSession: () => {},
   setActive: () => {},
   setOpen: () => {},
+  splitRatio: 0.5,
+  setSplitRatio: () => {},
+  canvasTabByType: {},
+  setCanvasTab: () => {},
 }
 
-describe('mergePersistedChatDrawer', () => {
+describe('mergePersistedChats', () => {
   it('keeps valid sessions and live actions', () => {
-    const merged = mergePersistedChatDrawer(
+    const merged = mergePersistedChats(
       {
         open: true,
         activeSessionId: 'roadmap',
@@ -27,7 +31,7 @@ describe('mergePersistedChatDrawer', () => {
   })
 
   it('drops sessions with unknown types', () => {
-    const merged = mergePersistedChatDrawer(
+    const merged = mergePersistedChats(
       { sessions: [{ id: 'x', type: 'bogus', title: 'x' }] } as unknown,
       base,
     )
@@ -35,7 +39,7 @@ describe('mergePersistedChatDrawer', () => {
   })
 
   it('forces open=false when no sessions survive', () => {
-    const merged = mergePersistedChatDrawer({ open: true, sessions: [] }, base)
+    const merged = mergePersistedChats({ open: true, sessions: [] }, base)
     expect(merged.open).toBe(false)
     expect(merged.activeSessionId).toBeNull()
   })

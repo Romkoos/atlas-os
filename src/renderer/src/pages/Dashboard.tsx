@@ -22,7 +22,7 @@ import { SEVERITY_META } from '@renderer/lib/signalStyle'
 import { trpc } from '@renderer/lib/trpc'
 import { useOpenSignal } from '@renderer/lib/useOpenSignal'
 import { useBeamRoam } from '@renderer/store/beamRoam'
-import { useChatDrawer } from '@renderer/store/chatDrawer'
+import { goToChat } from '@renderer/store/chats'
 import { useGraphBuildRun } from '@renderer/store/graphBuildRun'
 import { useNewsRun } from '@renderer/store/newsRun'
 import { useSignalsStore } from '@renderer/store/signals'
@@ -301,11 +301,7 @@ function QuickActions() {
         >
           ▶ BENCHMARK
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => useChatDrawer.getState().openSession({ type: 'roadmap' })}
-        >
+        <button type="button" className="btn" onClick={() => goToChat({ type: 'roadmap' })}>
           ◈ ROADMAP IDEA
         </button>
       </div>

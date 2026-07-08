@@ -6,7 +6,7 @@ import { WorkerChatOverlay } from '@renderer/components/WorkerChatOverlay'
 import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
-import { type ChatSessionType, useChatDrawer } from '@renderer/store/chatDrawer'
+import { type ChatSessionType, useChats } from '@renderer/store/chats'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
@@ -19,13 +19,13 @@ import { useEffect, useState } from 'react'
 // domain stores and their subscriptions in the App-level hosts, so collapsing
 // the drawer (or switching tabs) never stops a run. Only a tab's × ends a run.
 export function UnifiedChatDrawer() {
-  const open = useChatDrawer((s) => s.open)
-  const sessions = useChatDrawer((s) => s.sessions)
-  const activeSessionId = useChatDrawer((s) => s.activeSessionId)
-  const setActive = useChatDrawer((s) => s.setActive)
-  const setOpen = useChatDrawer((s) => s.setOpen)
-  const openSession = useChatDrawer((s) => s.openSession)
-  const closeSession = useChatDrawer((s) => s.closeSession)
+  const open = useChats((s) => s.open)
+  const sessions = useChats((s) => s.sessions)
+  const activeSessionId = useChats((s) => s.activeSessionId)
+  const setActive = useChats((s) => s.setActive)
+  const setOpen = useChats((s) => s.setOpen)
+  const openSession = useChats((s) => s.openSession)
+  const closeSession = useChats((s) => s.closeSession)
 
   const benchCancel = trpc.benchmarkChat.cancel.useMutation()
   const roadmapCancel = trpc.roadmapChat.cancel.useMutation()

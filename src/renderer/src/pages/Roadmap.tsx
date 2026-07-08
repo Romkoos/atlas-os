@@ -1,6 +1,6 @@
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { useChatDrawer } from '@renderer/store/chatDrawer'
+import { goToChat } from '@renderer/store/chats'
 import { useUiStore } from '@renderer/store/ui'
 import { useWorkerChatRun } from '@renderer/store/workerChatRun'
 import { useWorkerPrefill } from '@renderer/store/workerPrefill'
@@ -66,7 +66,7 @@ export function Roadmap() {
       const existing = await utils.roadmap.getDevBinding.fetch()
       const busy = BUSY_STATUSES.includes(useWorkerChatRun.getState().status)
       if (existing || busy) {
-        useChatDrawer.getState().openSession({ type: 'worker' })
+        goToChat({ type: 'worker' })
         toast.error('Worker is busy — finish or stop the current development first')
         return
       }
@@ -78,7 +78,7 @@ export function Roadmap() {
         model: 'claude-opus-4-8',
         autoStart: true,
       })
-      useChatDrawer.getState().openSession({ type: 'worker' })
+      goToChat({ type: 'worker' })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start development')
     } finally {
@@ -123,7 +123,7 @@ export function Roadmap() {
             <button
               type="button"
               className="btn primary"
-              onClick={() => useChatDrawer.getState().openSession({ type: 'roadmap' })}
+              onClick={() => goToChat({ type: 'roadmap' })}
             >
               <Plus size={12} /> new idea
             </button>

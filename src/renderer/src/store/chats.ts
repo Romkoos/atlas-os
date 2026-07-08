@@ -1,3 +1,4 @@
+import { useUiStore } from '@renderer/store/ui'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -25,10 +26,14 @@ const VALID_TYPES: ChatSessionType[] = [
   'worker',
 ]
 
+export const MIN_SPLIT = 0.2
+export const MAX_SPLIT = 0.8
+const clampRatio = (r: number): number => Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, r))
+
 // UI-only state for the unified chat drawer. Deliberately domain-agnostic: it
 // tracks which chat tabs are visible, not the chat sessions themselves (those
 // live in the per-type run stores). One session per type → id === type.
-export interface ChatDrawerState {
+export interface ChatsState {
   open: boolean
   sessions: ChatSession[]
   activeSessionId: string | null
@@ -37,16 +42,18 @@ export interface ChatDrawerState {
   closeSession: (id: string) => void
   setActive: (id: string) => void
   setOpen: (open: boolean) => void
+
+  splitRatio: number
+  setSplitRatio: (r: number) => void
+  canvasTabByType: Partial<Record<ChatSessionType, string>>
+  setCanvasTab: (type: ChatSessionType, tab: string) => void
 }
 
 // Pure sanitizer for rehydrated state: drop sessions with unknown types or bad
 // shape, keep the active id only if it still exists, and always keep live
 // action functions from `current`.
-export function mergePersistedChatDrawer(
-  persisted: unknown,
-  current: ChatDrawerState,
-): ChatDrawerState {
-  const p = (persisted ?? {}) as Partial<ChatDrawerState>
+export function mergePersistedChats(persisted: unknown, current: ChatsState): ChatsState {
+  const p = (persisted ?? {}) as Partial<ChatsState>
   const sessions = Array.isArray(p.sessions)
     ? p.sessions.filter(
         (s): s is ChatSession =>
@@ -60,7 +67,22 @@ export function mergePersistedChatDrawer(
     typeof p.activeSessionId === 'string' && sessions.some((s) => s.id === p.activeSessionId)
       ? p.activeSessionId
       : (sessions[0]?.id ?? null)
-  return { ...current, open: Boolean(p.open) && sessions.length > 0, sessions, activeSessionId }
+  const splitRatio =
+    typeof p.splitRatio === 'number' && Number.isFinite(p.splitRatio)
+      ? clampRatio(p.splitRatio)
+      : 0.5
+  const canvasTabByType =
+    p.canvasTabByType && typeof p.canvasTabByType === 'object' && !Array.isArray(p.canvasTabByType)
+      ? (p.canvasTabByType as Partial<Record<ChatSessionType, string>>)
+      : {}
+  return {
+    ...current,
+    open: Boolean(p.open) && sessions.length > 0,
+    sessions,
+    activeSessionId,
+    splitRatio,
+    canvasTabByType,
+  }
 }
 
 const noopStorage: Storage = {
@@ -72,11 +94,11 @@ const noopStorage: Storage = {
   length: 0,
 }
 
-const storage = createJSONStorage<Pick<ChatDrawerState, 'open' | 'sessions' | 'activeSessionId'>>(
-  () => (typeof localStorage !== 'undefined' ? localStorage : noopStorage),
-)
+const storage = createJSONStorage<
+  Pick<ChatsState, 'open' | 'sessions' | 'activeSessionId' | 'splitRatio' | 'canvasTabByType'>
+>(() => (typeof localStorage !== 'undefined' ? localStorage : noopStorage))
 
-export const useChatDrawer = create<ChatDrawerState>()(
+export const useChats = create<ChatsState>()(
   persist(
     (set) => ({
       open: false,
@@ -109,17 +131,33 @@ export const useChatDrawer = create<ChatDrawerState>()(
 
       setActive: (id) => set({ activeSessionId: id }),
       setOpen: (open) => set({ open }),
+
+      splitRatio: 0.5,
+      setSplitRatio: (r) => set({ splitRatio: clampRatio(r) }),
+      canvasTabByType: {},
+      setCanvasTab: (type, tab) =>
+        set((s) => ({ canvasTabByType: { ...s.canvasTabByType, [type]: tab } })),
     }),
     {
       name: 'atlas-chat-drawer',
-      version: 2,
+      version: 3,
       storage,
       partialize: (s) => ({
         open: s.open,
         sessions: s.sessions,
         activeSessionId: s.activeSessionId,
+        splitRatio: s.splitRatio,
+        canvasTabByType: s.canvasTabByType,
       }),
-      merge: (persisted, current) => mergePersistedChatDrawer(persisted, current),
+      merge: (persisted, current) => mergePersistedChats(persisted, current),
     },
   ),
 )
+
+// Open (or focus) a chat and bring the CHATS page forward. External callers
+// (Roadmap/Skills/Dashboard/Productivity) use this instead of openSession so a
+// button press both starts the chat and navigates to it.
+export function goToChat(input: { type: ChatSessionType; title?: string }): void {
+  useChats.getState().openSession(input)
+  useUiStore.getState().setSection('chats')
+}
