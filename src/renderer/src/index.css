@@ -5098,6 +5098,9 @@ textarea.input:focus,
 .dash-hero-row > .dash-reveal:nth-child(3) .panel-body {
   flex: 1 1 auto;
   min-height: 0;
+  /* With a fixed panel height (matches GalaxyHero), scroll rows instead of
+     letting them spill outside the panel when the feed is at its 10-row cap. */
+  overflow-y: auto;
 }
 .dash-mid {
   display: grid;
