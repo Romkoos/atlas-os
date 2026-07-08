@@ -78,13 +78,17 @@ export function SplitPane({ ratio, onRatioChange, left, right, minPx = 360 }: Sp
   }
 
   return (
-    <div className="split-pane" ref={rootRef}>
-      <div className="split-left" style={{ flexBasis: `${ratio * 100}%` }}>
+    // Named "chat-split*" (not "split-pane*") — that name is already taken by
+    // an unrelated vertical editor/preview split on the Skills page, and a
+    // shared class there would leak its flex-direction:column into this
+    // component's left/gutter/right row layout.
+    <div className="chat-split" ref={rootRef}>
+      <div className="chat-split-left" style={{ flexBasis: `${ratio * 100}%` }}>
         {left}
       </div>
       {/* biome-ignore lint/a11y/useSemanticElements: <hr> can't be focusable/draggable; this is the interactive WAI-ARIA window-splitter pattern */}
       <div
-        className="split-gutter"
+        className="chat-split-gutter"
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize panes"
@@ -99,7 +103,7 @@ export function SplitPane({ ratio, onRatioChange, left, right, minPx = 360 }: Sp
         }}
         onKeyDown={onKeyDown}
       />
-      <div className="split-right">{right}</div>
+      <div className="chat-split-right">{right}</div>
     </div>
   )
 }

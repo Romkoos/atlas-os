@@ -6,9 +6,9 @@ import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import type { ClaudeModelId } from '@shared/models'
 import { useState } from 'react'
 
-// Body of the general chat session, rendered inside UnifiedChatDrawer. Reads the
-// App-level store, so the session survives tab switches / drawer collapse (the
-// subscription lives in the App-level ChatHost). Close/stop is owned by the drawer.
+// Body of the general chat session, rendered inside the CHATS page. Reads the
+// App-level store, so the session survives tab switches (the subscription
+// lives in the App-level ChatHost). Close/stop is owned by the CHATS page tab ×.
 export function GeneralChatOverlay() {
   const status = useGeneralChatRun((s) => s.status)
   const sessionId = useGeneralChatRun((s) => s.sessionId)

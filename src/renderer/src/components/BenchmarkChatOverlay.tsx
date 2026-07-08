@@ -4,9 +4,9 @@ import { TimelineChatBody } from '@renderer/components/chat/TimelineChatBody'
 import { trpc } from '@renderer/lib/trpc'
 import { useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 
-// Body of the benchmark-discussion session, rendered inside UnifiedChatDrawer.
+// Body of the benchmark-discussion session, rendered inside the CHATS page.
 // Reads the App-level store, so the session continues even when this body is
-// unmounted (tab switch / drawer collapse). Close/stop is owned by the drawer.
+// unmounted (tab switch). Close/stop is owned by the CHATS page tab ×.
 export function BenchmarkChatOverlay() {
   const status = useBenchmarkChatRun((s) => s.status)
   const sessionId = useBenchmarkChatRun((s) => s.sessionId)

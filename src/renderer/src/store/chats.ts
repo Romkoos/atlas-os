@@ -34,14 +34,12 @@ const clampRatio = (r: number): number => Math.min(MAX_SPLIT, Math.max(MIN_SPLIT
 // tracks which chat tabs are visible, not the chat sessions themselves (those
 // live in the per-type run stores). One session per type → id === type.
 export interface ChatsState {
-  open: boolean
   sessions: ChatSession[]
   activeSessionId: string | null
 
   openSession: (s: { type: ChatSessionType; title?: string }) => void
   closeSession: (id: string) => void
   setActive: (id: string) => void
-  setOpen: (open: boolean) => void
 
   splitRatio: number
   setSplitRatio: (r: number) => void
@@ -77,7 +75,6 @@ export function mergePersistedChats(persisted: unknown, current: ChatsState): Ch
       : {}
   return {
     ...current,
-    open: Boolean(p.open) && sessions.length > 0,
     sessions,
     activeSessionId,
     splitRatio,
@@ -95,13 +92,12 @@ const noopStorage: Storage = {
 }
 
 const storage = createJSONStorage<
-  Pick<ChatsState, 'open' | 'sessions' | 'activeSessionId' | 'splitRatio' | 'canvasTabByType'>
+  Pick<ChatsState, 'sessions' | 'activeSessionId' | 'splitRatio' | 'canvasTabByType'>
 >(() => (typeof localStorage !== 'undefined' ? localStorage : noopStorage))
 
 export const useChats = create<ChatsState>()(
   persist(
     (set) => ({
-      open: false,
       sessions: [],
       activeSessionId: null,
 
@@ -110,7 +106,6 @@ export const useChats = create<ChatsState>()(
           const existing = s.sessions.find((x) => x.type === type)
           if (existing) {
             return {
-              open: true,
               activeSessionId: existing.id,
               sessions: s.sessions.map((x) =>
                 x.id === existing.id ? { ...x, title: title ?? x.title } : x,
@@ -118,7 +113,7 @@ export const useChats = create<ChatsState>()(
             }
           }
           const session: ChatSession = { id: type, type, title: title ?? DEFAULT_TITLES[type] }
-          return { open: true, sessions: [...s.sessions, session], activeSessionId: session.id }
+          return { sessions: [...s.sessions, session], activeSessionId: session.id }
         }),
 
       closeSession: (id) =>
@@ -126,11 +121,10 @@ export const useChats = create<ChatsState>()(
           const sessions = s.sessions.filter((x) => x.id !== id)
           const activeSessionId =
             s.activeSessionId === id ? (sessions[0]?.id ?? null) : s.activeSessionId
-          return { sessions, activeSessionId, open: sessions.length > 0 ? s.open : false }
+          return { sessions, activeSessionId }
         }),
 
       setActive: (id) => set({ activeSessionId: id }),
-      setOpen: (open) => set({ open }),
 
       splitRatio: 0.5,
       setSplitRatio: (r) => set({ splitRatio: clampRatio(r) }),
@@ -140,10 +134,9 @@ export const useChats = create<ChatsState>()(
     }),
     {
       name: 'atlas-chat-drawer',
-      version: 3,
+      version: 4,
       storage,
       partialize: (s) => ({
-        open: s.open,
         sessions: s.sessions,
         activeSessionId: s.activeSessionId,
         splitRatio: s.splitRatio,

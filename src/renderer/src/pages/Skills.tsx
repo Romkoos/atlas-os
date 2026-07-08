@@ -268,7 +268,7 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
 }
 
 // The editor is always shown for the selected skill; the improver session now
-// lives in the UnifiedChatDrawer. The editor auto-refreshes after accept/reject
+// lives in the CHATS page. The editor auto-refreshes after accept/reject
 // because SkillImproverHost invalidates skills.getRaw on done/aborted.
 function SelectedRight({ selectedId }: { selectedId: string }) {
   return <SkillEditorPane key={selectedId} skillId={selectedId} />

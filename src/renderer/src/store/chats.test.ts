@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useChats } from './chats'
 
 beforeEach(() => {
-  useChats.setState({ open: false, sessions: [], activeSessionId: null })
+  useChats.setState({ sessions: [], activeSessionId: null })
 })
 
 describe('useChats.openSession', () => {
-  it('adds a session, opens the drawer, and makes it active', () => {
+  it('adds a session and makes it active', () => {
     useChats.getState().openSession({ type: 'benchmark' })
     const s = useChats.getState()
-    expect(s.open).toBe(true)
     expect(s.sessions).toEqual([{ id: 'benchmark', type: 'benchmark', title: 'discuss results' }])
     expect(s.activeSessionId).toBe('benchmark')
   })
@@ -24,30 +23,28 @@ describe('useChats.openSession', () => {
     const s = useChats.getState()
     expect(s.sessions).toHaveLength(2)
     expect(s.activeSessionId).toBe('roadmap')
-    expect(s.open).toBe(true)
   })
 
   it('uses the default title per type and honors a custom title', () => {
     useChats.getState().openSession({ type: 'roadmap' })
     expect(useChats.getState().sessions[0].title).toBe('idea incubator')
-    useChats.setState({ open: false, sessions: [], activeSessionId: null })
+    useChats.setState({ sessions: [], activeSessionId: null })
     useChats.getState().openSession({ type: 'benchmark', title: 'custom' })
     expect(useChats.getState().sessions[0].title).toBe('custom')
   })
 })
 
 describe('useChats.closeSession', () => {
-  it('removes a session and closes the drawer when none remain', () => {
+  it('removes a session and clears the active id when none remain', () => {
     const { openSession, closeSession } = useChats.getState()
     openSession({ type: 'benchmark' })
     closeSession('benchmark')
     const s = useChats.getState()
     expect(s.sessions).toEqual([])
     expect(s.activeSessionId).toBeNull()
-    expect(s.open).toBe(false)
   })
 
-  it('switches active to a remaining session and keeps the drawer open', () => {
+  it('switches active to a remaining session', () => {
     const { openSession, setActive, closeSession } = useChats.getState()
     openSession({ type: 'benchmark' })
     openSession({ type: 'roadmap' })
@@ -56,16 +53,6 @@ describe('useChats.closeSession', () => {
     const s = useChats.getState()
     expect(s.sessions.map((x) => x.id)).toEqual(['benchmark'])
     expect(s.activeSessionId).toBe('benchmark')
-    expect(s.open).toBe(true)
-  })
-})
-
-describe('useChats misc actions', () => {
-  it('setOpen sets open explicitly', () => {
-    useChats.getState().setOpen(true)
-    expect(useChats.getState().open).toBe(true)
-    useChats.getState().setOpen(false)
-    expect(useChats.getState().open).toBe(false)
   })
 })
 
