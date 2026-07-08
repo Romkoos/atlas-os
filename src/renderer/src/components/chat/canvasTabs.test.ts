@@ -5,9 +5,6 @@ describe('tabsForType', () => {
   it('gives roadmap an Ideas tab', () => {
     expect(tabsForType('roadmap').map((t) => t.label)).toEqual(['Ideas'])
   })
-  it('gives benchmark a Results tab', () => {
-    expect(tabsForType('benchmark').map((t) => t.label)).toEqual(['Results'])
-  })
   it('gives skillImprover a Report tab', () => {
     expect(tabsForType('skillImprover').map((t) => t.label)).toEqual(['Report'])
   })

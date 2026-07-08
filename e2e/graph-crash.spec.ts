@@ -24,7 +24,7 @@ async function graphScenario(reload: boolean) {
   await window.getByRole('button', { name: '01 DASHBOARD' }).click()
   await expect(window.getByText('processes', { exact: true })).toBeVisible({ timeout: 15000 })
 
-  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
 
   const graphTab = window.getByRole('button', { name: './graph' })
   await graphTab.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
@@ -44,7 +44,7 @@ async function graphScenario(reload: boolean) {
     // Bounce to another page and back — repeated fresh mounts from elsewhere.
     await window.getByRole('button', { name: '01 DASHBOARD' }).click()
     await window.waitForTimeout(200)
-    await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+    await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
     await graphTab.click().catch(() => {})
     await window.waitForTimeout(600)
   }
@@ -75,7 +75,7 @@ test('toggling to the 2D view and re-entering does not throw the rAF tick error'
   window.on('pageerror', (e) => pageErrors.push(String(e.message ?? e)))
 
   await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
-  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
 
   const graphTab = window.getByRole('button', { name: './graph' })
   await graphTab.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
@@ -93,7 +93,7 @@ test('toggling to the 2D view and re-entering does not throw the rAF tick error'
   for (let i = 0; i < 3; i++) {
     await window.getByRole('button', { name: '01 DASHBOARD' }).click()
     await window.waitForTimeout(200)
-    await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+    await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
     await graphTab.click().catch(() => {})
     await twoD.click().catch(() => {})
     await window.waitForTimeout(600)

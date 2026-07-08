@@ -7,7 +7,7 @@ export type SignalLinkKind = 'section' | 'path'
 
 // Known emitters. `source` is a free-form text column, but these are the
 // subsystems that write signals today and the filter chips on the Signals page.
-export const SIGNAL_SOURCES = ['jobs', 'benchmark', 'infra', 'roadmap', 'chat', 'news'] as const
+export const SIGNAL_SOURCES = ['jobs', 'infra', 'roadmap', 'chat', 'news'] as const
 export type SignalSource = (typeof SIGNAL_SOURCES)[number]
 
 export const SIGNAL_SEVERITIES: readonly SignalSeverity[] = ['info', 'success', 'warning', 'error']

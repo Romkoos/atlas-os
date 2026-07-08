@@ -14,18 +14,14 @@ import { Toaster } from '@renderer/components/ui/sonner'
 import { trpc } from '@renderer/lib/trpc'
 import { Chats } from '@renderer/pages/Chats'
 import { Dashboard } from '@renderer/pages/Dashboard'
-import { Info } from '@renderer/pages/Info'
 import { Knowledge } from '@renderer/pages/Knowledge'
 import { News } from '@renderer/pages/News'
 import { Plugins } from '@renderer/pages/Plugins'
-import { Productivity } from '@renderer/pages/Productivity'
 import { Roadmap } from '@renderer/pages/Roadmap'
 import { Settings } from '@renderer/pages/Settings'
 import { Signals } from '@renderer/pages/Signals'
 import { Skills } from '@renderer/pages/Skills'
-import { Stats } from '@renderer/pages/Stats'
 import { useResolvedTheme } from '@renderer/providers/ThemeProvider'
-import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
@@ -41,12 +37,9 @@ const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
   roadmap: Roadmap,
   chats: Chats,
-  stats: Stats,
-  productivity: Productivity,
   knowledge: Knowledge,
   news: News,
   signals: Signals,
-  info: Info,
   skills: Skills,
   plugins: Plugins,
   settings: Settings,
@@ -77,12 +70,11 @@ export function App() {
 
   const Page = PAGES[section]
 
-  // Kickoffs: general/roadmap use the first user message; benchmark/improver use
-  // a domain id (batchId/skillId) carried in a companion store.
+  // Kickoffs: general/roadmap use the first user message; improver uses a domain
+  // id (skillId) carried in a companion store.
   const generalKickoff = useGeneralChatRun((s) => s.transcript[0]?.text)
   const workerKickoff = useWorkerChatRun((s) => s.transcript[0]?.text)
   const roadmapKickoff = useRoadmapChatRun((s) => s.transcript[0]?.text)
-  const benchmarkKickoff = useBenchmarkChatContext((s) => s.batchId) ?? undefined
   const improverKickoff = useSkillImproverExtra((s) => s.skillId) ?? undefined
 
   return (
@@ -133,11 +125,6 @@ export function App() {
             const e = event as { type: string; item?: RoadmapItem }
             if (e.type === 'saved' && e.item) useRoadmapSaved.getState().setSaved(e.item)
           }}
-        />
-        <ChatHost
-          useRun={useBenchmarkChatRun}
-          useOpenSubscription={trpc.benchmarkChat.open.useSubscription}
-          kickoff={benchmarkKickoff}
         />
         <ChatHost
           useRun={useSkillImproverRun}

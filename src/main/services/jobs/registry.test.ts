@@ -137,7 +137,7 @@ describe('JobRegistry meta', () => {
     const reg = new JobRegistry()
     const seen = vi.fn()
     reg.onChange(seen)
-    const job = reg.register({ kind: 'benchmark', label: 'Benchmark batch' })
+    const job = reg.register({ kind: 'news', label: 'News digest' })
     seen.mockClear()
     job.update({ detail: '2/5 · running', tokens: 100 })
     const j = reg.snapshot().running[0]
@@ -178,7 +178,7 @@ describe('JobRegistry meta', () => {
 
   it('finish() falls back to the last update() detail', () => {
     const reg = new JobRegistry()
-    const job = reg.register({ kind: 'benchmark', label: 'Benchmark batch' })
+    const job = reg.register({ kind: 'news', label: 'News digest' })
     job.update({ detail: '5/5 · analyzing' })
     job.finish('done')
     expect(reg.snapshot().recent[0].detail).toBe('5/5 · analyzing')

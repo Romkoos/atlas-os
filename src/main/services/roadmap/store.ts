@@ -5,7 +5,7 @@ import { roadmapItems } from '@main/db/schema'
 import { logger } from '@main/logger'
 import { ROADMAP_SEED } from '@main/services/roadmap/seed'
 import type { DevBinding, RoadmapCreate, RoadmapItem, RoadmapUpdate } from '@shared/roadmap'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import Store from 'electron-store'
 
 const CATEGORY_ORDER = ['intelligence', 'observability', 'macos', 'connectivity', 'wow']
@@ -16,13 +16,19 @@ interface RoadmapMeta {
   seeded: boolean
   claudePromptBackfilled: boolean
   statusIdeaToTodoMigrated: boolean
+  benchmarkSeedsRetired: boolean
 }
 let metaStore: Store<RoadmapMeta> | null = null
 function meta(): Store<RoadmapMeta> {
   if (!metaStore) {
     metaStore = new Store<RoadmapMeta>({
       name: 'roadmap-meta',
-      defaults: { seeded: false, claudePromptBackfilled: false, statusIdeaToTodoMigrated: false },
+      defaults: {
+        seeded: false,
+        claudePromptBackfilled: false,
+        statusIdeaToTodoMigrated: false,
+        benchmarkSeedsRetired: false,
+      },
     })
   }
   return metaStore
@@ -113,6 +119,25 @@ export function backfillRoadmapClaudePrompts(): void {
   }
   if (filled > 0) logger.info('Roadmap claudePrompt backfilled', { count: filled })
   meta().set('claudePromptBackfilled', true)
+}
+
+// One-time cleanup: the benchmark subsystem was removed, so these seeded ideas
+// (which depended on the benchmark suite / benchmark_runs) are no longer
+// relevant. Delete them by title. Matched against the original seed titles only,
+// so a user-renamed row is left untouched. Guarded by a flag so it runs once.
+const RETIRED_SEED_TITLES = [
+  'Self-improving skills loop',
+  'Cost / token forecaster',
+  'Focus/DND-aware scheduling',
+]
+export function retireBenchmarkRoadmapSeeds(): void {
+  if (meta().get('benchmarkSeedsRetired')) return
+  const res = db()
+    .delete(roadmapItems)
+    .where(inArray(roadmapItems.title, RETIRED_SEED_TITLES))
+    .run()
+  if (res.changes > 0) logger.info('Retired benchmark roadmap seeds', { count: res.changes })
+  meta().set('benchmarkSeedsRetired', true)
 }
 
 // Pure DB step: rewrite legacy status='idea' rows to 'todo'. Returns rows changed.

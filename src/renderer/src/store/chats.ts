@@ -2,7 +2,7 @@ import { useUiStore } from '@renderer/store/ui'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-export type ChatSessionType = 'benchmark' | 'roadmap' | 'skillImprover' | 'generalChat' | 'worker'
+export type ChatSessionType = 'roadmap' | 'skillImprover' | 'generalChat' | 'worker'
 
 export interface ChatSession {
   id: string
@@ -11,20 +11,13 @@ export interface ChatSession {
 }
 
 const DEFAULT_TITLES: Record<ChatSessionType, string> = {
-  benchmark: 'discuss results',
   roadmap: 'idea incubator',
   skillImprover: 'improver',
   generalChat: 'chat',
   worker: 'worker',
 }
 
-const VALID_TYPES: ChatSessionType[] = [
-  'benchmark',
-  'roadmap',
-  'skillImprover',
-  'generalChat',
-  'worker',
-]
+const VALID_TYPES: ChatSessionType[] = ['roadmap', 'skillImprover', 'generalChat', 'worker']
 
 export const MIN_SPLIT = 0.2
 export const MAX_SPLIT = 0.8
@@ -148,7 +141,7 @@ export const useChats = create<ChatsState>()(
 )
 
 // Open (or focus) a chat and bring the CHATS page forward. External callers
-// (Roadmap/Skills/Dashboard/Productivity) use this instead of openSession so a
+// (Roadmap/Skills/Dashboard) use this instead of openSession so a
 // button press both starts the chat and navigates to it.
 export function goToChat(input: { type: ChatSessionType; title?: string }): void {
   useChats.getState().openSession(input)

@@ -102,12 +102,9 @@ export class JobRegistry extends EventEmitter {
     this.recordSignal(status, meta, job)
   }
 
-  // Land a finished job in the Signals event log. `benchmark` batches emit their
-  // own richer batch-level signal (done/failed counts), so they're skipped here
-  // to avoid a duplicate. recordSignal is defensive — a db-less test env is a
-  // no-op, never a throw.
+  // Land a finished job in the Signals event log. recordSignal is defensive — a
+  // db-less test env is a no-op, never a throw.
   private recordSignal(status: JobStatus, meta: FinishMeta | undefined, job: ActiveJob): void {
-    if (job.kind === 'benchmark') return
     // A user-initiated cancel (× on a chat tab, abort button) is not a failure —
     // don't pollute the Signals log with a `job.failed`/error event for it.
     if (status === 'cancelled') return

@@ -25,7 +25,7 @@ export function TrayHud() {
         <span className="tray-head-hint">dashboard →</span>
       </button>
 
-      <button type="button" className="tray-block" onClick={() => nav('productivity')}>
+      <button type="button" className="tray-block" onClick={() => nav('dashboard')}>
         <div className="tray-row">
           <span className="tray-k">TOKENS TODAY</span>
           <span className="tray-v amber">{t ? num(t.totalTokens) : '—'}</span>

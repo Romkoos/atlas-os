@@ -1,4 +1,3 @@
-import { BenchmarkChatOverlay } from '@renderer/components/BenchmarkChatOverlay'
 import { Canvas } from '@renderer/components/chat/Canvas'
 import { SplitPane } from '@renderer/components/chat/SplitPane'
 import { GeneralChatOverlay } from '@renderer/components/GeneralChatOverlay'
@@ -7,7 +6,6 @@ import { SkillImproverOverlay } from '@renderer/components/SkillImproverOverlay'
 import { WorkerChatOverlay } from '@renderer/components/WorkerChatOverlay'
 import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
-import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
 import { type ChatSessionType, useChats } from '@renderer/store/chats'
 import { useGeneralChatRun } from '@renderer/store/generalChatRun'
 import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatRun'
@@ -21,7 +19,7 @@ import { useState } from 'react'
 // right (Canvas) below. Sessions live in the per-type run stores and their
 // subscriptions in the App-level ChatHosts, so switching tabs (or leaving the
 // page) never stops a run. Only a tab's × ends a run. This page is the single
-// mount point for the five chat overlays — the old slide-out drawer component
+// mount point for the four chat overlays — the old slide-out drawer component
 // was deleted in this same commit so the overlay bodies are never double-mounted.
 export function Chats() {
   const sessions = useChats((s) => s.sessions)
@@ -32,7 +30,6 @@ export function Chats() {
   const splitRatio = useChats((s) => s.splitRatio)
   const setSplitRatio = useChats((s) => s.setSplitRatio)
 
-  const benchCancel = trpc.benchmarkChat.cancel.useMutation()
   const roadmapCancel = trpc.roadmapChat.cancel.useMutation()
   const skillCancel = trpc.skillImprover.cancel.useMutation()
   const generalCancel = trpc.generalChat.cancel.useMutation()
@@ -42,12 +39,7 @@ export function Chats() {
   // endSession(type): cancel the running server run (if any), reset the run
   // store, clear the companion store, then closeSession.
   const endSession = (type: ChatSessionType) => {
-    if (type === 'benchmark') {
-      const st = useBenchmarkChatRun.getState()
-      if (st.sessionId && st.running) benchCancel.mutate({ sessionId: st.sessionId })
-      st.reset()
-      useBenchmarkChatContext.getState().clearBatch()
-    } else if (type === 'roadmap') {
+    if (type === 'roadmap') {
       const st = useRoadmapChatRun.getState()
       if (st.sessionId && st.running) roadmapCancel.mutate({ sessionId: st.sessionId })
       st.reset()
@@ -100,11 +92,10 @@ export function Chats() {
     </>
   )
 
-  // The five chat overlay bodies. Mounted exactly once, here — never in a
+  // The four chat overlay bodies. Mounted exactly once, here — never in a
   // second host — so cutting the drawer over to this page can't double-mount.
   const overlay = (
     <>
-      {active?.type === 'benchmark' ? <BenchmarkChatOverlay /> : null}
       {active?.type === 'roadmap' ? <RoadmapChatOverlay /> : null}
       {active?.type === 'skillImprover' ? <SkillImproverOverlay /> : null}
       {active?.type === 'generalChat' ? <GeneralChatOverlay /> : null}

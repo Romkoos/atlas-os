@@ -23,14 +23,14 @@ describe('mergePersistedUi', () => {
   it('preserves selectedProject and tabsBySection when present', () => {
     const out = mergePersistedUi(
       {
-        section: 'productivity',
+        section: 'knowledge',
         selectedProject: 'atlas-os',
-        tabsBySection: { productivity: 'sessions' },
+        tabsBySection: { knowledge: 'graph' },
       },
       base,
     )
     expect(out.selectedProject).toBe('atlas-os')
-    expect(out.tabsBySection).toEqual({ productivity: 'sessions' })
+    expect(out.tabsBySection).toEqual({ knowledge: 'graph' })
   })
 
   it('defaults selectedProject to null and tabsBySection to {} when absent or malformed', () => {
@@ -46,7 +46,7 @@ describe('mergePersistedUi', () => {
 
   it('SECTIONS contains the canonical pages', () => {
     expect(SECTIONS).toContain('dashboard')
-    expect(SECTIONS).not.toContain('benchmark' as never) // sanity: benchmark is a tab, not a section
+    expect(SECTIONS).not.toContain('worker' as never) // sanity: worker is a chat type, not a section
   })
 
   it('defaults roadmapHideDone to false when absent', () => {

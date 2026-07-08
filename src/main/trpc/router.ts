@@ -1,5 +1,3 @@
-import { benchmarkRouter } from '@main/trpc/routers/benchmark'
-import { benchmarkChatRouter } from '@main/trpc/routers/benchmarkChat'
 import { generalChatRouter } from '@main/trpc/routers/generalChat'
 import { graphRouter } from '@main/trpc/routers/graph'
 import { healthRouter } from '@main/trpc/routers/health'
@@ -15,7 +13,6 @@ import { settingsRouter } from '@main/trpc/routers/settings'
 import { signalsRouter } from '@main/trpc/routers/signals'
 import { skillImproverRouter } from '@main/trpc/routers/skillImprover'
 import { skillsRouter } from '@main/trpc/routers/skills'
-import { statsRouter } from '@main/trpc/routers/stats'
 import { subscriptionUsageRouter } from '@main/trpc/routers/subscriptionUsage'
 import { timelineRouter } from '@main/trpc/routers/timeline'
 import { trendingRouter } from '@main/trpc/routers/trending'
@@ -27,12 +24,9 @@ export const appRouter = router({
   jobs: jobsRouter,
   settings: settingsRouter,
   rebuild: rebuildRouter,
-  stats: statsRouter,
   skills: skillsRouter,
   skillImprover: skillImproverRouter,
   productivity: productivityRouter,
-  benchmark: benchmarkRouter,
-  benchmarkChat: benchmarkChatRouter,
   knowledge: knowledgeRouter,
   graph: graphRouter,
   news: newsRouter,
