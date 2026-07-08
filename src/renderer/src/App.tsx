@@ -13,6 +13,7 @@ import { TrendingRunHost } from '@renderer/components/TrendingRunHost'
 import { UnifiedChatDrawer } from '@renderer/components/UnifiedChatDrawer'
 import { Toaster } from '@renderer/components/ui/sonner'
 import { trpc } from '@renderer/lib/trpc'
+import { Chats } from '@renderer/pages/Chats'
 import { Dashboard } from '@renderer/pages/Dashboard'
 import { Info } from '@renderer/pages/Info'
 import { Knowledge } from '@renderer/pages/Knowledge'
@@ -40,6 +41,7 @@ import { toast } from 'sonner'
 const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
   roadmap: Roadmap,
+  chats: Chats,
   stats: Stats,
   productivity: Productivity,
   knowledge: Knowledge,
