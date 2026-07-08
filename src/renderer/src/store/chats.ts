@@ -134,7 +134,7 @@ export const useChats = create<ChatsState>()(
     }),
     {
       name: 'atlas-chat-drawer',
-      version: 4,
+      version: 2,
       storage,
       partialize: (s) => ({
         sessions: s.sessions,

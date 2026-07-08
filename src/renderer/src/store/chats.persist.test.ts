@@ -80,4 +80,23 @@ describe('mergePersistedChats', () => {
     const merged = mergePersistedChats({ canvasTabByType: { worker: 'Docs' } }, base)
     expect(merged.canvasTabByType).toEqual({ worker: 'Docs' })
   })
+
+  it('upgrades v2 persisted data (sessions/activeSessionId only, no new fields) with clean defaults', () => {
+    // Real upgrade path: users on `main` persisted at version 2 with shape
+    // `{ open, sessions, activeSessionId }` — no splitRatio/canvasTabByType at
+    // all. Persist version must stay 2 so this reaches merge() intact instead
+    // of being wiped by a version-mismatch reset.
+    const merged = mergePersistedChats(
+      {
+        open: true,
+        sessions: [{ id: 'roadmap', type: 'roadmap', title: 'idea incubator' }],
+        activeSessionId: 'roadmap',
+      },
+      base,
+    )
+    expect(merged.sessions).toEqual([{ id: 'roadmap', type: 'roadmap', title: 'idea incubator' }])
+    expect(merged.activeSessionId).toBe('roadmap')
+    expect(merged.splitRatio).toBe(0.5)
+    expect(merged.canvasTabByType).toEqual({})
+  })
 })

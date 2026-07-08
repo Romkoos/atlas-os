@@ -14,6 +14,7 @@ export function ResultsCanvas() {
 
   if (!batchId) return <div className="canvas-empty">No batch attached.</div>
   if (progress.isLoading) return <div className="canvas-empty">Loading results…</div>
+  if (analysis.isLoading) return <div className="canvas-empty">Loading…</div>
 
   const prog = progress.data
   const rows = analysis.data?.batchId === batchId ? (analysis.data?.dataJson ?? []) : []

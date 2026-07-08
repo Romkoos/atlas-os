@@ -1,6 +1,5 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
-import { ImproverReportView } from '@renderer/components/ImproverReportView'
 import { trpc } from '@renderer/lib/trpc'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 
@@ -32,12 +31,6 @@ export function SkillImproverOverlay() {
           awaitingInput={run.awaitingInput}
           onPickOption={send}
         />
-        {report ? (
-          <div className="improver-report-wrap">
-            <ImproverReportView report={report} />
-          </div>
-        ) : null}
-
         {report ? (
           <div className="improver-foot">
             <button
