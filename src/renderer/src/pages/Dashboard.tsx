@@ -11,6 +11,7 @@ import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
+import { capSignalsForPanel } from '@renderer/components/dashboard/signals-feed'
 import { TokenHeatmap } from '@renderer/components/dashboard/TokenHeatmap'
 import { UsagePlasmaWidget } from '@renderer/components/dashboard/UsagePlasmaWidget'
 import { WeeklyPlasmaWidget } from '@renderer/components/dashboard/WeeklyPlasmaWidget'
@@ -334,7 +335,7 @@ function SignalsPanel() {
   const signals = useSignalsStore((s) => s.signals)
   const beam = useBeamRoam((s) => s.active === 'signals')
   const open = useOpenSignal()
-  const top = signals.slice(0, 6)
+  const top = capSignalsForPanel(signals)
   return (
     <div className="panel">
       {beam && <BorderBeam duration={5} />}
