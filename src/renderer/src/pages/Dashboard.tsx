@@ -182,13 +182,12 @@ function ActivityPanel() {
         <span className="ttl">
           <ScrambleText text="activity · 30d" />
         </span>
-        <DrillLink to="productivity" label="productivity" />
       </div>
       <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {kpi.isLoading ? (
           <Note>loading…</Note>
         ) : byDay.length === 0 ? (
-          <Note>no activity yet — use Claude Code, then refresh on Productivity.</Note>
+          <Note>no activity yet — use Claude Code, then refresh.</Note>
         ) : (
           <>
             <StatRow
@@ -241,11 +240,6 @@ function QuickActions() {
     },
     onError: (e) => toast.error(e.message),
   })
-  const benchmark = trpc.benchmark.run.useMutation({
-    onSuccess: (r) => toast.success(`Benchmark started — ${r.total} runs queued`),
-    onError: (e) => toast.error(e.message),
-  })
-
   // Deep-map target: the project matching the sidebar selection, else the first.
   const projects = trpc.graph.listProjects.useQuery()
   const selectedProject = useUiStore((s) => s.selectedProject)
@@ -294,14 +288,6 @@ function QuickActions() {
         >
           ▶ {buildRun.running ? 'BUILDING…' : 'BUILD MAP'}
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => benchmark.mutate({})}
-          disabled={benchmark.isPending}
-        >
-          ▶ BENCHMARK
-        </button>
         <button type="button" className="btn" onClick={() => goToChat({ type: 'roadmap' })}>
           ◈ ROADMAP IDEA
         </button>
@@ -311,7 +297,7 @@ function QuickActions() {
 }
 
 // ── SIGNALS ────────────────────────────────────────────────────────────────
-// Live cross-subsystem event feed (jobs, benchmark, infra, roadmap, chat). Reads
+// Live cross-subsystem event feed (jobs, infra, roadmap, chat). Reads
 // the signals store fed by the app-wide SignalsHost subscription — no fetch here.
 function SignalFeedRow({ sig, onOpen }: { sig: SignalView; onOpen: (s: SignalView) => void }) {
   const { icon: Icon, color } = SEVERITY_META[sig.severity]

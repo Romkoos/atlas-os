@@ -105,10 +105,6 @@ export type ImproverEvent =
   | { type: 'error'; message: string }
   | { type: 'aborted'; tokens: number; durationMs: number }
 
-// Events streamed from main → renderer during a benchmark-discussion chat
-// (tRPC subscription). Mirrors the improver shape minus accept/reject/report.
-export type BenchmarkChatEvent = BaseChatEvent
-
 // Events streamed from main → renderer during a general free-form chat.
 export type GeneralChatEvent = BaseChatEvent
 

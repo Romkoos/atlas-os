@@ -125,66 +125,6 @@ export type NewAgentSessionRow = typeof agentSessions.$inferInsert
 export type EcosystemChangeRow = typeof ecosystemChanges.$inferSelect
 export type NewEcosystemChangeRow = typeof ecosystemChanges.$inferInsert
 
-// One row per benchmark run (task × rep). Frozen-task token cost stamped with an
-// infra fingerprint so cost is comparable across infra versions. See
-// docs/superpowers/specs/2026-05-25-benchmark-suite-design.md.
-export const benchmarkRuns = sqliteTable(
-  'benchmark_runs',
-  {
-    id: text('id').primaryKey(),
-    batchId: text('batch_id').notNull(),
-    ts: integer('ts', { mode: 'timestamp_ms' }).notNull(),
-    taskId: text('task_id').notNull(),
-    rep: integer('rep').notNull(),
-    infraHash: text('infra_hash').notNull(),
-    infraSnapshot: text('infra_snapshot', { mode: 'json' })
-      .$type<import('@main/services/productivity/infra').InfraState>()
-      .notNull(),
-    repoCommit: text('repo_commit').notNull(),
-    model: text('model').notNull(),
-    tokensIn: integer('tokens_in').notNull().default(0),
-    tokensOut: integer('tokens_out').notNull().default(0),
-    cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
-    cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
-    totalCostUsd: real('total_cost_usd').notNull().default(0),
-    numTurns: integer('num_turns').notNull().default(0),
-    durationMs: integer('duration_ms').notNull().default(0),
-    success: integer('success', { mode: 'boolean' }).notNull(),
-    failReason: text('fail_reason'),
-    transcriptPath: text('transcript_path'),
-  },
-  (t) => [
-    index('idx_bench_task').on(t.taskId),
-    index('idx_bench_infra').on(t.infraHash),
-    index('idx_bench_batch').on(t.batchId),
-    index('idx_bench_ts').on(t.ts),
-  ],
-)
-
-// One row per completed batch's auto-analysis. The UI reads the newest row, so
-// it behaves as "replaced each batch". `dataJson` is the A/B slice the summary
-// was based on; it also seeds the discuss-chat. `summary` is null when the
-// analysis call failed.
-export const benchmarkAnalysis = sqliteTable(
-  'benchmark_analysis',
-  {
-    id: text('id').primaryKey(),
-    batchId: text('batch_id').notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    model: text('model').notNull(),
-    infraHash: text('infra_hash').notNull(),
-    baselineInfraHash: text('baseline_infra_hash'),
-    summary: text('summary'),
-    dataJson: text('data_json', { mode: 'json' })
-      .$type<import('@main/services/benchmark/aggregate').AbRow[]>()
-      .notNull(),
-  },
-  (t) => [index('idx_bench_analysis_created').on(t.createdAt)],
-)
-
-export type BenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferSelect
-export type NewBenchmarkAnalysisRow = typeof benchmarkAnalysis.$inferInsert
-
 // ── Roadmap ─────────────────────────────────────────────────────────────────
 // One candidate feature for Atlas OS, shown on the ROADMAP page. Seeded once
 // from the brainstorm list (guarded by a store flag), then user-editable.
@@ -273,7 +213,7 @@ export const signals = sqliteTable(
   'signals',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    source: text('source').notNull(), // jobs | benchmark | infra | roadmap | chat | news
+    source: text('source').notNull(), // jobs | infra | roadmap | chat | news
     type: text('type').notNull(), // namespaced source.event, e.g. job.completed
     severity: text('severity').notNull(), // info | success | warning | error
     title: text('title').notNull(),

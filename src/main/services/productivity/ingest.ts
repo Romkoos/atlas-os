@@ -2,7 +2,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AppDatabase } from '@main/db/client'
 import type { NewAgentSessionRow, NewAgentTurnRow } from '@main/db/schema'
-import { agentSessions, agentTurns, benchmarkRuns, ecosystemChanges } from '@main/db/schema'
+import { agentSessions, agentTurns, ecosystemChanges } from '@main/db/schema'
 import { estimateDifficulty } from '@main/services/productivity/difficulty'
 import { turnId } from '@main/services/productivity/ids'
 import { detectInfraChanges } from '@main/services/productivity/infra'
@@ -19,7 +19,7 @@ import {
   parseTranscriptTurns,
 } from '@main/services/productivity/transcript'
 import { getSettings } from '@main/store'
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 
 export interface SessionAggregate {
   projectPath: string
@@ -318,28 +318,9 @@ async function estimateMissingDifficulties(
   }
 }
 
-// Benchmark runs spawn real `claude` sessions that write transcripts into
-// ~/.claude/projects, so the ingest would otherwise pick them up as genuine agent
-// activity and inflate tokens/day, KPI, and the session list. Drop them by their
-// session_id (stored as benchmark_runs.transcriptPath). Self-healing: runs every
-// ingest, so even a session ingested before its benchmark row existed gets removed.
-function purgeBenchmarkSessions(database: AppDatabase): void {
-  const ids = database
-    .select({ id: benchmarkRuns.transcriptPath })
-    .from(benchmarkRuns)
-    .where(isNotNull(benchmarkRuns.transcriptPath))
-    .all()
-    .map((r) => r.id)
-    .filter((id): id is string => id != null)
-  if (ids.length === 0) return
-  database.delete(agentTurns).where(inArray(agentTurns.sessionId, ids)).run()
-  database.delete(agentSessions).where(inArray(agentSessions.sessionId, ids)).run()
-}
-
 export async function ingestAll(database: AppDatabase, paths: IngestPaths): Promise<IngestResult> {
   const rows = await collectIngestRows(paths)
   const result = writeRows(database, rows)
-  purgeBenchmarkSessions(database)
   await estimateMissingDifficulties(database, rows.firstPromptBySession)
   let infra = 0
   if (paths.claudeDir && paths.claudeJson && paths.infraSnapshotPath) {

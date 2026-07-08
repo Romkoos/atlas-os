@@ -23,7 +23,7 @@ test('Knowledge graph tab renders a canvas', async () => {
   const window = await app.firstWindow()
 
   await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
-  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
 
   // The graph tab is only present when projects exist; skip cleanly otherwise.
   const graphTab = window.getByRole('button', { name: './graph' })
@@ -53,7 +53,7 @@ test('Code graph tab shows a single Build control', async () => {
   const window = await app.firstWindow()
 
   await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
-  await window.getByRole('button', { name: '05 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
 
   // The code-graph tab is only present when projects exist; skip cleanly otherwise.
   const codeGraphTab = window.getByRole('button', { name: './code-graph' })
@@ -140,7 +140,7 @@ test('restores last section + tab after reload', async () => {
   await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
 
   // Navigate to News and select the GitHub Trending feed tab.
-  await window.getByRole('button', { name: '06 NEWS' }).click()
+  await window.getByRole('button', { name: '05 NEWS' }).click()
   await window.getByRole('button', { name: /GITHUB TRENDING/ }).click()
   await expect(window.getByRole('button', { name: /GITHUB TRENDING/ })).toHaveClass(/on/)
 
@@ -150,25 +150,6 @@ test('restores last section + tab after reload', async () => {
   await expect(window.getByRole('button', { name: /GITHUB TRENDING/ })).toHaveClass(/on/, {
     timeout: 15000,
   })
-
-  await app.close()
-})
-
-test('Productivity benchmark tab hides the days range selector', async () => {
-  const app = await electron.launch({ args: ['.'] })
-  const window = await app.firstWindow()
-  await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
-
-  await window.getByRole('button', { name: '04 PRODUCTIVITY' }).click()
-
-  // On overview, the 30d range button is present.
-  await expect(window.getByRole('button', { name: '30d', exact: true })).toBeVisible({
-    timeout: 15000,
-  })
-
-  // Switch to benchmark: the days range buttons are removed.
-  await window.getByRole('button', { name: './benchmark' }).click()
-  await expect(window.getByRole('button', { name: '30d', exact: true })).toHaveCount(0)
 
   await app.close()
 })

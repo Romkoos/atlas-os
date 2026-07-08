@@ -21,7 +21,7 @@ export const ROADMAP_SEED: RoadmapSeed[] = [
     category: 'intelligence',
     priority: 'high',
     claudePrompt:
-      'Build a visual multi-agent workflow builder in Atlas OS. Add a new page + tRPC router. Let the user compose a DAG of Claude Agent SDK steps (fan-out, verify, synthesize) on a canvas, persist graphs as .flow JSON in SQLite (new Drizzle table + migration), and execute them by driving the Agent SDK per node. Reuse the streaming-input session pattern in src/main/services/benchmarkChat/run.ts and the job registry for live progress. Stream per-node status to the renderer over a tRPC subscription.',
+      'Build a visual multi-agent workflow builder in Atlas OS. Add a new page + tRPC router. Let the user compose a DAG of Claude Agent SDK steps (fan-out, verify, synthesize) on a canvas, persist graphs as .flow JSON in SQLite (new Drizzle table + migration), and execute them by driving the Agent SDK per node. Reuse the streaming-input session pattern in src/main/services/skillImprover/run.ts and the job registry for live progress. Stream per-node status to the renderer over a tRPC subscription.',
   },
   {
     title: 'Ambient "Atlas Copilot"',
@@ -31,24 +31,6 @@ export const ROADMAP_SEED: RoadmapSeed[] = [
     priority: 'medium',
     claudePrompt:
       'Add a global command palette to Atlas OS opened by a system-wide shortcut (Electron globalShortcut, e.g. Cmd+Shift+Space) that shows a floating input. Route natural-language queries to a Claude Agent SDK run grounded on the ~/atlas-knowledge index (see src/main/services/knowledge and src/main/trpc/routers/knowledge.ts), and let it invoke existing Atlas actions by mapping intents to tRPC procedures. Stream the answer into a small overlay. Keep the renderer sandboxed; do all Node work in main.',
-  },
-  {
-    title: 'Self-improving skills loop',
-    description:
-      'A nightly cron that benchmarks each skill, detects regressions, and auto-proposes SKILL.md edits — extends the existing skill-improver into a scheduled, autonomous optimizer.',
-    category: 'intelligence',
-    priority: 'medium',
-    claudePrompt:
-      'Extend the existing skill-improver (src/main/services/skillImprover, src/main/trpc/routers/skillImprover.ts) into a scheduled, autonomous optimizer. Add a scheduler in main that periodically benchmarks each skill using the benchmark suite (src/main/services/benchmark), detects score regressions against a stored baseline, and runs the improver to draft SKILL.md edits as backups for review. Persist run history in a new Drizzle table. Surface proposed diffs on the Skills page for one-click accept/revert.',
-  },
-  {
-    title: 'Cost / token forecaster',
-    description:
-      "Predict a task's token cost before running it (from historical benchmark data), with a live budget meter and a pre-flight 'this will cost ~X' estimate.",
-    category: 'intelligence',
-    priority: 'medium',
-    claudePrompt:
-      'Add token/cost forecasting to Atlas OS. Fit a simple estimator over historical benchmark_runs + agent_turns (see src/main/db/schema.ts) that maps task/difficulty signals to expected tokens and USD cost. Expose a tRPC query that returns a pre-flight estimate for a given prompt, and render a "this will cost ~X" chip plus a live budget meter in the agent run UI. Keep the model logic pure and unit-tested in a shared module.',
   },
   // ── Observability & Insight ────────────────────────────────────────────────
   {
@@ -72,11 +54,11 @@ export const ROADMAP_SEED: RoadmapSeed[] = [
   {
     title: 'Semantic search over everything',
     description:
-      'A local embeddings index across daily logs, transcripts, skills, and benchmarks; ask "when did I fix the flush ledger bug?" and jump to the exact log.',
+      'A local embeddings index across daily logs, transcripts, and skills; ask "when did I fix the flush ledger bug?" and jump to the exact log.',
     category: 'observability',
     priority: 'high',
     claudePrompt:
-      'Add local semantic search across daily logs, Claude transcripts, skills, and benchmark data. Build an embeddings index in main (local model or a small on-device embedder), stored in SQLite with incremental updates on file change. Expose a tRPC query that returns ranked snippets with source + line, and add a search UI (extend the Knowledge search page) that deep-links to the exact file/location. Keep indexing off the UI thread and idempotent.',
+      'Add local semantic search across daily logs, Claude transcripts, and skills. Build an embeddings index in main (local model or a small on-device embedder), stored in SQLite with incremental updates on file change. Expose a tRPC query that returns ranked snippets with source + line, and add a search UI (extend the Knowledge search page) that deep-links to the exact file/location. Keep indexing off the UI thread and idempotent.',
   },
   // ── Native macOS Power ─────────────────────────────────────────────────────
   {
@@ -87,15 +69,6 @@ export const ROADMAP_SEED: RoadmapSeed[] = [
     priority: 'medium',
     claudePrompt:
       "Add a macOS menu-bar (Tray) HUD to Atlas OS. In main, create an Electron Tray with a small popover window showing live running jobs (from the job registry, src/main/services/jobs), today's KPI, and token spend, updated via the same data the Dashboard uses. Clicking an item focuses/opens the main window on the relevant page. Handle app lifecycle so the tray persists when the window is closed.",
-  },
-  {
-    title: 'Focus/DND-aware scheduling',
-    description:
-      'Run heavy benchmarks only when macOS is idle / on AC power (respecting the "benchmarks must stay sequential" constraint).',
-    category: 'macos',
-    priority: 'low',
-    claudePrompt:
-      'Add condition-aware scheduling for heavy jobs (benchmarks) in Atlas OS. In main, detect system idle time (powerMonitor.getSystemIdleTime) and AC-power state (powerMonitor on-ac/on-battery) and only start queued benchmark batches when idle and on power. IMPORTANT: benchmark runs must stay strictly sequential (parallelism breaks cache/wall-time metrics). Add settings toggles and expose the current scheduling state to the UI.',
   },
   {
     title: 'Local voice interface',
@@ -156,6 +129,6 @@ export const ROADMAP_SEED: RoadmapSeed[] = [
     category: 'wow',
     priority: 'medium',
     claudePrompt:
-      'Add a statistical anomaly watcher to Atlas OS. Periodically compute rolling baselines (median + MAD) over KPI, token rate, and infra fingerprint from agent_sessions/benchmark_runs, flag points that deviate beyond a threshold, and raise a native notification + an alerts feed in the UI. Make thresholds configurable in Settings and keep the detection logic in a pure, unit-tested shared module.',
+      'Add a statistical anomaly watcher to Atlas OS. Periodically compute rolling baselines (median + MAD) over KPI, token rate, and infra fingerprint from agent_sessions, flag points that deviate beyond a threshold, and raise a native notification + an alerts feed in the UI. Make thresholds configurable in Settings and keep the detection logic in a pure, unit-tested shared module.',
   },
 ]

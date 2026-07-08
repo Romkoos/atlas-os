@@ -8,17 +8,17 @@ beforeEach(() => {
 
 describe('useChats.openSession', () => {
   it('adds a session and makes it active', () => {
-    useChats.getState().openSession({ type: 'benchmark' })
+    useChats.getState().openSession({ type: 'generalChat' })
     const s = useChats.getState()
-    expect(s.sessions).toEqual([{ id: 'benchmark', type: 'benchmark', title: 'discuss results' }])
-    expect(s.activeSessionId).toBe('benchmark')
+    expect(s.sessions).toEqual([{ id: 'generalChat', type: 'generalChat', title: 'chat' }])
+    expect(s.activeSessionId).toBe('generalChat')
   })
 
   it('is idempotent per type: re-opening focuses the existing session (no duplicate)', () => {
     const { openSession, setActive } = useChats.getState()
-    openSession({ type: 'benchmark' })
+    openSession({ type: 'generalChat' })
     openSession({ type: 'roadmap' })
-    setActive('benchmark')
+    setActive('generalChat')
     useChats.getState().openSession({ type: 'roadmap' })
     const s = useChats.getState()
     expect(s.sessions).toHaveLength(2)
@@ -29,7 +29,7 @@ describe('useChats.openSession', () => {
     useChats.getState().openSession({ type: 'roadmap' })
     expect(useChats.getState().sessions[0].title).toBe('idea incubator')
     useChats.setState({ sessions: [], activeSessionId: null })
-    useChats.getState().openSession({ type: 'benchmark', title: 'custom' })
+    useChats.getState().openSession({ type: 'generalChat', title: 'custom' })
     expect(useChats.getState().sessions[0].title).toBe('custom')
   })
 })
@@ -37,8 +37,8 @@ describe('useChats.openSession', () => {
 describe('useChats.closeSession', () => {
   it('removes a session and clears the active id when none remain', () => {
     const { openSession, closeSession } = useChats.getState()
-    openSession({ type: 'benchmark' })
-    closeSession('benchmark')
+    openSession({ type: 'generalChat' })
+    closeSession('generalChat')
     const s = useChats.getState()
     expect(s.sessions).toEqual([])
     expect(s.activeSessionId).toBeNull()
@@ -46,23 +46,23 @@ describe('useChats.closeSession', () => {
 
   it('switches active to a remaining session', () => {
     const { openSession, setActive, closeSession } = useChats.getState()
-    openSession({ type: 'benchmark' })
+    openSession({ type: 'generalChat' })
     openSession({ type: 'roadmap' })
     setActive('roadmap')
     closeSession('roadmap')
     const s = useChats.getState()
-    expect(s.sessions.map((x) => x.id)).toEqual(['benchmark'])
-    expect(s.activeSessionId).toBe('benchmark')
+    expect(s.sessions.map((x) => x.id)).toEqual(['generalChat'])
+    expect(s.activeSessionId).toBe('generalChat')
   })
 })
 
 describe('useChats skillImprover + title refresh', () => {
   it('opens a third session type with a custom title', () => {
-    useChats.getState().openSession({ type: 'benchmark' })
+    useChats.getState().openSession({ type: 'generalChat' })
     useChats.getState().openSession({ type: 'roadmap' })
     useChats.getState().openSession({ type: 'skillImprover', title: 'improver · my-skill' })
     const s = useChats.getState()
-    expect(s.sessions.map((x) => x.id)).toEqual(['benchmark', 'roadmap', 'skillImprover'])
+    expect(s.sessions.map((x) => x.id)).toEqual(['generalChat', 'roadmap', 'skillImprover'])
     expect(s.sessions.find((x) => x.type === 'skillImprover')?.title).toBe('improver · my-skill')
     expect(s.activeSessionId).toBe('skillImprover')
   })
@@ -81,11 +81,11 @@ describe('useChats skillImprover + title refresh', () => {
   })
 
   it('keeps the existing title when re-opening without a title', () => {
-    useChats.getState().openSession({ type: 'benchmark' })
+    useChats.getState().openSession({ type: 'generalChat' })
     useChats.setState((st) => ({
       sessions: st.sessions.map((x) => ({ ...x, title: 'custom' })),
     }))
-    useChats.getState().openSession({ type: 'benchmark' })
+    useChats.getState().openSession({ type: 'generalChat' })
     expect(useChats.getState().sessions[0].title).toBe('custom')
   })
 })

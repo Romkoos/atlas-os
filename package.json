@@ -1,6 +1,6 @@
 {
   "name": "atlas-os",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Atlas OS — desktop control panel for AI tools (macOS)",
   "private": true,
   "type": "module",

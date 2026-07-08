@@ -12,6 +12,7 @@ import { ingestAll } from '@main/services/productivity/ingest'
 import {
   backfillRoadmapClaudePrompts,
   migrateStatusIdeaToTodoIfNeeded,
+  retireBenchmarkRoadmapSeeds,
   seedRoadmapIfNeeded,
 } from '@main/services/roadmap/store'
 import { getSettings, initStore } from '@main/store'
@@ -68,6 +69,7 @@ app
     seedRoadmapIfNeeded()
     backfillRoadmapClaudePrompts()
     migrateStatusIdeaToTodoIfNeeded()
+    retireBenchmarkRoadmapSeeds()
     logger.info('Database ready and migrations applied')
 
     applySecurity()
