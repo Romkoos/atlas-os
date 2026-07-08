@@ -134,21 +134,25 @@ export function Chats() {
               </button>
             </div>
           ))}
-          <div className="chat-new-wrap">
-            <button
-              type="button"
-              className="chats-new-btn"
-              aria-label="New chat"
-              onClick={() => setPickerOpen((o) => !o)}
-            >
-              <Plus size={14} />
-            </button>
-            {pickerOpen ? (
-              <div className="chat-picker chat-picker-inline" role="menu">
-                {pickerButtons}
-              </div>
-            ) : null}
-          </div>
+        </div>
+        {/* The "+" picker lives OUTSIDE .chats-tablist: that list is an
+            overflow-x:auto scroller (which computes overflow-y to auto), so a
+            dropdown anchored inside it would be clipped. Keeping the wrap as a
+            sibling lets the menu escape. */}
+        <div className="chat-new-wrap">
+          <button
+            type="button"
+            className="chats-new-btn"
+            aria-label="New chat"
+            onClick={() => setPickerOpen((o) => !o)}
+          >
+            <Plus size={14} />
+          </button>
+          {pickerOpen ? (
+            <div className="chat-picker chat-picker-inline" role="menu">
+              {pickerButtons}
+            </div>
+          ) : null}
         </div>
       </div>
 
