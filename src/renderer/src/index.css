@@ -4482,6 +4482,8 @@ textarea.input:focus,
 }
 .chat-new-wrap {
   position: relative;
+  flex: none;
+  padding: 0 8px 4px;
 }
 .chat-picker-inline {
   position: absolute;
@@ -4500,9 +4502,13 @@ textarea.input:focus,
   min-height: 0;
 }
 .chats-tabs {
+  display: flex;
+  align-items: flex-end;
   border-bottom: 1px solid var(--line);
 }
 .chats-tablist {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 2px;
   padding: 6px 8px 0;
