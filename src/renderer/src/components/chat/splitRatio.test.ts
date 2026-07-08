@@ -15,4 +15,10 @@ describe('clampSplitRatio', () => {
   it('centres when the container is too narrow for two minimums', () => {
     expect(clampSplitRatio(0.9, 600, 360)).toBe(0.5)
   })
+  it('returns 0.5 for a non-finite ratio', () => {
+    expect(clampSplitRatio(Number.NaN, 1000, 360)).toBe(0.5)
+  })
+  it('returns 0.5 for a zero-width container', () => {
+    expect(clampSplitRatio(0.5, 0, 360)).toBe(0.5)
+  })
 })

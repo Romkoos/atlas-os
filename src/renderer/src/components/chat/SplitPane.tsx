@@ -45,14 +45,19 @@ export function SplitPane({ ratio, onRatioChange, left, right, minPx = 360 }: Sp
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      // If we unmount mid-drag, onUp never fires — don't leave the page
-      // permanently unselectable.
+    }
+  }, [applyFromClientX])
+
+  // Unmount-only safety net: if we unmount mid-drag, release the flag and the
+  // text-selection lock. Empty deps → runs the cleanup only on unmount.
+  useEffect(() => {
+    return () => {
       if (draggingRef.current) {
         draggingRef.current = false
         document.body.style.userSelect = ''
       }
     }
-  }, [applyFromClientX])
+  }, [])
 
   // Re-clamp on container resize so a persisted ratio never violates min widths.
   // Reads the latest ratio via a ref rather than depending on `ratio` directly,
