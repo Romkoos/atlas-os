@@ -1658,115 +1658,7 @@
     border-top: 1px solid var(--line);
   }
 
-  /* ============ UNIFIED CHAT DRAWER ============ */
-  .chat-fab {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--panel);
-    color: var(--fg-2);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    cursor: pointer;
-    z-index: 60;
-  }
-  .chat-fab:hover {
-    color: var(--fg);
-    border-color: var(--amber);
-  }
-  /* Amber breathing ring while any chat session is alive. */
-  @media (prefers-reduced-motion: no-preference) {
-    .chat-fab.live {
-      animation: fx-fab-pulse 2.6s ease-in-out infinite;
-    }
-  }
-  @keyframes fx-fab-pulse {
-    0%,
-    100% {
-      box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 0 0 color-mix(in oklch, var(--amber) 35%, transparent);
-    }
-    50% {
-      box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.4),
-        0 0 0 5px color-mix(in oklch, var(--amber) 12%, transparent);
-    }
-  }
-  .chat-fab.chat-fab-hidden {
-    display: none;
-  }
-  .chat-fab-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--bg);
-    background: var(--amber);
-    border-radius: 8px;
-  }
-  .chat-drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 440px;
-    max-width: 90vw;
-    display: flex;
-    flex-direction: column;
-    background: var(--panel);
-    border-left: 1px solid var(--line);
-    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
-    transform: translateX(100%);
-    visibility: hidden;
-    pointer-events: none;
-    /* The panel is fixed at top:0 and overlaps the .win-bar title bar, which is
-       a -webkit-app-region: drag region. Without no-drag the OS drag region
-       swallows clicks in the drawer's top strip (tabs / tab × / collapse ×). */
-    -webkit-app-region: no-drag;
-    transition:
-      transform 0.5s var(--ease-drawer),
-      width 0.5s var(--ease-drawer),
-      visibility 0s linear 0.5s;
-    z-index: 55;
-  }
-  .chat-drawer.open {
-    transform: translateX(0);
-    visibility: visible;
-    pointer-events: auto;
-    transition:
-      transform 0.5s var(--ease-drawer),
-      width 0.5s var(--ease-drawer);
-  }
-  .chat-drawer.wide {
-    width: 560px;
-  }
-  .chat-drawer-tabs {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 8px 8px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-  .chat-drawer-tablist {
-    display: flex;
-    flex: 1;
-    gap: 6px;
-    overflow-x: auto;
-  }
+  /* ============ CHAT TABS (shared: CHATS page tab strip) ============ */
   .chat-tab {
     display: flex;
     align-items: center;
@@ -1805,38 +1697,6 @@
   }
   .chat-tab-x:hover {
     color: var(--fg);
-  }
-  .chat-drawer-collapse {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: 0;
-    padding: 4px;
-    color: var(--fg-3);
-    cursor: pointer;
-  }
-  .chat-drawer-collapse:hover {
-    color: var(--fg);
-  }
-  .chat-drawer-new {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: 0;
-    padding: 4px;
-    color: var(--fg-3);
-    cursor: pointer;
-  }
-  .chat-drawer-new:hover {
-    color: var(--fg);
-  }
-  .chat-drawer-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
   }
   .bench-chat-body,
   .rm-chat-body {
@@ -4590,11 +4450,11 @@ textarea.input:focus,
   max-height: 40%;
 }
 
-/* Chat type picker (FAB / "+" → Chat vs Worker). */
+/* Chat type picker ("+" → Chat vs Worker). Base menu chrome; positioning is
+   supplied by whichever layout class is combined with it (.chat-picker-inline
+   anchors it under the CHATS page "+" button — there is no floating/FAB
+   variant anymore). */
 .chat-picker {
-  position: fixed;
-  right: 20px;
-  bottom: 74px;
   z-index: 50;
   display: flex;
   flex-direction: column;
@@ -4629,6 +4489,192 @@ textarea.input:focus,
   right: 0;
   bottom: auto;
   left: auto;
+}
+
+/* ── CHATS PAGE ────────────────────────────────────────────────────────── */
+
+.chats-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chats-tabs {
+  border-bottom: 1px solid var(--line);
+}
+.chats-tablist {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  align-items: flex-end;
+  overflow-x: auto;
+}
+.chats-new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 4px;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+.chats-new-btn:hover {
+  color: var(--fg);
+}
+/* .chats-empty is a direct flex-column child of .chats-page (no split pane
+   mounted yet); .canvas-empty is either a direct child of .chat-split-right
+   (EmptyCanvas) or nested inside .canvas-body (per-type "nothing yet"
+   fallback). flex:1 makes both claim the remaining height directly instead
+   of relying on height:100% resolving against a flex item's own (otherwise
+   content-based) size; flex:1 is a no-op where the parent isn't a flex
+   container (e.g. inside .canvas-body). */
+.chats-empty,
+.canvas-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 0;
+  color: var(--fg-3);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* Two horizontal panes (conversation | Canvas) with a draggable gutter.
+   Named "chat-split*" — .split-pane is already taken (Skills editor/preview
+   vertical split), so this stays scoped to the CHATS page's layout. */
+.chat-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.chat-split-left {
+  min-width: 360px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.chat-split-right {
+  flex: 1;
+  min-width: 360px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.chat-split-gutter {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: var(--line);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.chat-split-gutter:hover,
+.chat-split-gutter:focus-visible {
+  background: var(--amber);
+  outline: none;
+}
+
+.chat-left {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Right-pane Canvas: per-type tab strip + scrollable body. .canvas (or, for
+   EmptyCanvas, .canvas-empty directly) is the sole child of .chat-split-right,
+   a column flex container — flex:1 makes it claim the full height rather than
+   relying on height:100% against a flex item's content-based size. */
+.canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.canvas-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.canvas-tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 6px 11px;
+  color: var(--fg-3);
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  cursor: pointer;
+}
+.canvas-tab.on {
+  color: var(--amber);
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+.canvas-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.canvas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.canvas-h {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-dim);
+}
+.canvas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.canvas-table th,
+.canvas-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-dim);
+}
+.canvas-table th {
+  color: var(--fg-3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
+/* Saved idea cards (roadmap "idea incubator" Canvas). */
+.idea-card {
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-dim);
+}
+.idea-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg);
+}
+.idea-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.idea-status {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--amber-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* ── DASHBOARD 2.0 ─────────────────────────────────────────────────────── */

@@ -1,3 +1,4 @@
+import { NAV } from '@renderer/components/layout/nav'
 import { describe, expect, it } from 'vitest'
 import { mergePersistedUi, SECTIONS, useUiStore } from './ui'
 
@@ -104,5 +105,21 @@ describe('graphSources', () => {
       'skill',
       'graphify',
     ])
+  })
+})
+
+describe('chats section', () => {
+  it('is a known section', () => {
+    expect(SECTIONS).toContain('chats')
+  })
+  it('has a nav item right after roadmap', () => {
+    const ids = NAV.map((n) => n.id)
+    expect(ids).toContain('chats')
+    expect(ids.indexOf('chats')).toBe(ids.indexOf('roadmap') + 1)
+  })
+  it('keeps NAV keys as 1-based sequential [NN]', () => {
+    NAV.forEach((n, i) => {
+      expect(n.key).toBe(String(i + 1).padStart(2, '0'))
+    })
   })
 })

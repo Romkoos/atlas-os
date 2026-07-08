@@ -12,7 +12,7 @@ import { TermSelect } from '@renderer/components/ui/select'
 import { trpc } from '@renderer/lib/trpc'
 import { cn, formatDate, formatDateTime } from '@renderer/lib/utils'
 import { useBenchmarkChatContext, useBenchmarkChatRun } from '@renderer/store/benchmarkChatRun'
-import { useChatDrawer } from '@renderer/store/chatDrawer'
+import { goToChat } from '@renderer/store/chats'
 import { useUiStore } from '@renderer/store/ui'
 import { groupByPrefix } from '@shared/skills'
 import { ChevronRight } from 'lucide-react'
@@ -2118,7 +2118,7 @@ function BenchmarkTab() {
                   onClick={() => {
                     useBenchmarkChatContext.getState().setBatch(analysis.data?.batchId ?? '')
                     useBenchmarkChatRun.getState().startBlank()
-                    useChatDrawer.getState().openSession({ type: 'benchmark' })
+                    goToChat({ type: 'benchmark' })
                   }}
                 >
                   DISCUSS

@@ -1,13 +1,12 @@
 import { ChatComposer } from '@renderer/components/chat/ChatComposer'
 import { ChatTranscript } from '@renderer/components/chat/ChatTranscript'
-import { ImproverReportView } from '@renderer/components/ImproverReportView'
 import { trpc } from '@renderer/lib/trpc'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 
-// Body of the skill-improver session, rendered inside UnifiedChatDrawer. Reads
-// the App-level store, so the session survives tab switches / drawer collapse
-// (the subscription lives in the App-level ChatHost). Cancel is owned by the
-// drawer tab ×; Accept/Reject/Send are improver-specific and stay here.
+// Body of the skill-improver session, rendered inside the CHATS page. Reads
+// the App-level store, so the session survives tab switches (the subscription
+// lives in the App-level ChatHost). Cancel is owned by the CHATS page tab ×;
+// Accept/Reject/Send are improver-specific and stay here.
 export function SkillImproverOverlay() {
   const run = useSkillImproverRun()
   const report = useSkillImproverExtra((s) => s.report)
@@ -32,12 +31,6 @@ export function SkillImproverOverlay() {
           awaitingInput={run.awaitingInput}
           onPickOption={send}
         />
-        {report ? (
-          <div className="improver-report-wrap">
-            <ImproverReportView report={report} />
-          </div>
-        ) : null}
-
         {report ? (
           <div className="improver-foot">
             <button

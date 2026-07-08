@@ -1,7 +1,7 @@
 import { LetterGlitch } from '@renderer/components/fx/LetterGlitch'
 import { PageHeader } from '@renderer/components/layout/PageHeader'
 import { trpc } from '@renderer/lib/trpc'
-import { useChatDrawer } from '@renderer/store/chatDrawer'
+import { goToChat } from '@renderer/store/chats'
 import { useSkillImproverExtra, useSkillImproverRun } from '@renderer/store/skillImproverRun'
 import { groupByPrefix, type SkillMeta, splitFrontmatter } from '@shared/skills'
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
@@ -94,7 +94,7 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
     }
     useSkillImproverExtra.getState().setSkill(skillId)
     startImproverBlank()
-    useChatDrawer.getState().openSession({
+    goToChat({
       type: 'skillImprover',
       title: `improver · ${skillId}`,
     })
@@ -268,7 +268,7 @@ function SkillEditorPane({ skillId }: { skillId: string }) {
 }
 
 // The editor is always shown for the selected skill; the improver session now
-// lives in the UnifiedChatDrawer. The editor auto-refreshes after accept/reject
+// lives in the CHATS page. The editor auto-refreshes after accept/reject
 // because SkillImproverHost invalidates skills.getRaw on done/aborted.
 function SelectedRight({ selectedId }: { selectedId: string }) {
   return <SkillEditorPane key={selectedId} skillId={selectedId} />

@@ -5,10 +5,10 @@ import { useRoadmapChatRun, useRoadmapSaved } from '@renderer/store/roadmapChatR
 import { CheckCircle2 } from 'lucide-react'
 import { useState } from 'react'
 
-// Body of the roadmap brainstorming session, rendered inside UnifiedChatDrawer.
-// Reads the App-level store, so the session survives tab switches / drawer
-// collapse (the subscription lives in the App-level ChatHost). Close/stop is
-// owned by the drawer.
+// Body of the roadmap brainstorming session, rendered inside the CHATS page.
+// Reads the App-level store, so the session survives tab switches (the
+// subscription lives in the App-level ChatHost). Close/stop is owned by the
+// CHATS page tab ×.
 export function RoadmapChatOverlay() {
   const status = useRoadmapChatRun((s) => s.status)
   const sessionId = useRoadmapChatRun((s) => s.sessionId)

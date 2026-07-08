@@ -2,6 +2,7 @@ import { Ticker } from '@renderer/components/fx/Ticker'
 import { NAV } from '@renderer/components/layout/nav'
 import { springSnappy } from '@renderer/lib/motion'
 import { trpc } from '@renderer/lib/trpc'
+import { useChats } from '@renderer/store/chats'
 import { useSignalsStore } from '@renderer/store/signals'
 import { useUiStore } from '@renderer/store/ui'
 import gsap from 'gsap'
@@ -30,6 +31,7 @@ export function Sidebar() {
   const section = useUiStore((s) => s.section)
   const setSection = useUiStore((s) => s.setSection)
   const unreadSignals = useSignalsStore((s) => s.unreadCount)
+  const activeChats = useChats((s) => s.sessions.length)
 
   const health = trpc.health.ping.useQuery()
   const settings = trpc.settings.get.useQuery()
@@ -70,6 +72,8 @@ export function Sidebar() {
             <span>{n.label}</span>
             {n.id === 'signals' && unreadSignals > 0 ? (
               <span className="nav-badge">{unreadSignals > 99 ? '99+' : unreadSignals}</span>
+            ) : n.id === 'chats' && activeChats > 0 ? (
+              <span className="nav-badge">{activeChats}</span>
             ) : (
               <span className="badge" />
             )}
