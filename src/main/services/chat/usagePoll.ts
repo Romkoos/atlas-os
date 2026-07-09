@@ -18,8 +18,20 @@ const execFileP = promisify(execFile)
 // (same subscription auth atlas's chats use), so this works even where a direct
 // `/api/oauth/usage` call can't (the OAuth token isn't exposed to our process).
 
-const DEFAULT_INTERVAL_MS = 120_000
+// The gauge tracks slow-moving subscription limits and the client-side countdown
+// ticks every second on its own, so the poll itself can be coarse. Each poll
+// spawns a `claude -p /usage` CLI process that leaves a session transcript behind,
+// so a tight interval multiplies throwaway transcripts (and the cost of the
+// knowledge sweep that later summarizes them) for no visible benefit.
+const DEFAULT_INTERVAL_MS = 600_000
 const RUN_TIMEOUT_MS = 20_000
+
+// Only one poll loop may run per process. A second `startUsagePolling` call — e.g.
+// the main entry re-executing under `electron-vite dev --watch`, or a self-rebuild
+// relaunch that raced the old process — would stack another self-rescheduling
+// timer on top of the first, and every surviving loop keeps spawning `/usage`.
+// Stop any existing loop before starting a new one.
+let activeStop: (() => void) | null = null
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
@@ -162,6 +174,9 @@ export function startUsagePolling(
   onWindows: (windows: UsageWindow[]) => void,
   intervalMs = DEFAULT_INTERVAL_MS,
 ): () => void {
+  // Supersede any loop already running in this process (see activeStop above).
+  activeStop?.()
+
   let stopped = false
   let timer: ReturnType<typeof setTimeout> | null = null
   let loggedFirst = false
@@ -188,8 +203,11 @@ export function startUsagePolling(
 
   void tick()
 
-  return () => {
+  const stop = (): void => {
     stopped = true
     if (timer) clearTimeout(timer)
+    if (activeStop === stop) activeStop = null
   }
+  activeStop = stop
+  return stop
 }

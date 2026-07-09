@@ -36,6 +36,23 @@ function ingestProductivity(): void {
     .catch((error) => logger.error('Productivity ingest failed', error))
 }
 
+// Single-instance lock. A second copy — a `pnpm dev` instance running alongside
+// the packaged app, or a process left over from a self-rebuild relaunch — would
+// start its own `/usage` poll loop and double (or worse) the throwaway `claude -p`
+// transcripts churning through the subscription. Bail out if another instance
+// already holds the lock; otherwise focus the existing window when a second launch
+// is attempted.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+
+app.on('second-instance', () => {
+  const win = ensureMainWindow()
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+})
+
 app
   .whenReady()
   .then(() => {
@@ -86,7 +103,12 @@ app
     // shows real limits without waiting for a chat run's intermittent
     // rate_limit_event.
     subscriptionUsage.restore(appPaths().usageSnapshot)
-    startUsagePolling((windows) => subscriptionUsage.updateFromPoll(windows, Date.now()))
+    const stopUsagePolling = startUsagePolling((windows) =>
+      subscriptionUsage.updateFromPoll(windows, Date.now()),
+    )
+    // Stop the poll loop on quit so it can't outlive the app (a lingering loop
+    // keeps spawning `/usage` and is exactly what stacked up before).
+    app.on('before-quit', () => stopUsagePolling())
 
     app.on('activate', () => {
       const win = ensureMainWindow()
