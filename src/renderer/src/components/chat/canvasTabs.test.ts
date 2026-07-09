@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { tabsForType } from './canvasTabs'
 
 describe('tabsForType', () => {
-  it('gives roadmap an Ideas tab', () => {
-    expect(tabsForType('roadmap').map((t) => t.label)).toEqual(['Ideas'])
+  it('appends the Artifact tab after roadmap Ideas', () => {
+    expect(tabsForType('roadmap').map((t) => t.label)).toEqual(['Ideas', 'Artifact'])
   })
-  it('gives skillImprover a Report tab', () => {
-    expect(tabsForType('skillImprover').map((t) => t.label)).toEqual(['Report'])
+  it('appends the Artifact tab after skillImprover Report', () => {
+    expect(tabsForType('skillImprover').map((t) => t.label)).toEqual(['Report', 'Artifact'])
   })
-  it('gives worker and generalChat no tabs in phase 1', () => {
-    expect(tabsForType('worker')).toEqual([])
-    expect(tabsForType('generalChat')).toEqual([])
+  it('gives worker and generalChat the Artifact tab as their only tab', () => {
+    expect(tabsForType('worker').map((t) => t.label)).toEqual(['Artifact'])
+    expect(tabsForType('generalChat').map((t) => t.label)).toEqual(['Artifact'])
   })
 })

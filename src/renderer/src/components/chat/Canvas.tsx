@@ -33,7 +33,7 @@ export function Canvas({ type }: { type: ChatSessionType }) {
         ))}
       </div>
       <div className="canvas-body">
-        <View />
+        <View type={type} />
       </div>
     </div>
   )
