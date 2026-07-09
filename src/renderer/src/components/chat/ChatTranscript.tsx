@@ -3,13 +3,10 @@ import { Bot, ChevronRight, Loader2, X, Zap } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { OptionChips } from './OptionChips'
 import { parseOptions } from './parseOptions'
 import { ToolActivityGroup } from './ToolActivityGroup'
 
 type ToolEntry = Extract<ChatEntry, { kind: 'tool' }>
-
-const noop = () => {}
 
 // Skill invocations stay visible (the user asked to keep them), showing the
 // skill name; everything else collapses into the activity group.
@@ -66,8 +63,6 @@ function TaskActivity({
               <ChatTranscript
                 transcript={sub.transcript}
                 streaming={sub.streaming}
-                awaitingInput={false}
-                onPickOption={noop}
                 subagents={subagents}
               />
             ) : (
@@ -82,19 +77,16 @@ function TaskActivity({
 
 // Shared transcript renderer. Markdown for assistant/user text; Skill and Task
 // calls render inline (Task with a nested live subagent transcript); every other
-// non-skill tool call collapses into one ToolActivityGroup. Option chips show
-// only while awaiting input on the last assistant turn.
+// non-skill tool call collapses into one ToolActivityGroup. The model's pending
+// ```options block is stripped from the shown text here; the clickable options
+// themselves are rendered in the Canvas Artifact view (BrainstormCanvas).
 export function ChatTranscript({
   transcript,
   streaming,
-  awaitingInput,
-  onPickOption,
   subagents = {},
 }: {
   transcript: ChatEntry[]
   streaming: string
-  awaitingInput: boolean
-  onPickOption: (text: string) => void
   // Nested per-Task subagent transcripts, keyed by Task tool_use id. Passed
   // recursively so nested Task rows can resolve their own children.
   subagents?: Record<string, SubagentRun>
@@ -133,16 +125,13 @@ export function ChatTranscript({
       return
     }
     const isLastAssistant = e.kind === 'assistant' && i === lastAssistantIdx
-    const { display, options } = isLastAssistant
-      ? parseOptions(e.text)
-      : { display: e.text, options: [] as string[] }
+    // Strip the pending ```options block from the last assistant turn's shown
+    // text; the options themselves render as cards in the Canvas Artifact view.
+    const display = isLastAssistant ? parseOptions(e.text).display : e.text
     nodes.push(
       // biome-ignore lint/suspicious/noArrayIndexKey: append-only transcript
       <div key={`e-${i}`} className={`chat-entry ${e.kind}`}>
         <Markdown remarkPlugins={[remarkGfm]}>{display}</Markdown>
-        {isLastAssistant && awaitingInput && !streaming ? (
-          <OptionChips options={options} onPick={onPickOption} />
-        ) : null}
       </div>,
     )
   })

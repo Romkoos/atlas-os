@@ -11,21 +11,17 @@ export function TimelineChatBody({
   sessionId,
   transcript,
   streaming,
-  awaitingInput,
   timelineEvents,
   running,
   freshStart,
-  onPickOption,
   subagents,
 }: {
   sessionId: string | null
   transcript: ChatEntry[]
   streaming: string
-  awaitingInput: boolean
   timelineEvents: TimelineEvent[]
   running: boolean
   freshStart: boolean
-  onPickOption: (text: string) => void
   subagents?: Record<string, SubagentRun>
 }) {
   const [view, setView] = useState<'transcript' | 'timeline'>('transcript')
@@ -52,13 +48,7 @@ export function TimelineChatBody({
         </button>
       </div>
       {view === 'transcript' ? (
-        <ChatTranscript
-          transcript={transcript}
-          streaming={streaming}
-          awaitingInput={awaitingInput}
-          onPickOption={onPickOption}
-          subagents={subagents}
-        />
+        <ChatTranscript transcript={transcript} streaming={streaming} subagents={subagents} />
       ) : (
         <SessionTimelineView
           sessionId={sessionId ?? ''}

@@ -79,11 +79,9 @@ export function GeneralChatOverlay() {
         sessionId={sessionId}
         transcript={transcript}
         streaming={streaming}
-        awaitingInput={awaitingInput}
         timelineEvents={timelineEvents}
         running={running}
         freshStart={freshStart}
-        onPickOption={send}
         subagents={subagents}
       />
       <ChatComposer
