@@ -5,7 +5,7 @@ export type Section =
   | 'dashboard'
   | 'roadmap'
   | 'chats'
-  | 'knowledge'
+  | 'maps'
   | 'news'
   | 'signals'
   | 'skills'
@@ -16,7 +16,7 @@ export const SECTIONS: readonly Section[] = [
   'dashboard',
   'roadmap',
   'chats',
-  'knowledge',
+  'maps',
   'news',
   'signals',
   'skills',

@@ -7,7 +7,6 @@ import {
   timeAgo,
 } from '@renderer/components/dashboard/dash-utils'
 import { GalaxyHero } from '@renderer/components/dashboard/GalaxyHero'
-import { KnowledgePulse } from '@renderer/components/dashboard/KnowledgePulse'
 import { ProcessesStrip } from '@renderer/components/dashboard/ProcessesStrip'
 import { RoadmapNextUp } from '@renderer/components/dashboard/RoadmapNextUp'
 import { Sparkline } from '@renderer/components/dashboard/Sparkline'
@@ -31,7 +30,6 @@ import { useTrendingRun } from '@renderer/store/trendingRun'
 import { useUiStore } from '@renderer/store/ui'
 import type { SignalView } from '@shared/signals'
 import { type CSSProperties, useEffect, useMemo } from 'react'
-import { toast } from 'sonner'
 
 // ── TELEMETRY MARQUEE ──────────────────────────────────────────────────────
 // A thin, endlessly scrolling strip of live readouts (all real data; the
@@ -102,10 +100,9 @@ function StatusRow() {
       <UsagePlasmaWidget />
       <WeeklyPlasmaWidget />
 
-      {/* ── Right stack: heatmap + knowledge tiles ─────────────────────────── */}
+      {/* ── Right stack: heatmap ─────────────────────────────────────────────── */}
       <div className="kpis-hero-side">
         <TokenHeatmap />
-        <KnowledgePulse />
       </div>
     </div>
   )
@@ -231,15 +228,6 @@ function QuickActions() {
   const newsRun = useNewsRun()
   const trendingRun = useTrendingRun()
   const buildRun = useGraphBuildRun()
-  const compile = trpc.knowledge.compileAll.useMutation({
-    onSuccess: (rows) => {
-      const ok = rows.filter((r) => r.status === 'compiled').length
-      toast.success(
-        `Compiled ${ok}/${rows.length} knowledge ${rows.length === 1 ? 'base' : 'bases'}`,
-      )
-    },
-    onError: (e) => toast.error(e.message),
-  })
   // Deep-map target: the project matching the sidebar selection, else the first.
   const projects = trpc.graph.listProjects.useQuery()
   const selectedProject = useUiStore((s) => s.selectedProject)
@@ -271,14 +259,6 @@ function QuickActions() {
           disabled={trendingRun.running}
         >
           ↻ {trendingRun.running ? 'TRENDING…' : 'TRENDING'}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => compile.mutate()}
-          disabled={compile.isPending}
-        >
-          ↻ {compile.isPending ? 'COMPILING…' : 'KNOWLEDGE'}
         </button>
         <button
           type="button"

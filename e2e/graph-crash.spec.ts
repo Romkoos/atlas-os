@@ -24,28 +24,23 @@ async function graphScenario(reload: boolean) {
   await window.getByRole('button', { name: '01 DASHBOARD' }).click()
   await expect(window.getByText('processes', { exact: true })).toBeVisible({ timeout: 15000 })
 
-  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 MAPS' }).click()
 
-  const graphTab = window.getByRole('button', { name: './graph' })
-  await graphTab.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-  if (!(await graphTab.isVisible().catch(() => false))) {
+  // CodeGraphTab renders directly on the Maps page. Its canvas is only present
+  // when a graph has been built; skip cleanly otherwise.
+  const canvas = window.locator('.kb-graph canvas')
+  await canvas.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
+  if (!(await canvas.first().isVisible().catch(() => false))) {
     await app.close()
     return { skipped: true, pageErrors, consoleErrors }
   }
 
-  await graphTab.click()
-
-  // Stress the reheat path: wait for a canvas, toggle 2d/3d a few times, and
-  // switch the project scope — each remount re-runs the deferred reheat.
-  const canvas = window.locator('.kb-graph canvas')
-  await canvas.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {})
-
+  // Stress the reheat path: bounce off another page and back a few times — each
+  // remount re-runs the deferred reheat.
   for (let i = 0; i < 3; i++) {
-    // Bounce to another page and back — repeated fresh mounts from elsewhere.
     await window.getByRole('button', { name: '01 DASHBOARD' }).click()
     await window.waitForTimeout(200)
-    await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
-    await graphTab.click().catch(() => {})
+    await window.getByRole('button', { name: '04 MAPS' }).click()
     await window.waitForTimeout(600)
   }
 
@@ -75,16 +70,17 @@ test('toggling to the 2D view and re-entering does not throw the rAF tick error'
   window.on('pageerror', (e) => pageErrors.push(String(e.message ?? e)))
 
   await expect(window.getByRole('heading', { name: 'ATLAS.OS' })).toBeVisible()
-  await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
+  await window.getByRole('button', { name: '04 MAPS' }).click()
 
-  const graphTab = window.getByRole('button', { name: './graph' })
-  await graphTab.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-  if (!(await graphTab.isVisible().catch(() => false))) {
+  // CodeGraphTab renders directly on the Maps page; its canvas is only present
+  // when a graph has been built.
+  const canvas = window.locator('.kb-graph canvas')
+  await canvas.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+  if (!(await canvas.first().isVisible().catch(() => false))) {
     await app.close()
     test.skip(true, 'no built graph on this machine')
     return
   }
-  await graphTab.click()
 
   // Switch to 2D, then bounce off another page and back several times so the
   // 2D ForceGraph remounts fresh each time and re-runs its reheat.
@@ -93,8 +89,7 @@ test('toggling to the 2D view and re-entering does not throw the rAF tick error'
   for (let i = 0; i < 3; i++) {
     await window.getByRole('button', { name: '01 DASHBOARD' }).click()
     await window.waitForTimeout(200)
-    await window.getByRole('button', { name: '04 KNOWLEDGE' }).click()
-    await graphTab.click().catch(() => {})
+    await window.getByRole('button', { name: '04 MAPS' }).click()
     await twoD.click().catch(() => {})
     await window.waitForTimeout(600)
   }

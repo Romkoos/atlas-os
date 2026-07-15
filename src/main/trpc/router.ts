@@ -2,7 +2,6 @@ import { generalChatRouter } from '@main/trpc/routers/generalChat'
 import { graphRouter } from '@main/trpc/routers/graph'
 import { healthRouter } from '@main/trpc/routers/health'
 import { jobsRouter } from '@main/trpc/routers/jobs'
-import { knowledgeRouter } from '@main/trpc/routers/knowledge'
 import { newsRouter } from '@main/trpc/routers/news'
 import { pluginsRouter } from '@main/trpc/routers/plugins'
 import { productivityRouter } from '@main/trpc/routers/productivity'
@@ -27,7 +26,6 @@ export const appRouter = router({
   skills: skillsRouter,
   skillImprover: skillImproverRouter,
   productivity: productivityRouter,
-  knowledge: knowledgeRouter,
   graph: graphRouter,
   news: newsRouter,
   trending: trendingRouter,

@@ -14,7 +14,7 @@ import { Toaster } from '@renderer/components/ui/sonner'
 import { trpc } from '@renderer/lib/trpc'
 import { Chats } from '@renderer/pages/Chats'
 import { Dashboard } from '@renderer/pages/Dashboard'
-import { Knowledge } from '@renderer/pages/Knowledge'
+import { Maps } from '@renderer/pages/Maps'
 import { News } from '@renderer/pages/News'
 import { Plugins } from '@renderer/pages/Plugins'
 import { Roadmap } from '@renderer/pages/Roadmap'
@@ -37,7 +37,7 @@ const PAGES: Record<Section, ComponentType> = {
   dashboard: Dashboard,
   roadmap: Roadmap,
   chats: Chats,
-  knowledge: Knowledge,
+  maps: Maps,
   news: News,
   signals: Signals,
   skills: Skills,
