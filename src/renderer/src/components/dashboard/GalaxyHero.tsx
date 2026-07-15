@@ -92,7 +92,7 @@ export function GalaxyHero() {
         )}
         {(empty || failed) && (
           <div className="galaxy-hero-empty">
-            {failed ? '// 3D unavailable on this GPU' : '// no graph yet — run Build on Knowledge'}
+            {failed ? '// 3D unavailable on this GPU' : '// no graph yet — run BUILD MAP'}
           </div>
         )}
         <div className="galaxy-hud" aria-hidden>

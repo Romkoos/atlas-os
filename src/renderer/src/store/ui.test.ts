@@ -6,8 +6,8 @@ const base = useUiStore.getState()
 
 describe('mergePersistedUi', () => {
   it('keeps a valid persisted section', () => {
-    const out = mergePersistedUi({ section: 'knowledge' }, base)
-    expect(out.section).toBe('knowledge')
+    const out = mergePersistedUi({ section: 'maps' }, base)
+    expect(out.section).toBe('maps')
   })
 
   it('falls back to dashboard for an unknown section', () => {
@@ -23,14 +23,14 @@ describe('mergePersistedUi', () => {
   it('preserves selectedProject and tabsBySection when present', () => {
     const out = mergePersistedUi(
       {
-        section: 'knowledge',
+        section: 'maps',
         selectedProject: 'atlas-os',
-        tabsBySection: { knowledge: 'graph' },
+        tabsBySection: { maps: 'graph' },
       },
       base,
     )
     expect(out.selectedProject).toBe('atlas-os')
-    expect(out.tabsBySection).toEqual({ knowledge: 'graph' })
+    expect(out.tabsBySection).toEqual({ maps: 'graph' })
   })
 
   it('defaults selectedProject to null and tabsBySection to {} when absent or malformed', () => {
@@ -67,8 +67,8 @@ describe('mergePersistedUi', () => {
 
 describe('useUiStore actions', () => {
   it('setTab stores a per-section tab id', () => {
-    useUiStore.getState().setTab('knowledge', 'graph')
-    expect(useUiStore.getState().tabsBySection.knowledge).toBe('graph')
+    useUiStore.getState().setTab('maps', 'graph')
+    expect(useUiStore.getState().tabsBySection.maps).toBe('graph')
   })
 
   it('setSelectedProject updates the global project', () => {
