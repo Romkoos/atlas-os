@@ -1,11 +1,12 @@
 import type { Dirent } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
+import { claudeConfigDir } from '@main/paths'
 import type { SkillDetail, SkillMeta } from '@shared/skills'
 import { load } from 'js-yaml'
 
-export const SKILLS_DIR = join(homedir(), '.claude', 'skills')
+// Skills of the PRIVATE subscription (~/.claude-private/skills), not ~/.claude.
+export const SKILLS_DIR = join(claudeConfigDir(), 'skills')
 
 // Captures the YAML between the leading `---` fence and the rest as the body.
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?([\s\S]*)$/

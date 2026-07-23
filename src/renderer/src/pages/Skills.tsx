@@ -322,7 +322,7 @@ export function Skills() {
           ) : skills.isError ? (
             <div style={{ ...hintStyle, color: 'var(--amber)' }}>{'// error loading skills'}</div>
           ) : items.length === 0 ? (
-            <div style={hintStyle}>{'// no skills found in ~/.claude/skills'}</div>
+            <div style={hintStyle}>{'// no skills found in ~/.claude-private/skills'}</div>
           ) : (
             groupByPrefix(items).map(([prefix, group]) =>
               group.length === 1 ? (

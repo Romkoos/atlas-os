@@ -4,6 +4,8 @@ import { basename } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { logger } from '@main/logger'
 import { claudeSdkExecutableOption } from '@main/paths'
+// Private-subscription env (CLAUDE_CONFIG_DIR=~/.claude-private + stripped API keys).
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import { createMailbox, type Mailbox } from '@main/services/skillImprover/mailbox'
 import { buildImproverPrompt, REPORT_SENTINEL } from '@main/services/skillImprover/prompt'
 import { findSkillCreatorPath } from '@main/services/skillImprover/skillCreator'
@@ -29,17 +31,6 @@ const IMPROVER_TOOLS = [
   'WebSearch',
   'WebFetch',
 ]
-
-// Strip metered API keys so the spawned CLI uses the user's Pro/Max OAuth.
-function subscriptionEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) env[key] = value
-  }
-  delete env.ANTHROPIC_API_KEY
-  delete env.ANTHROPIC_AUTH_TOKEN
-  return env
-}
 
 export interface ImproverRun {
   reply: (text: string) => void
@@ -99,7 +90,7 @@ export function startImproverRun(opts: StartImproverOptions): ImproverRun {
     if (!skillCreatorPath) {
       opts.emit({
         type: 'error',
-        message: 'skill-creator plugin not found in ~/.claude/plugins',
+        message: 'skill-creator plugin not found in ~/.claude-private/plugins',
       })
       return
     }

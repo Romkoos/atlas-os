@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { claudeSdkExecutableOption } from '@main/paths'
 import { storeRoot } from '@main/services/knowledge/store'
+// Private-subscription env (CLAUDE_CONFIG_DIR=~/.claude-private + stripped API keys).
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 
 export interface NewsRun {
   done: Promise<{ filePath: string; outputTokens: number }>
@@ -43,18 +45,6 @@ export function readNews(): { raw: string; updatedAt: string | null } {
   return { raw: readFileSync(file, 'utf8'), updatedAt: statSync(file).mtime.toISOString() }
 }
 
-// Subscription-only: strip metered API keys so the spawned CLI uses the user's
-// Pro/Max OAuth (mirrors claude.ts / benchmark/runner.ts).
-function subscriptionEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) env[key] = value
-  }
-  delete env.ANTHROPIC_API_KEY
-  delete env.ANTHROPIC_AUTH_TOKEN
-  return env
-}
-
 // Run the daily-ai-news skill headlessly, streaming the model's text output. The
 // skill owns the file write; `done` resolves with the path once the run succeeds.
 export function runNews(opts: RunNewsOptions): NewsRun {
@@ -73,7 +63,7 @@ export function runNews(opts: RunNewsOptions): NewsRun {
       prompt: NEWS_PROMPT,
       options: {
         model: opts.model,
-        settingSources: ['user'], // load ~/.claude/skills so daily-ai-news is available
+        settingSources: ['user'], // load ~/.claude-private/skills so daily-ai-news is available
         allowedTools: NEWS_TOOLS,
         permissionMode: 'bypassPermissions', // headless: never hang on a prompt
         includePartialMessages: true,

@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { claudeExecutable } from '@main/paths'
+import { claudeConfigDir, claudeExecutable } from '@main/paths'
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 import {
   isSemver,
   type MarketplacePlugin,
@@ -18,9 +18,18 @@ import {
 
 const execFileAsync = promisify(execFile)
 
-// ~/.claude/plugins — holds installed_plugins.json + known_marketplaces.json.
+// ~/.claude-private/plugins (PRIVATE subscription) — holds installed_plugins.json
+// + known_marketplaces.json. The app manages the private subscription's plugins,
+// never the work subscription's (~/.claude/plugins).
 function pluginsDir(): string {
-  return join(homedir(), '.claude', 'plugins')
+  return join(claudeConfigDir(), 'plugins')
+}
+
+// Env for every shelled-out `claude` command below: pins CLAUDE_CONFIG_DIR to the
+// private subscription (and strips API keys) so plugin/MCP operations read and
+// mutate the private config, matching pluginsDir() above.
+function cliEnv(): Record<string, string> {
+  return subscriptionEnv()
 }
 
 // ---- pure helpers (unit-tested) -------------------------------------------
@@ -332,6 +341,7 @@ export async function listPlugins(): Promise<Plugin[]> {
     const { stdout } = await execFileAsync(claudeExecutable(), ['plugin', 'list', '--json'], {
       timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
+      env: cliEnv(),
     })
     const installed = readInstalled(pluginsDir())
     return parsePluginList(stdout).map((p) => ({ ...p, commit: installed[p.id]?.sha ?? null }))
@@ -347,6 +357,7 @@ export async function setEnabled(id: string, enabled: boolean): Promise<void> {
       ['plugin', enabled ? 'enable' : 'disable', id, '--scope', 'user'],
       {
         timeout: 30_000,
+        env: cliEnv(),
       },
     )
   } catch (err) {
@@ -360,6 +371,7 @@ export async function checkUpdates(): Promise<UpdateInfo[]> {
   try {
     await execFileAsync(claudeExecutable(), ['plugin', 'marketplace', 'update'], {
       timeout: 120_000,
+      env: cliEnv(),
     })
   } catch (err) {
     const e = err as NodeJS.ErrnoException
@@ -386,6 +398,7 @@ export async function updatePlugin(id: string): Promise<UpdateResult> {
       {
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
+        env: cliEnv(),
       },
     )
     return { id, ok: true, message: stdout.trim() || 'updated' }
@@ -418,6 +431,7 @@ export async function installPlugin(id: string): Promise<OpResult> {
       {
         timeout: 120_000,
         maxBuffer: 10 * 1024 * 1024,
+        env: cliEnv(),
       },
     )
     return { ok: true, message: stdout.trim() || `installed ${id}` }
@@ -431,7 +445,7 @@ export async function uninstallPlugin(id: string): Promise<OpResult> {
     const { stdout } = await execFileAsync(
       claudeExecutable(),
       ['plugin', 'uninstall', id, '--scope', 'user', '--yes'],
-      { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 },
+      { timeout: 60_000, maxBuffer: 10 * 1024 * 1024, env: cliEnv() },
     )
     return { ok: true, message: stdout.trim() || `uninstalled ${id}` }
   } catch (err) {
@@ -444,7 +458,7 @@ export async function addMarketplace(source: string): Promise<OpResult> {
     const { stdout } = await execFileAsync(
       claudeExecutable(),
       ['plugin', 'marketplace', 'add', source, '--scope', 'user'],
-      { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 },
+      { timeout: 120_000, maxBuffer: 10 * 1024 * 1024, env: cliEnv() },
     )
     return { ok: true, message: stdout.trim() || `added ${source}` }
   } catch (err) {
@@ -460,6 +474,7 @@ export async function pluginDetails(id: string): Promise<PluginDetails> {
     const { stdout } = await execFileAsync(claudeExecutable(), ['plugin', 'details', id], {
       timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
+      env: cliEnv(),
     })
     return { id, ok: true, output: stdout.trim() || 'no details reported' }
   } catch (err) {
@@ -474,6 +489,7 @@ export async function mcpHealth(): Promise<McpHealth[]> {
     const { stdout } = await execFileAsync(claudeExecutable(), ['mcp', 'list'], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
+      env: cliEnv(),
     })
     return parseMcpHealth(stdout)
   } catch (err) {

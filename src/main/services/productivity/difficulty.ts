@@ -1,6 +1,8 @@
 import { homedir } from 'node:os'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { claudeSdkExecutableOption } from '@main/paths'
+// Private-subscription env (CLAUDE_CONFIG_DIR=~/.claude-private + stripped API keys).
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 
 const RUBRIC = `You rate the intrinsic difficulty of a software task from the FIRST user request only.
 Rate 1–10 based on what was ASKED, not how it was done.
@@ -10,18 +12,6 @@ Reply with ONLY the integer.`
 
 // Hard ceiling so a stuck request never blocks the productivity pipeline.
 const TIMEOUT_MS = 30_000
-
-// Subscription-only: strip any metered API key so the bundled Claude Code falls
-// back to the user's Pro/Max OAuth login (~/.claude). Mirrors claude.ts.
-function subscriptionEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) env[key] = value
-  }
-  delete env.ANTHROPIC_API_KEY
-  delete env.ANTHROPIC_AUTH_TOKEN
-  return env
-}
 
 // Pull the integer 1–10 out of arbitrary assistant text.
 function parseRating(text: string): number | null {

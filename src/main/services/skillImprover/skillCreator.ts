@@ -1,8 +1,9 @@
 import { access, readdir } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { claudeConfigDir } from '@main/paths'
 
-const PLUGINS_ROOT = join(homedir(), '.claude', 'plugins')
+// Plugins of the PRIVATE subscription (~/.claude-private/plugins), not ~/.claude.
+const PLUGINS_ROOT = join(claudeConfigDir(), 'plugins')
 
 async function exists(p: string): Promise<boolean> {
   try {

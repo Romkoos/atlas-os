@@ -1,6 +1,8 @@
 import { homedir } from 'node:os'
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { claudeSdkExecutableOption } from '@main/paths'
+// Private-subscription env (CLAUDE_CONFIG_DIR=~/.claude-private + stripped API keys).
+import { subscriptionEnv } from '@main/services/llm/subscriptionEnv'
 
 export interface ClaudeResult {
   text: string
@@ -16,18 +18,6 @@ export interface RunClaudeOptions {
   prompt: string
   model: string
   onToken: (text: string) => void
-}
-
-// Subscription-only: strip any metered API key from the spawned CLI's env so the
-// bundled Claude Code falls back to the user's Pro/Max OAuth login (~/.claude).
-function subscriptionEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) env[key] = value
-  }
-  delete env.ANTHROPIC_API_KEY
-  delete env.ANTHROPIC_AUTH_TOKEN
-  return env
 }
 
 export function runClaude(opts: RunClaudeOptions): ClaudeRun {

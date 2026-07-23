@@ -1,5 +1,23 @@
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
+
+// HARD RULE: Atlas OS operates EXCLUSIVELY under the user's PRIVATE Claude
+// subscription, whose config + OAuth login live in ~/.claude-private — never
+// ~/.claude, which is the (work) subscription bound to the bare `claude`
+// command. The `claude-private` shell alias achieves this with
+// `CLAUDE_CONFIG_DIR=~/.claude-private claude`; we replicate it here so every
+// SDK/CLI process the app spawns authenticates as the private subscription and
+// reads/writes the private config (projects, plugins, skills, settings, MCP).
+// This name is the single source of truth — change it here, nowhere else.
+export const CLAUDE_CONFIG_DIR_NAME = '.claude-private'
+
+// Absolute path to the private Claude config directory. Passed as
+// CLAUDE_CONFIG_DIR to every spawned `claude`/SDK process (see subscriptionEnv)
+// and used as the root for all config the app reads directly.
+export function claudeConfigDir(): string {
+  return join(homedir(), CLAUDE_CONFIG_DIR_NAME)
+}
 
 export interface AppPaths {
   userData: string
@@ -7,10 +25,11 @@ export interface AppPaths {
   defaultOutputDir: string
   migrations: string
   // Productivity tracker raw sources (see docs/agent-productivity-tracker.md).
-  claudeProjectsDir: string // ~/.claude/projects — Claude Code transcripts
+  // All scoped to the private config dir (CLAUDE_CONFIG_DIR_NAME), not ~/.claude.
+  claudeProjectsDir: string // ~/.claude-private/projects — Claude Code transcripts
   analyticsBufferDir: string // ~/agent-analytics — hook JSONL buffer
-  claudeDir: string // ~/.claude — infra watcher root (settings.json, skills/)
-  claudeJson: string // ~/.claude.json — MCP server config
+  claudeDir: string // ~/.claude-private — infra watcher root (settings.json, skills/)
+  claudeJson: string // ~/.claude-private/.claude.json — MCP server config
   infraSnapshot: string // userData/infra-snapshot.json — last seen infra state
   usageSnapshot: string // userData/usage-snapshot.json — last known subscription usage
 }
@@ -60,6 +79,7 @@ export function claudeSdkExecutableOption(): { pathToClaudeCodeExecutable?: stri
 export function appPaths(): AppPaths {
   const userData = app.getPath('userData')
   const home = app.getPath('home')
+  const configDir = claudeConfigDir()
   return {
     userData,
     db: join(userData, 'atlas.db'),
@@ -68,10 +88,13 @@ export function appPaths(): AppPaths {
     migrations: app.isPackaged
       ? join(process.resourcesPath, 'drizzle')
       : join(app.getAppPath(), 'drizzle'),
-    claudeProjectsDir: join(home, '.claude', 'projects'),
+    // Private-subscription config dir, not ~/.claude — see CLAUDE_CONFIG_DIR_NAME.
+    // With CLAUDE_CONFIG_DIR set, the CLI keeps its .claude.json INSIDE the config
+    // dir, so the MCP config is ~/.claude-private/.claude.json (not ~/.claude.json).
+    claudeProjectsDir: join(configDir, 'projects'),
     analyticsBufferDir: join(home, 'agent-analytics'),
-    claudeDir: join(home, '.claude'),
-    claudeJson: join(home, '.claude.json'),
+    claudeDir: configDir,
+    claudeJson: join(configDir, '.claude.json'),
     infraSnapshot: join(userData, 'infra-snapshot.json'),
     usageSnapshot: join(userData, 'usage-snapshot.json'),
   }
